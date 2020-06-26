@@ -26,5 +26,4 @@ package org.apache.flink.runtime.controlplane.dispatcher;
  */
 public abstract class StreamManagerDispatcher {
 	public static final String DISPATCHER_NAME = "streammanagerdispatcher";
-
 }

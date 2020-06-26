@@ -18,5 +18,8 @@
 
 package org.apache.flink.runtime.controlplane.streammaster;
 
+/**
+ * Gateway for StreamMaster Component.
+ */
 public interface StreamMasterGateway {
 }

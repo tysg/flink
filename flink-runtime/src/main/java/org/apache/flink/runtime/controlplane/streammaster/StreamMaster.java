@@ -18,5 +18,8 @@
 
 package org.apache.flink.runtime.controlplane.streammaster;
 
+/**
+ * StreamMaster implementation.
+ */
 public class StreamMaster {
 }

@@ -20,6 +20,9 @@ package org.apache.flink.runtime.controlplane.dispatcher;
 
 import org.apache.flink.runtime.dispatcher.DispatcherGateway;
 
+/**
+ * Gateway for the StreamManagerDispatcher component.
+ */
 public interface StreamManagerDispatcherGateway extends DispatcherGateway{
 
 }

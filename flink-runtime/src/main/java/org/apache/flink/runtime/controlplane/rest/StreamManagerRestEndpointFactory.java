@@ -41,10 +41,10 @@ public enum StreamManagerRestEndpointFactory implements RestEndpointFactory<Stre
 
     @Override
     public WebMonitorEndpoint<StreamManagerDispatcherGateway> createRestEndpoint(Configuration configuration,
-            LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever,
-            LeaderGatewayRetriever<ResourceManagerGateway> resourceManagerGatewayRetriever,
-            TransientBlobService transientBlobService, ScheduledExecutorService executor, MetricFetcher metricFetcher,
-            LeaderElectionService leaderElectionService, FatalErrorHandler fatalErrorHandler) throws Exception {
+																				 LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever,
+																				 LeaderGatewayRetriever<ResourceManagerGateway> resourceManagerGatewayRetriever,
+																				 TransientBlobService transientBlobService, ScheduledExecutorService executor, MetricFetcher metricFetcher,
+																				 LeaderElectionService leaderElectionService, FatalErrorHandler fatalErrorHandler) throws Exception {
         // TODO Auto-generated method stub
         return null;
     }
