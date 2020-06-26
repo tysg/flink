@@ -51,3 +51,4 @@ tools/flink
 tools/flink-*
 tools/releasing/release
 tools/japicmp-output
+flink-connectors/flink-connector-hive/.factorypath
