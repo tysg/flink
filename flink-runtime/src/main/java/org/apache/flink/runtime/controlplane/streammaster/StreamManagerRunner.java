@@ -19,8 +19,6 @@
 package org.apache.flink.runtime.controlplane.streammaster;
 
 import org.apache.flink.api.common.JobID;
-//import org.apache.flink.runtime.jobmaster.JobMaster;
-//import org.apache.flink.runtime.jobmaster.JobMasterGateway;
 import org.apache.flink.util.AutoCloseableAsync;
 
 import java.util.concurrent.CompletableFuture;
