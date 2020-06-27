@@ -20,6 +20,7 @@ package org.apache.flink.runtime.entrypoint.component;
 
 import org.apache.flink.runtime.clusterframework.ApplicationStatus;
 import org.apache.flink.runtime.concurrent.FutureUtils;
+import org.apache.flink.runtime.controlplane.webmonitor.StreamManagerWebMonitorEndpoint;
 import org.apache.flink.runtime.dispatcher.Dispatcher;
 import org.apache.flink.runtime.dispatcher.runner.DispatcherRunner;
 import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalService;
@@ -63,6 +64,9 @@ public class DispatcherResourceManagerComponent implements AutoCloseableAsync {
 	@Nonnull
 	private final WebMonitorEndpoint<?> webMonitorEndpoint;
 
+	@Nonnull
+	private final StreamManagerWebMonitorEndpoint<?> smWebMonitorEndpoint;
+
 	private final CompletableFuture<Void> terminationFuture;
 
 	private final CompletableFuture<ApplicationStatus> shutDownFuture;
@@ -70,16 +74,18 @@ public class DispatcherResourceManagerComponent implements AutoCloseableAsync {
 	private final AtomicBoolean isRunning = new AtomicBoolean(true);
 
 	DispatcherResourceManagerComponent(
-			@Nonnull DispatcherRunner dispatcherRunner,
-			@Nonnull ResourceManager<?> resourceManager,
-			@Nonnull LeaderRetrievalService dispatcherLeaderRetrievalService,
-			@Nonnull LeaderRetrievalService resourceManagerRetrievalService,
-			@Nonnull WebMonitorEndpoint<?> webMonitorEndpoint) {
+		@Nonnull DispatcherRunner dispatcherRunner,
+		@Nonnull ResourceManager<?> resourceManager,
+		@Nonnull LeaderRetrievalService dispatcherLeaderRetrievalService,
+		@Nonnull LeaderRetrievalService resourceManagerRetrievalService,
+		@Nonnull WebMonitorEndpoint<?> webMonitorEndpoint,
+		@Nonnull StreamManagerWebMonitorEndpoint<?> smWebMonitorEndpoint) {
 		this.dispatcherRunner = dispatcherRunner;
 		this.resourceManager = resourceManager;
 		this.dispatcherLeaderRetrievalService = dispatcherLeaderRetrievalService;
 		this.resourceManagerRetrievalService = resourceManagerRetrievalService;
 		this.webMonitorEndpoint = webMonitorEndpoint;
+		this.smWebMonitorEndpoint = smWebMonitorEndpoint;
 		this.terminationFuture = new CompletableFuture<>();
 		this.shutDownFuture = new CompletableFuture<>();
 
@@ -103,22 +109,25 @@ public class DispatcherResourceManagerComponent implements AutoCloseableAsync {
 	 * @return Future which is completed once the shut down
 	 */
 	public CompletableFuture<Void> deregisterApplicationAndClose(
-			final ApplicationStatus applicationStatus,
-			final @Nullable String diagnostics) {
+		final ApplicationStatus applicationStatus,
+		final @Nullable String diagnostics) {
 
 		if (isRunning.compareAndSet(true, false)) {
 			final CompletableFuture<Void> closeWebMonitorAndDeregisterAppFuture =
 				FutureUtils.composeAfterwards(webMonitorEndpoint.closeAsync(), () -> deregisterApplication(applicationStatus, diagnostics));
 
-			return FutureUtils.composeAfterwards(closeWebMonitorAndDeregisterAppFuture, this::closeAsyncInternal);
+			final CompletableFuture<Void> closeSMWebMonitorAndDeregisterAppFuture =
+				FutureUtils.composeAfterwards(closeWebMonitorAndDeregisterAppFuture, smWebMonitorEndpoint::closeAsync);
+
+			return FutureUtils.composeAfterwards(closeSMWebMonitorAndDeregisterAppFuture, this::closeAsyncInternal);
 		} else {
 			return terminationFuture;
 		}
 	}
 
 	private CompletableFuture<Void> deregisterApplication(
-			final ApplicationStatus applicationStatus,
-			final @Nullable String diagnostics) {
+		final ApplicationStatus applicationStatus,
+		final @Nullable String diagnostics) {
 
 		final ResourceManagerGateway selfGateway = resourceManager.getSelfGateway(ResourceManagerGateway.class);
 		return selfGateway.deregisterApplication(applicationStatus, diagnostics).thenApply(ack -> null);

@@ -21,24 +21,20 @@ package org.apache.flink.runtime.controlplane.dispatcher;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.runtime.blob.TransientBlobService;
+import org.apache.flink.runtime.controlplane.webmonitor.StreamManagerWebMonitorEndpoint;
+import org.apache.flink.runtime.dispatcher.Dispatcher;
+import org.apache.flink.runtime.dispatcher.DispatcherGateway;
 import org.apache.flink.runtime.leaderelection.LeaderElectionService;
-import org.apache.flink.runtime.resourcemanager.ResourceManagerGateway;
 import org.apache.flink.runtime.rest.RestServerEndpointConfiguration;
 import org.apache.flink.runtime.rest.handler.RestHandlerConfiguration;
 import org.apache.flink.runtime.rest.handler.RestHandlerSpecification;
 import org.apache.flink.runtime.rest.handler.job.JobSubmitHandler;
 import org.apache.flink.runtime.rest.handler.legacy.ExecutionGraphCache;
-import org.apache.flink.runtime.rest.handler.legacy.metrics.MetricFetcher;
 import org.apache.flink.runtime.rpc.FatalErrorHandler;
-import org.apache.flink.runtime.webmonitor.WebMonitorEndpoint;
 import org.apache.flink.runtime.webmonitor.WebMonitorExtension;
-import org.apache.flink.runtime.webmonitor.WebMonitorUtils;
 import org.apache.flink.runtime.webmonitor.retriever.GatewayRetriever;
-
 import org.apache.flink.shaded.netty4.io.netty.channel.ChannelInboundHandler;
 import org.apache.flink.util.ExceptionUtils;
-import org.apache.flink.util.FlinkException;
 
 import java.io.IOException;
 import java.util.List;
@@ -46,34 +42,28 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledExecutorService;
 
 /**
- * REST endpoint for the {@link StreamManagerDispatcher} component.
+ * REST endpoint for the {@link Dispatcher} component.
  */
-public class StreamManagerDispatcherRestEndpoint extends WebMonitorEndpoint<StreamManagerDispatcherGateway> {
+public class StreamManagerDispatcherRestEndpoint extends StreamManagerWebMonitorEndpoint<DispatcherGateway> {
 
 	private WebMonitorExtension webSubmissionExtension;
 
 	public StreamManagerDispatcherRestEndpoint(
-			RestServerEndpointConfiguration endpointConfiguration,
-			GatewayRetriever<StreamManagerDispatcherGateway> leaderRetriever,
-			Configuration clusterConfiguration,
-			RestHandlerConfiguration restConfiguration,
-			GatewayRetriever<ResourceManagerGateway> resourceManagerRetriever,
-			TransientBlobService transientBlobService,
-			ScheduledExecutorService executor,
-			MetricFetcher metricFetcher,
-			LeaderElectionService leaderElectionService,
-			ExecutionGraphCache executionGraphCache,
-			FatalErrorHandler fatalErrorHandler) throws IOException {
+		RestServerEndpointConfiguration endpointConfiguration,
+		GatewayRetriever<DispatcherGateway> leaderRetriever,
+		Configuration clusterConfiguration,
+		RestHandlerConfiguration restConfiguration,
+		ScheduledExecutorService executor,
+		LeaderElectionService leaderElectionService,
+		ExecutionGraphCache executionGraphCache,
+		FatalErrorHandler fatalErrorHandler) throws IOException {
 
 		super(
 			endpointConfiguration,
 			leaderRetriever,
 			clusterConfiguration,
 			restConfiguration,
-			resourceManagerRetriever,
-			transientBlobService,
 			executor,
-			metricFetcher,
 			leaderElectionService,
 			executionGraphCache,
 			fatalErrorHandler);
@@ -96,30 +86,31 @@ public class StreamManagerDispatcherRestEndpoint extends WebMonitorEndpoint<Stre
 			executor,
 			clusterConfiguration);
 
-		if (restConfiguration.isWebSubmitEnabled()) {
-			try {
-				webSubmissionExtension = WebMonitorUtils.loadWebSubmissionExtension(
-					leaderRetriever,
-					timeout,
-					responseHeaders,
-					localAddressFuture,
-					uploadDir,
-					executor,
-					clusterConfiguration);
-
-				// register extension handlers
-				handlers.addAll(webSubmissionExtension.getHandlers());
-			} catch (FlinkException e) {
-				if (log.isDebugEnabled()) {
-					log.debug("Failed to load web based job submission extension.", e);
-				} else {
-					log.info("Failed to load web based job submission extension. " +
-						"Probable reason: flink-runtime-web is not in the classpath.");
-				}
-			}
-		} else {
-			log.info("Web-based job submission is not enabled.");
-		}
+		// TODO: do not enable web submit currently.
+//		if (restConfiguration.isWebSubmitEnabled()) {
+//			try {
+//				webSubmissionExtension = WebMonitorUtils.loadWebSubmissionExtension(
+//					leaderRetriever,
+//					timeout,
+//					responseHeaders,
+//					localAddressFuture,
+//					uploadDir,
+//					executor,
+//					clusterConfiguration);
+//
+//				// register extension handlers
+//				handlers.addAll(webSubmissionExtension.getHandlers());
+//			} catch (FlinkException e) {
+//				if (log.isDebugEnabled()) {
+//					log.debug("Failed to load web based job submission extension.", e);
+//				} else {
+//					log.info("Failed to load web based job submission extension. " +
+//						"Probable reason: flink-runtime-web is not in the classpath.");
+//				}
+//			}
+//		} else {
+//			log.info("Web-based job submission is not enabled.");
+//		}
 
 		handlers.add(Tuple2.of(jobSubmitHandler.getMessageHeaders(), jobSubmitHandler));
 
