@@ -25,6 +25,10 @@ import org.apache.flink.configuration.RestOptions;
 import org.apache.flink.runtime.blob.BlobServer;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
+import org.apache.flink.runtime.controlplane.rest.JobStreamManagerRestEndpointFactory;
+import org.apache.flink.runtime.controlplane.rest.SessionStreamManagerRestEndpointFactory;
+import org.apache.flink.runtime.controlplane.rest.StreamManagerRestEndpointFactory;
+import org.apache.flink.runtime.controlplane.webmonitor.StreamManagerWebMonitorEndpoint;
 import org.apache.flink.runtime.dispatcher.ArchivedExecutionGraphStore;
 import org.apache.flink.runtime.dispatcher.DispatcherGateway;
 import org.apache.flink.runtime.dispatcher.DispatcherId;
@@ -89,31 +93,37 @@ public class DefaultDispatcherResourceManagerComponentFactory implements Dispatc
 	@Nonnull
 	private final RestEndpointFactory<?> restEndpointFactory;
 
+	//	@Nonnull
+	private final StreamManagerRestEndpointFactory<?> smRestEndpointFactory;
+
 	DefaultDispatcherResourceManagerComponentFactory(
-			@Nonnull DispatcherRunnerFactory dispatcherRunnerFactory,
-			@Nonnull ResourceManagerFactory<?> resourceManagerFactory,
-			@Nonnull RestEndpointFactory<?> restEndpointFactory) {
+		@Nonnull DispatcherRunnerFactory dispatcherRunnerFactory,
+		@Nonnull ResourceManagerFactory<?> resourceManagerFactory,
+		@Nonnull RestEndpointFactory<?> restEndpointFactory,
+		@Nonnull StreamManagerRestEndpointFactory<?> smRestEndpointFactory) {
 		this.dispatcherRunnerFactory = dispatcherRunnerFactory;
 		this.resourceManagerFactory = resourceManagerFactory;
 		this.restEndpointFactory = restEndpointFactory;
+		this.smRestEndpointFactory = smRestEndpointFactory;
 	}
 
 	@Override
 	public DispatcherResourceManagerComponent create(
-			Configuration configuration,
-			Executor ioExecutor,
-			RpcService rpcService,
-			HighAvailabilityServices highAvailabilityServices,
-			BlobServer blobServer,
-			HeartbeatServices heartbeatServices,
-			MetricRegistry metricRegistry,
-			ArchivedExecutionGraphStore archivedExecutionGraphStore,
-			MetricQueryServiceRetriever metricQueryServiceRetriever,
-			FatalErrorHandler fatalErrorHandler) throws Exception {
+		Configuration configuration,
+		Executor ioExecutor,
+		RpcService rpcService,
+		HighAvailabilityServices highAvailabilityServices,
+		BlobServer blobServer,
+		HeartbeatServices heartbeatServices,
+		MetricRegistry metricRegistry,
+		ArchivedExecutionGraphStore archivedExecutionGraphStore,
+		MetricQueryServiceRetriever metricQueryServiceRetriever,
+		FatalErrorHandler fatalErrorHandler) throws Exception {
 
 		LeaderRetrievalService dispatcherLeaderRetrievalService = null;
 		LeaderRetrievalService resourceManagerRetrievalService = null;
 		WebMonitorEndpoint<?> webMonitorEndpoint = null;
+		StreamManagerWebMonitorEndpoint<?> smWebMonitorEndpoint = null;
 		ResourceManager<?> resourceManager = null;
 		ResourceManagerMetricGroup resourceManagerMetricGroup = null;
 		DispatcherRunner dispatcherRunner = null;
@@ -146,10 +156,10 @@ public class DefaultDispatcherResourceManagerComponentFactory implements Dispatc
 			final MetricFetcher metricFetcher = updateInterval == 0
 				? VoidMetricFetcher.INSTANCE
 				: MetricFetcherImpl.fromConfiguration(
-					configuration,
-					metricQueryServiceRetriever,
-					dispatcherGatewayRetriever,
-					executor);
+				configuration,
+				metricQueryServiceRetriever,
+				dispatcherGatewayRetriever,
+				executor);
 
 			webMonitorEndpoint = restEndpointFactory.createRestEndpoint(
 				configuration,
@@ -163,6 +173,18 @@ public class DefaultDispatcherResourceManagerComponentFactory implements Dispatc
 
 			log.debug("Starting Dispatcher REST endpoint.");
 			webMonitorEndpoint.start();
+
+			smWebMonitorEndpoint = smRestEndpointFactory.createRestEndpoint(
+				configuration,
+				dispatcherGatewayRetriever,
+				blobServer,
+				executor,
+				metricFetcher,
+				highAvailabilityServices.getClusterRestEndpointLeaderElectionService(),
+				fatalErrorHandler);
+
+			log.debug("Starting StreamManagerDispatcher REST endpoint.");
+			smWebMonitorEndpoint.start();
 
 			final String hostname = RpcUtils.getHostname(rpcService);
 
@@ -212,7 +234,8 @@ public class DefaultDispatcherResourceManagerComponentFactory implements Dispatc
 				resourceManager,
 				dispatcherLeaderRetrievalService,
 				resourceManagerRetrievalService,
-				webMonitorEndpoint);
+				webMonitorEndpoint,
+				smWebMonitorEndpoint);
 
 		} catch (Exception exception) {
 			// clean up all started components
@@ -263,19 +286,21 @@ public class DefaultDispatcherResourceManagerComponentFactory implements Dispatc
 	}
 
 	public static DefaultDispatcherResourceManagerComponentFactory createSessionComponentFactory(
-			ResourceManagerFactory<?> resourceManagerFactory) {
+		ResourceManagerFactory<?> resourceManagerFactory) {
 		return new DefaultDispatcherResourceManagerComponentFactory(
 			DefaultDispatcherRunnerFactory.createSessionRunner(SessionDispatcherFactory.INSTANCE),
 			resourceManagerFactory,
-			SessionRestEndpointFactory.INSTANCE);
+			SessionRestEndpointFactory.INSTANCE,
+			SessionStreamManagerRestEndpointFactory.INSTANCE);
 	}
 
 	public static DefaultDispatcherResourceManagerComponentFactory createJobComponentFactory(
-			ResourceManagerFactory<?> resourceManagerFactory,
-			JobGraphRetriever jobGraphRetriever) {
+		ResourceManagerFactory<?> resourceManagerFactory,
+		JobGraphRetriever jobGraphRetriever) {
 		return new DefaultDispatcherResourceManagerComponentFactory(
 			DefaultDispatcherRunnerFactory.createJobRunner(jobGraphRetriever),
 			resourceManagerFactory,
-			JobRestEndpointFactory.INSTANCE);
+			JobRestEndpointFactory.INSTANCE,
+			JobStreamManagerRestEndpointFactory.INSTANCE);
 	}
 }

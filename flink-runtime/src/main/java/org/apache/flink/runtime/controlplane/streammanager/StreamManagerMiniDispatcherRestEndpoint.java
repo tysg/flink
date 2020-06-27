@@ -16,45 +16,45 @@
  * limitations under the License.
  */
 
-package org.apache.flink.runtime.controlplane.rest;
+package org.apache.flink.runtime.controlplane.streammanager;
 
-import org.apache.flink.api.common.time.Time;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.runtime.blob.TransientBlobService;
-import org.apache.flink.runtime.controlplane.webmonitor.StreamManagerRestfulGateway;
 import org.apache.flink.runtime.controlplane.webmonitor.StreamManagerWebMonitorEndpoint;
 import org.apache.flink.runtime.dispatcher.DispatcherGateway;
+import org.apache.flink.runtime.entrypoint.JobClusterEntrypoint;
 import org.apache.flink.runtime.leaderelection.LeaderElectionService;
+import org.apache.flink.runtime.rest.RestServerEndpointConfiguration;
 import org.apache.flink.runtime.rest.handler.RestHandlerConfiguration;
-import org.apache.flink.runtime.rest.handler.legacy.DefaultExecutionGraphCache;
 import org.apache.flink.runtime.rest.handler.legacy.ExecutionGraphCache;
-import org.apache.flink.runtime.rest.handler.legacy.metrics.MetricFetcher;
 import org.apache.flink.runtime.rpc.FatalErrorHandler;
 import org.apache.flink.runtime.webmonitor.RestfulGateway;
-import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
+import org.apache.flink.runtime.webmonitor.retriever.GatewayRetriever;
 
+import java.io.IOException;
 import java.util.concurrent.ScheduledExecutorService;
 
 /**
- * {@link StreamManagerWebMonitorEndpoint} factory.
- *
- * @param <T> type of the {@link StreamManagerRestfulGateway}
+ * REST endpoint for the {@link JobClusterEntrypoint}.
  */
-public interface StreamManagerRestEndpointFactory<T extends RestfulGateway> {
+public class StreamManagerMiniDispatcherRestEndpoint extends StreamManagerWebMonitorEndpoint<RestfulGateway> {
 
-	StreamManagerWebMonitorEndpoint<T> createRestEndpoint(
-		Configuration configuration,
-		// TODO: change it to StreamManagerDispatcherGateway
-		LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever,
-		TransientBlobService transientBlobService,
-		ScheduledExecutorService executor,
-		MetricFetcher metricFetcher,
-		LeaderElectionService leaderElectionService,
-		FatalErrorHandler fatalErrorHandler) throws Exception;
-
-	static ExecutionGraphCache createExecutionGraphCache(RestHandlerConfiguration restConfiguration) {
-		return new DefaultExecutionGraphCache(
-			restConfiguration.getTimeout(),
-			Time.milliseconds(restConfiguration.getRefreshInterval()));
+	public StreamManagerMiniDispatcherRestEndpoint(
+			RestServerEndpointConfiguration endpointConfiguration,
+			GatewayRetriever<? extends DispatcherGateway> leaderRetriever,
+			Configuration clusterConfiguration,
+			RestHandlerConfiguration restConfiguration,
+			ScheduledExecutorService executor,
+			LeaderElectionService leaderElectionService,
+			ExecutionGraphCache executionGraphCache,
+			FatalErrorHandler fatalErrorHandler) throws IOException {
+		super(
+			endpointConfiguration,
+			leaderRetriever,
+			clusterConfiguration,
+			restConfiguration,
+			executor,
+			leaderElectionService,
+			executionGraphCache,
+			fatalErrorHandler);
 	}
 }
