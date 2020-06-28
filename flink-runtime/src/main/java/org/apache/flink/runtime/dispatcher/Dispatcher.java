@@ -102,7 +102,7 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
 
 	public static final String DISPATCHER_NAME = "dispatcher";
 
-	public static final boolean TEST_FLAG = true; // TODO: set to true to run the Stream Manager Only.
+	public static final boolean TEST_FLAG = false; // TODO: set to true to run the Stream Manager Only.
 
 	private final Configuration configuration;
 
