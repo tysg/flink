@@ -16,10 +16,18 @@
  * limitations under the License.
  */
 
-package org.apache.flink.runtime.controlplane.streammaster;
+package org.apache.flink.runtime.controlplane.streammanager.factories;
+
+import org.apache.flink.runtime.controlplane.streammanager.StreamManagerService;
+import org.apache.flink.runtime.jobgraph.JobGraph;
+import org.apache.flink.runtime.jobmanager.OnCompletionActions;
+import org.apache.flink.runtime.jobmaster.JobMasterService;
 
 /**
- * Gateway for StreamMaster Component.
+ * Factory for a {@link StreamManagerService}.
  */
-public interface StreamMasterGateway {
+public interface StreamManagerServiceFactory {
+
+	StreamManagerService createStreamManagerService(
+            JobGraph jobGraph) throws Exception;
 }

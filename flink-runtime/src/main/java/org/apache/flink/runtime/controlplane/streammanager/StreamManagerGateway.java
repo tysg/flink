@@ -16,10 +16,24 @@
  * limitations under the License.
  */
 
-package org.apache.flink.runtime.controlplane.streammaster;
+package org.apache.flink.runtime.controlplane.streammanager;
+
+import org.apache.flink.runtime.jobmaster.JobMasterId;
+import org.apache.flink.runtime.rpc.FencedRpcGateway;
 
 /**
- * StreamMaster implementation.
+ * {@link StreamManager} rpc gateway interface
  */
-public class StreamMaster {
+public interface StreamManagerGateway extends FencedRpcGateway<StreamManagerId> {
+
+    /*
+     * Disconnects the job manager from the stream manager because of the given cause.
+     *
+     * @param jobMasterId identifying the job manager leader id
+     * @param cause of the disconnect
+     */
+    void disconnectJobMaster(
+            final JobMasterId jobMasterId,
+            final Exception cause);
+
 }
