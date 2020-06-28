@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,13 +16,16 @@
  * limitations under the License.
  */
 
-package org.apache.flink.runtime.controlplane.dispatcher;
+package org.apache.flink.runtime.controlplane.dispatcher.runner;
 
-import org.apache.flink.runtime.dispatcher.DispatcherGateway;
+import org.apache.flink.runtime.controlplane.dispatcher.runner.DispatcherLeaderProcess;
+
+import java.util.UUID;
 
 /**
- * Gateway for the StreamManagerDispatcher component.
+ * Factory for the {@link DispatcherLeaderProcess}.
  */
-public interface StreamManagerDispatcherGateway extends DispatcherGateway{
+public interface DispatcherLeaderProcessFactory {
 
+	DispatcherLeaderProcess create(UUID leaderSessionID);
 }

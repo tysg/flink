@@ -20,6 +20,8 @@ package org.apache.flink.runtime.entrypoint.component;
 
 import org.apache.flink.runtime.clusterframework.ApplicationStatus;
 import org.apache.flink.runtime.concurrent.FutureUtils;
+import org.apache.flink.runtime.controlplane.dispatcher.StreamManagerDispatcher;
+import org.apache.flink.runtime.controlplane.dispatcher.runner.StreamManagerDispatcherRunner;
 import org.apache.flink.runtime.controlplane.webmonitor.StreamManagerWebMonitorEndpoint;
 import org.apache.flink.runtime.dispatcher.Dispatcher;
 import org.apache.flink.runtime.dispatcher.runner.DispatcherRunner;
@@ -53,6 +55,9 @@ public class DispatcherResourceManagerComponent implements AutoCloseableAsync {
 	private final DispatcherRunner dispatcherRunner;
 
 	@Nonnull
+	private final StreamManagerDispatcherRunner smDispatcherRunner;
+
+	@Nonnull
 	private final ResourceManager<?> resourceManager;
 
 	@Nonnull
@@ -75,12 +80,14 @@ public class DispatcherResourceManagerComponent implements AutoCloseableAsync {
 
 	DispatcherResourceManagerComponent(
 		@Nonnull DispatcherRunner dispatcherRunner,
+		@Nonnull StreamManagerDispatcherRunner smDispatcherRunner,
 		@Nonnull ResourceManager<?> resourceManager,
 		@Nonnull LeaderRetrievalService dispatcherLeaderRetrievalService,
 		@Nonnull LeaderRetrievalService resourceManagerRetrievalService,
 		@Nonnull WebMonitorEndpoint<?> webMonitorEndpoint,
 		@Nonnull StreamManagerWebMonitorEndpoint<?> smWebMonitorEndpoint) {
 		this.dispatcherRunner = dispatcherRunner;
+		this.smDispatcherRunner = smDispatcherRunner;
 		this.resourceManager = resourceManager;
 		this.dispatcherLeaderRetrievalService = dispatcherLeaderRetrievalService;
 		this.resourceManagerRetrievalService = resourceManagerRetrievalService;
@@ -94,6 +101,7 @@ public class DispatcherResourceManagerComponent implements AutoCloseableAsync {
 
 	private void registerShutDownFuture() {
 		FutureUtils.forward(dispatcherRunner.getShutDownFuture(), shutDownFuture);
+		FutureUtils.forward(smDispatcherRunner.getShutDownFuture(), shutDownFuture);
 	}
 
 	public final CompletableFuture<ApplicationStatus> getShutDownFuture() {
@@ -153,6 +161,7 @@ public class DispatcherResourceManagerComponent implements AutoCloseableAsync {
 		}
 
 		terminationFutures.add(dispatcherRunner.closeAsync());
+		terminationFutures.add(smDispatcherRunner.closeAsync());
 
 		terminationFutures.add(resourceManager.closeAsync());
 
