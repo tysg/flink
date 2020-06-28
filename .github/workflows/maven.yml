@@ -20,6 +20,8 @@ jobs:
         java-version: 1.8
     - name: Build with Maven
       run: |
-        cd flink-runtime
+        cd flink-core
+        mvn clean install -Dcheckstyle.skip -DskipTests 
+        cd ../flink-runtime
         mvn clean verify -Dcheckstyle.skip -DskipTests 
         
