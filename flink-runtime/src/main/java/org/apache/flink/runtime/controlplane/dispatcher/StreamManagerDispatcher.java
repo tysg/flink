@@ -18,12 +18,65 @@
 
 package org.apache.flink.runtime.controlplane.dispatcher;
 
+import org.apache.commons.lang.NotImplementedException;
+import org.apache.flink.api.common.JobID;
+import org.apache.flink.runtime.controlplane.streammanager.StreamManagerRunner;
+import org.apache.flink.runtime.controlplane.webmonitor.StreamManagerDispatcherGateway;
+import org.apache.flink.runtime.jobgraph.JobGraph;
+import org.apache.flink.runtime.rpc.PermanentlyFencedRpcEndpoint;
+import org.apache.flink.runtime.rpc.RpcService;
+import org.apache.flink.util.function.CheckedSupplier;
+
+import java.util.concurrent.CompletableFuture;
+
 /**
  * Base class for the StreamManagerDispatcher component. The StreamManagerDispatcher
  * component is responsible for receiving job submissions, persisting them, spawning
  * StreamManagers to control the JobManagers and to recover them in case of a master
  * failure.
  */
-public abstract class StreamManagerDispatcher {
-	public static final String DISPATCHER_NAME = "streammanagerdispatcher";
+public abstract class StreamManagerDispatcher
+	extends PermanentlyFencedRpcEndpoint<StreamManagerDispatcherId>
+	implements StreamManagerDispatcherGateway {
+
+	public static final String DISPATCHER_NAME = "stream-manager-dispatcher";
+	private StreamManagerRunnerFactory streamManagerRunnerFactory;
+
+	protected StreamManagerDispatcher(RpcService rpcService,
+									  String endpointId,
+									  StreamManagerDispatcherId fencingToken,
+									  StreamManagerRunnerFactory factory) {
+		super(rpcService, endpointId, fencingToken);
+		this.streamManagerRunnerFactory = factory;
+	}
+
+
+	private void startDispatcherService() {
+
+	}
+
+	private CompletableFuture<StreamManagerRunner> startStreamManagerRunner(JobGraph jobGraph) {
+		final RpcService rpcService = getRpcService();
+
+		return CompletableFuture.supplyAsync(
+			CheckedSupplier.unchecked(() ->
+				streamManagerRunnerFactory.createStreamManagerRunner(
+					jobGraph,
+					null,
+					rpcService,
+					null,
+					null,
+					null
+				)
+			), rpcService.getExecutor());
+	}
+
+	@Override
+	public void close() throws Exception {
+
+	}
+
+	public CompletableFuture<Void> onRemovedJobGraph(JobID jobId){
+		throw new NotImplementedException("may not need to remove jobs");
+	}
 }

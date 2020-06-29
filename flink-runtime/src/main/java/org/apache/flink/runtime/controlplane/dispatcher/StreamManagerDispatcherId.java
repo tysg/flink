@@ -18,6 +18,7 @@
 
 package org.apache.flink.runtime.controlplane.dispatcher;
 
+import org.apache.flink.runtime.dispatcher.DispatcherId;
 import org.apache.flink.util.AbstractID;
 
 import java.util.UUID;
@@ -50,7 +51,7 @@ public class StreamManagerDispatcherId extends AbstractID {
 	/**
 	 * Creates a new DispatcherId that corresponds to the UUID.
 	 */
-	public static org.apache.flink.runtime.controlplane.dispatcher.StreamManagerDispatcherId fromUuid(UUID uuid) {
-		return new org.apache.flink.runtime.controlplane.dispatcher.StreamManagerDispatcherId(uuid);
+	public static StreamManagerDispatcherId fromUuid(UUID uuid) {
+		return new StreamManagerDispatcherId(uuid);
 	}
 }
