@@ -27,7 +27,7 @@ public enum SessionStreamManagerDispatcherFactory implements StreamManagerDispat
 	static class TempSMRunnerFactory implements StreamManagerRunnerFactory {
 
 		@Override
-		public StreamManagerRunner createJobManagerRunner(JobGraph jobGraph,
+		public StreamManagerRunner createStreamManagerRunner(JobGraph jobGraph,
 														  Configuration configuration,
 														  RpcService rpcService,
 														  HighAvailabilityServices highAvailabilityServices,
