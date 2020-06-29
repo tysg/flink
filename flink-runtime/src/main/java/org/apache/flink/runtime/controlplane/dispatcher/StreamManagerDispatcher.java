@@ -60,7 +60,7 @@ public abstract class StreamManagerDispatcher
 
 		return CompletableFuture.supplyAsync(
 			CheckedSupplier.unchecked(() ->
-				streamManagerRunnerFactory.createJobManagerRunner(
+				streamManagerRunnerFactory.createStreamManagerRunner(
 					jobGraph,
 					null,
 					rpcService,
