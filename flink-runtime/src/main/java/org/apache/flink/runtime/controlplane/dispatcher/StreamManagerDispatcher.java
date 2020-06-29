@@ -65,6 +65,7 @@ public abstract class StreamManagerDispatcher
 					null,
 					rpcService,
 					null,
+					null,
 					null
 				)
 			), rpcService.getExecutor());
