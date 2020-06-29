@@ -2,7 +2,7 @@ package org.apache.flink.runtime.controlplane.dispatcher;
 
 import org.apache.commons.lang.NotImplementedException;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.runtime.controlplane.streammaster.StreamManagerRunner;
+import org.apache.flink.runtime.controlplane.streammanager.StreamManagerRunner;
 import org.apache.flink.runtime.dispatcher.DefaultJobManagerRunnerFactory;
 import org.apache.flink.runtime.dispatcher.DispatcherServices;
 import org.apache.flink.runtime.dispatcher.StandaloneDispatcher;
