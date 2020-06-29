@@ -20,7 +20,7 @@ package org.apache.flink.runtime.controlplane.dispatcher;
 
 import org.apache.commons.lang.NotImplementedException;
 import org.apache.flink.api.common.JobID;
-import org.apache.flink.runtime.controlplane.streammaster.StreamManagerRunner;
+import org.apache.flink.runtime.controlplane.streammanager.StreamManagerRunner;
 import org.apache.flink.runtime.controlplane.webmonitor.StreamManagerDispatcherGateway;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.rpc.PermanentlyFencedRpcEndpoint;
