@@ -31,6 +31,7 @@ public enum SessionStreamManagerDispatcherFactory implements StreamManagerDispat
 														  Configuration configuration,
 														  RpcService rpcService,
 														  HighAvailabilityServices highAvailabilityServices,
+														  HeartbeatServices heartbeatServices,
 														  FatalErrorHandler fatalErrorHandler) throws Exception {
 			throw new NotImplementedException("temp solution, Runxin does not implement this currently!");
 		}
