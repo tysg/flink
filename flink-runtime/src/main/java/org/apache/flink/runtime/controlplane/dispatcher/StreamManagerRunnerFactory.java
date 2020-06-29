@@ -20,23 +20,25 @@ package org.apache.flink.runtime.controlplane.dispatcher;
 
 import org.apache.flink.configuration.Configuration;
 
-import org.apache.flink.runtime.controlplane.streammaster.StreamManagerRunner;
+import org.apache.flink.runtime.controlplane.streammanager.StreamManagerRunner;
+import org.apache.flink.runtime.heartbeat.HeartbeatServices;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.rpc.FatalErrorHandler;
 import org.apache.flink.runtime.rpc.RpcService;
 
 /**
+ * @author trx
  * Factory for a {@link StreamManagerRunner}.
  */
 @FunctionalInterface
 public interface StreamManagerRunnerFactory {
 
-	StreamManagerRunner createJobManagerRunner(
-		JobGraph jobGraph,
-		Configuration configuration,
-		RpcService rpcService,
-		HighAvailabilityServices highAvailabilityServices,
-//		HeartbeatServices heartbeatServices, // TODO: to be considered
-		FatalErrorHandler fatalErrorHandler) throws Exception;
+	StreamManagerRunner createStreamManagerRunner(
+			JobGraph jobGraph,
+			Configuration configuration,
+			RpcService rpcService,
+			HighAvailabilityServices highAvailabilityServices,
+			HeartbeatServices heartbeatServices, // TODO: to be considered
+			FatalErrorHandler fatalErrorHandler) throws Exception;
 }

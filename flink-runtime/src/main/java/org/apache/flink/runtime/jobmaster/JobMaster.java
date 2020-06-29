@@ -1015,10 +1015,6 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		slotPool.disconnectResourceManager();
 	}
 
-	//----------------------------------------------------------------------------------------------
-	// Service methods
-	//----------------------------------------------------------------------------------------------
-
 	@Override
 	public JobMasterGateway getGateway() {
 		return getSelfGateway(JobMasterGateway.class);
