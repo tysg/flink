@@ -19,7 +19,6 @@
 package org.apache.flink.runtime.controlplane.dispatcher;
 
 import org.apache.flink.configuration.Configuration;
-
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerRunner;
 import org.apache.flink.runtime.heartbeat.HeartbeatServices;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;

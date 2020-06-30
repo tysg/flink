@@ -18,7 +18,6 @@
 
 package org.apache.flink.runtime.controlplane.dispatcher;
 
-import org.apache.commons.lang.NotImplementedException;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.runtime.client.JobSubmissionException;
@@ -143,6 +142,6 @@ public abstract class StreamManagerDispatcher
 	}
 
 	public CompletableFuture<Void> onRemovedJobGraph(JobID jobId){
-		throw new NotImplementedException("may not need to remove jobs");
+		throw new ControlPlaneNotImplementedException("may not need to remove jobs");
 	}
 }

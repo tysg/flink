@@ -1,6 +1,5 @@
 package org.apache.flink.runtime.controlplane.dispatcher.runner;
 
-import org.apache.flink.runtime.controlplane.dispatcher.runner.StreamManagerDispatcherRunner;
 import org.apache.flink.runtime.dispatcher.PartialDispatcherServices;
 import org.apache.flink.runtime.jobmanager.JobGraphStoreFactory;
 import org.apache.flink.runtime.leaderelection.LeaderElectionService;
