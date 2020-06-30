@@ -20,16 +20,15 @@ package org.apache.flink.runtime.controlplane.dispatcher.runner;
 
 import org.apache.flink.runtime.clusterframework.ApplicationStatus;
 import org.apache.flink.runtime.controlplane.webmonitor.StreamManagerDispatcherGateway;
-import org.apache.flink.runtime.dispatcher.DispatcherGateway;
 
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * {@link DispatcherLeaderProcess} implementation which is stopped. This class
+ * {@link StreamManagerDispatcherLeaderProcess} implementation which is stopped. This class
  * is useful as the initial state of the {@link DefaultStreamManagerDispatcherRunner}.
  */
-public enum StoppedDispatcherLeaderProcess implements DispatcherLeaderProcess {
+public enum StoppedStreamManagerDispatcherLeaderProcess implements StreamManagerDispatcherLeaderProcess {
 	INSTANCE;
 
 	private static final CompletableFuture<Void> TERMINATION_FUTURE = CompletableFuture.completedFuture(null);

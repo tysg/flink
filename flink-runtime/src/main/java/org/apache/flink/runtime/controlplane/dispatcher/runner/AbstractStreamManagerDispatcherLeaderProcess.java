@@ -26,7 +26,6 @@ import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.controlplane.dispatcher.StreamManagerDispatcherId;
 import org.apache.flink.runtime.controlplane.webmonitor.StreamManagerDispatcherGateway;
 import org.apache.flink.runtime.controlplane.webmonitor.StreamManagerRestfulGateway;
-import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobmanager.JobGraphWriter;
 import org.apache.flink.runtime.rpc.FatalErrorHandler;
 import org.apache.flink.util.AutoCloseableAsync;
@@ -35,14 +34,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
-import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
-abstract class AbstractDispatcherLeaderProcess implements DispatcherLeaderProcess {
+abstract class AbstractStreamManagerDispatcherLeaderProcess implements StreamManagerDispatcherLeaderProcess {
 
 	protected final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -65,7 +63,7 @@ abstract class AbstractDispatcherLeaderProcess implements DispatcherLeaderProces
 	@Nullable
 	private DispatcherGatewayService dispatcherService;
 
-	AbstractDispatcherLeaderProcess(UUID leaderSessionId, FatalErrorHandler fatalErrorHandler) {
+	AbstractStreamManagerDispatcherLeaderProcess(UUID leaderSessionId, FatalErrorHandler fatalErrorHandler) {
 		this.leaderSessionId = leaderSessionId;
 		this.fatalErrorHandler = fatalErrorHandler;
 

@@ -1,26 +1,21 @@
 package org.apache.flink.runtime.controlplane.dispatcher.runner;
 
-import org.apache.flink.runtime.clusterframework.ApplicationStatus;
 import org.apache.flink.runtime.controlplane.dispatcher.StreamManagerDispatcher;
 import org.apache.flink.runtime.controlplane.dispatcher.StreamManagerDispatcherFactory;
 import org.apache.flink.runtime.controlplane.dispatcher.StreamManagerDispatcherId;
-import org.apache.flink.runtime.controlplane.webmonitor.StreamManagerDispatcherGateway;
 import org.apache.flink.runtime.dispatcher.PartialDispatcherServices;
 import org.apache.flink.runtime.jobmanager.JobGraphWriter;
 import org.apache.flink.runtime.rpc.RpcService;
-import org.apache.flink.util.AutoCloseableAsync;
 import org.apache.flink.util.FlinkRuntimeException;
 
-import java.util.concurrent.CompletableFuture;
 
-
-public class DefaultDispatcherGatewayServiceFactory implements AbstractDispatcherLeaderProcess.DispatcherGatewayServiceFactory {
+public class DefaultStreamManagerDispatcherGatewayServiceFactory implements AbstractStreamManagerDispatcherLeaderProcess.DispatcherGatewayServiceFactory {
 
 	private StreamManagerDispatcherFactory dispatcherFactory;
 	private RpcService rpcService;
 	private PartialDispatcherServices partialDispatcherServices;
 
-	DefaultDispatcherGatewayServiceFactory(
+	DefaultStreamManagerDispatcherGatewayServiceFactory(
 		StreamManagerDispatcherFactory dispatcherFactory,
 		RpcService rpcService,
 		PartialDispatcherServices partialDispatcherServices) {
@@ -32,7 +27,7 @@ public class DefaultDispatcherGatewayServiceFactory implements AbstractDispatche
 
 
 	@Override
-	public AbstractDispatcherLeaderProcess.DispatcherGatewayService create(
+	public AbstractStreamManagerDispatcherLeaderProcess.DispatcherGatewayService create(
 		StreamManagerDispatcherId fencingToken,
 		JobGraphWriter jobGraphWriter) {
 
@@ -47,7 +42,7 @@ public class DefaultDispatcherGatewayServiceFactory implements AbstractDispatche
 
 		dispatcher.start();
 
-		return DefaultDispatcherGatewayService.from(dispatcher);
+		return DefaultStreamManagerDispatcherGatewayService.from(dispatcher);
 	}
 
 

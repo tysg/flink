@@ -42,7 +42,7 @@ import java.util.concurrent.Executor;
  * Process which encapsulates the job recovery logic and life cycle management of a
  * {@link Dispatcher}.
  */
-public class SessionDispatcherLeaderProcess extends AbstractDispatcherLeaderProcess implements JobGraphStore.JobGraphListener {
+public class SessionStreamManagerDispatcherLeaderProcess extends AbstractStreamManagerDispatcherLeaderProcess implements JobGraphStore.JobGraphListener {
 
 	private final DispatcherGatewayServiceFactory dispatcherGatewayServiceFactory;
 
@@ -52,7 +52,7 @@ public class SessionDispatcherLeaderProcess extends AbstractDispatcherLeaderProc
 
 	private CompletableFuture<Void> onGoingRecoveryOperation = FutureUtils.completedVoidFuture();
 
-	private SessionDispatcherLeaderProcess(
+	private SessionStreamManagerDispatcherLeaderProcess(
 		UUID leaderSessionId,
 		DispatcherGatewayServiceFactory dispatcherGatewayServiceFactory,
 		JobGraphStore jobGraphStore,
@@ -255,13 +255,13 @@ public class SessionDispatcherLeaderProcess extends AbstractDispatcherLeaderProc
 	// Factory methods
 	// ---------------------------------------------------------------
 
-	public static SessionDispatcherLeaderProcess create(
+	public static SessionStreamManagerDispatcherLeaderProcess create(
 		UUID leaderSessionId,
 		DispatcherGatewayServiceFactory dispatcherFactory,
 		JobGraphStore jobGraphStore,
 		Executor ioExecutor,
 		FatalErrorHandler fatalErrorHandler) {
-		return new SessionDispatcherLeaderProcess(
+		return new SessionStreamManagerDispatcherLeaderProcess(
 			leaderSessionId,
 			dispatcherFactory,
 			jobGraphStore,

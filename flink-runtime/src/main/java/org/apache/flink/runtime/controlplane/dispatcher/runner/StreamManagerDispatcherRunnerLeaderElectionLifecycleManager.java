@@ -26,11 +26,11 @@ import org.apache.flink.runtime.leaderelection.LeaderElectionService;
 import java.util.Arrays;
 import java.util.concurrent.CompletableFuture;
 
-final class DispatcherRunnerLeaderElectionLifecycleManager<T extends StreamManagerDispatcherRunner & LeaderContender> implements StreamManagerDispatcherRunner {
+final class StreamManagerDispatcherRunnerLeaderElectionLifecycleManager<T extends StreamManagerDispatcherRunner & LeaderContender> implements StreamManagerDispatcherRunner {
 	private final T dispatcherRunner;
 	private final LeaderElectionService leaderElectionService;
 
-	private DispatcherRunnerLeaderElectionLifecycleManager(T dispatcherRunner, LeaderElectionService leaderElectionService) throws Exception {
+	private StreamManagerDispatcherRunnerLeaderElectionLifecycleManager(T dispatcherRunner, LeaderElectionService leaderElectionService) throws Exception {
 		this.dispatcherRunner = dispatcherRunner;
 		this.leaderElectionService = leaderElectionService;
 
@@ -63,6 +63,6 @@ final class DispatcherRunnerLeaderElectionLifecycleManager<T extends StreamManag
 	public static <T extends StreamManagerDispatcherRunner & LeaderContender> StreamManagerDispatcherRunner createFor(
 		T dispatcherRunner,
 		LeaderElectionService leaderElectionService) throws Exception {
-		return new DispatcherRunnerLeaderElectionLifecycleManager<>(dispatcherRunner, leaderElectionService);
+		return new StreamManagerDispatcherRunnerLeaderElectionLifecycleManager<>(dispatcherRunner, leaderElectionService);
 	}
 }
