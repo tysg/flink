@@ -18,7 +18,6 @@
 
 package org.apache.flink.runtime.controlplane.dispatcher;
 
-import org.apache.flink.runtime.dispatcher.DispatcherId;
 import org.apache.flink.util.AbstractID;
 
 import java.util.UUID;

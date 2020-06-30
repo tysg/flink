@@ -18,9 +18,9 @@
 
 package org.apache.flink.runtime.controlplane.dispatcher.runner;
 
-import org.apache.commons.lang.NotImplementedException;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.runtime.clusterframework.ApplicationStatus;
+import org.apache.flink.runtime.controlplane.dispatcher.ControlPlaneNotImplementedException;
 import org.apache.flink.runtime.controlplane.dispatcher.StreamManagerDispatcher;
 import org.apache.flink.runtime.controlplane.webmonitor.StreamManagerDispatcherGateway;
 
@@ -48,7 +48,7 @@ class DefaultStreamManagerDispatcherGatewayService implements AbstractStreamMana
 
 	@Override
 	public CompletableFuture<ApplicationStatus> getShutDownFuture() {
-		throw new NotImplementedException("Not supported now");
+		return dispatcher.getShutDownFuture();
 	}
 
 	@Override

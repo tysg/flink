@@ -18,10 +18,10 @@
 
 package org.apache.flink.runtime.controlplane.dispatcher;
 
-import org.apache.commons.lang.NotImplementedException;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.runtime.client.JobSubmissionException;
+import org.apache.flink.runtime.clusterframework.ApplicationStatus;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerRunner;
 import org.apache.flink.runtime.controlplane.webmonitor.StreamManagerDispatcherGateway;
 import org.apache.flink.runtime.jobgraph.JobGraph;
@@ -50,12 +50,16 @@ public abstract class StreamManagerDispatcher
 
 	private StreamManagerRunnerFactory streamManagerRunnerFactory;
 
+	protected final CompletableFuture<ApplicationStatus> shutDownFuture;
+
+
 	protected StreamManagerDispatcher(RpcService rpcService,
 									  String endpointId,
 									  StreamManagerDispatcherId fencingToken,
 									  StreamManagerRunnerFactory factory) {
 		super(rpcService, endpointId, fencingToken);
 		this.streamManagerRunnerFactory = factory;
+		shutDownFuture = new CompletableFuture<>();
 	}
 
 
@@ -142,7 +146,15 @@ public abstract class StreamManagerDispatcher
 
 	}
 
+	//------------------------------------------------------
+	// Getters
+	//------------------------------------------------------
+
+	public CompletableFuture<ApplicationStatus> getShutDownFuture() {
+		return shutDownFuture;
+	}
+
 	public CompletableFuture<Void> onRemovedJobGraph(JobID jobId){
-		throw new NotImplementedException("may not need to remove jobs");
+		throw new ControlPlaneNotImplementedException("may not need to remove jobs");
 	}
 }
