@@ -102,7 +102,7 @@ public abstract class StreamManagerDispatcher
 		}));
 	}
 
-	private CompletableFuture<Void> runStream(JobGraph jobGraph) {
+	private CompletableFuture<Void> runStreamManager(JobGraph jobGraph) {
 
 		final CompletableFuture<StreamManagerRunner> streamManagerRunnerFuture = createStreamManagerRunner(jobGraph);
 
