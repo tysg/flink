@@ -48,7 +48,7 @@ class DefaultStreamManagerDispatcherGatewayService implements AbstractStreamMana
 
 	@Override
 	public CompletableFuture<ApplicationStatus> getShutDownFuture() {
-		throw new ControlPlaneNotImplementedException("Not supported now");
+		return dispatcher.getShutDownFuture();
 	}
 
 	@Override
