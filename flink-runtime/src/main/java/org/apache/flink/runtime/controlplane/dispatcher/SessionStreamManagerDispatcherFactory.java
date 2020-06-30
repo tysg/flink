@@ -21,20 +21,6 @@ public enum SessionStreamManagerDispatcherFactory implements StreamManagerDispat
 			rpcService,
 			getEndpointId(),
 			fencingToken,
-			new TempSMRunnerFactory()
-		);
-	}
-
-	static class TempSMRunnerFactory implements StreamManagerRunnerFactory {
-
-		@Override
-		public StreamManagerRunner createStreamManagerRunner(JobGraph jobGraph,
-														  Configuration configuration,
-														  RpcService rpcService,
-														  HighAvailabilityServices highAvailabilityServices,
-														  HeartbeatServices heartbeatServices,
-														  FatalErrorHandler fatalErrorHandler) throws Exception {
-			throw new NotImplementedException("temp solution, Runxin does not implement this currently!");
-		}
+			DefaultStreamManagerRunnerFactory.INSTANCE);
 	}
 }
