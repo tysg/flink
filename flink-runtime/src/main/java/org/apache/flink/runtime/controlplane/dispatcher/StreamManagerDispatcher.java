@@ -20,14 +20,21 @@ package org.apache.flink.runtime.controlplane.dispatcher;
 
 import org.apache.commons.lang.NotImplementedException;
 import org.apache.flink.api.common.JobID;
+import org.apache.flink.api.common.time.Time;
+import org.apache.flink.runtime.client.JobSubmissionException;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerRunner;
 import org.apache.flink.runtime.controlplane.webmonitor.StreamManagerDispatcherGateway;
 import org.apache.flink.runtime.jobgraph.JobGraph;
+import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.rpc.PermanentlyFencedRpcEndpoint;
 import org.apache.flink.runtime.rpc.RpcService;
+import org.apache.flink.util.ExceptionUtils;
+import org.apache.flink.util.function.BiConsumerWithException;
 import org.apache.flink.util.function.CheckedSupplier;
+import org.apache.flink.util.function.FunctionUtils;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 /**
  * Base class for the StreamManagerDispatcher component. The StreamManagerDispatcher
@@ -40,6 +47,7 @@ public abstract class StreamManagerDispatcher
 	implements StreamManagerDispatcherGateway {
 
 	public static final String DISPATCHER_NAME = "stream-manager-dispatcher";
+
 	private StreamManagerRunnerFactory streamManagerRunnerFactory;
 
 	protected StreamManagerDispatcher(RpcService rpcService,
@@ -55,20 +63,78 @@ public abstract class StreamManagerDispatcher
 
 	}
 
-	private CompletableFuture<StreamManagerRunner> startStreamManagerRunner(JobGraph jobGraph) {
-		final RpcService rpcService = getRpcService();
+	public CompletableFuture<Acknowledge> submitJob(JobGraph jobGraph, Time timeout) {
+		// SMD refers to StreamManagerDispatcher
+		log.info("[SMD] Received JobGraph submission {} ({})", jobGraph.getJobID(), jobGraph.getName());
+		// TODO: deal with duplicates and partial resource
+		return internalSubmitJob(jobGraph);
+	}
 
+	private CompletableFuture<Acknowledge> internalSubmitJob(JobGraph jobGraph) {
+		log.info("[SMD] Submitting job {} ({})", jobGraph.getJobID(), jobGraph.getName());
+		// TODO: waitForTerminatingStreamManager
+		final CompletableFuture<Acknowledge> submitDirectly = persistAndRunJob(jobGraph)
+				.thenApply(ignored -> Acknowledge.get());
+		return submitDirectly.handleAsync((acknowledge, throwable) -> {
+			if (throwable != null) {
+				//TODO: cleanup data
+
+				final Throwable strippedThrowable = ExceptionUtils.stripCompletionException(throwable);
+				log.error("Failed to submit job {}.", jobGraph.getJobID(), strippedThrowable);
+				throw new CompletionException(
+						new JobSubmissionException(jobGraph.getJobID(), "Failed to submit job.", strippedThrowable));
+			} else {
+				return acknowledge;
+			}
+		}, getRpcService().getExecutor());
+	}
+
+	private CompletableFuture<Void> persistAndRunJob(JobGraph jobGraph) {
+		// TODO: jobGraphWriter
+		final CompletableFuture<Void> runSMFuture = runStream(jobGraph);
+		return runSMFuture.whenComplete(BiConsumerWithException.unchecked((Object ignored, Throwable throwable) -> {
+			if (throwable != null) {
+				final Throwable strippedThrowable = ExceptionUtils.stripCompletionException(throwable);
+
+				log.error("Failed to run stream manager.", strippedThrowable);
+				// jobGraphWriter.removeJobGraph(jobGraph.getJobID());
+			}
+		}));
+	}
+
+	private CompletableFuture<Void> runStream(JobGraph jobGraph) {
+
+		final CompletableFuture<StreamManagerRunner> streamManagerRunnerFuture = createStreamManagerRunner(jobGraph);
+
+		return streamManagerRunnerFuture
+				.thenApply(FunctionUtils.uncheckedFunction(this::startStreamManagerRunner))
+				.thenApply(FunctionUtils.nullFn())
+				.whenCompleteAsync(
+						(ignored, throwable) -> {
+						},
+						getMainThreadExecutor());
+
+	}
+
+
+	private CompletableFuture<StreamManagerRunner> createStreamManagerRunner(JobGraph jobGraph) {
+		final RpcService rpcService = getRpcService();
 		return CompletableFuture.supplyAsync(
-			CheckedSupplier.unchecked(() ->
-				streamManagerRunnerFactory.createStreamManagerRunner(
-					jobGraph,
-					null,
-					rpcService,
-					null,
-					null,
-					null
-				)
-			), rpcService.getExecutor());
+				CheckedSupplier.unchecked(() ->
+						streamManagerRunnerFactory.createStreamManagerRunner(
+								jobGraph,
+								null, //configuration,
+								rpcService,
+								null, //highAvailabilityServices,
+								null, //heartbeatServices,
+								null //fatalErrorHandler
+						)),
+				rpcService.getExecutor());
+	}
+
+	private StreamManagerRunner startStreamManagerRunner(StreamManagerRunner streamManagerRunner) throws Exception {
+		streamManagerRunner.start();
+		return streamManagerRunner;
 	}
 
 	@Override
