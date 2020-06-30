@@ -18,19 +18,28 @@
 
 package org.apache.flink.runtime.controlplane.dispatcher;
 
+import org.apache.flink.runtime.dispatcher.Dispatcher;
+import org.apache.flink.runtime.dispatcher.DispatcherId;
+import org.apache.flink.runtime.dispatcher.PartialDispatcherServicesWithJobGraphStore;
+import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.rpc.RpcService;
 
+import java.util.Collection;
 import java.util.UUID;
 
 /**
- * {@link StreamManagerDispatcher} factory interface.
+ * {@link Dispatcher} factory interface.
  */
 public interface StreamManagerDispatcherFactory {
 
+	/**
+	 * Create a {@link StreamManagerDispatcher}.
+	 */
 	StreamManagerDispatcher createStreamManagerDispatcher(
 		RpcService rpcService,
-		StreamManagerDispatcherId fencingToken
-	) throws Exception;
+		StreamManagerDispatcherId fencingToken,
+		Collection<JobGraph> recoveredJobs,
+		PartialStreamManagerDispatcherServicesWithJobGraphStore partialDispatcherServicesWithJobGraphStore) throws Exception;
 
 	default String generateEndpointIdWithUUID() {
 		return getEndpointId() + UUID.randomUUID();

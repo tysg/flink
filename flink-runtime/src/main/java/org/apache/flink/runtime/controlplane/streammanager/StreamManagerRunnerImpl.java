@@ -23,15 +23,9 @@ import org.apache.flink.api.common.JobID;
 import org.apache.flink.runtime.client.JobExecutionException;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.controlplane.streammanager.factories.StreamManagerServiceFactory;
-import org.apache.flink.runtime.execution.librarycache.LibraryCacheManager;
 import org.apache.flink.runtime.executiongraph.ArchivedExecutionGraph;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
-import org.apache.flink.runtime.highavailability.RunningJobsRegistry;
-import org.apache.flink.runtime.highavailability.RunningJobsRegistry.JobSchedulingStatus;
 import org.apache.flink.runtime.jobgraph.JobGraph;
-import org.apache.flink.runtime.jobmanager.OnCompletionActions;
-import org.apache.flink.runtime.jobmaster.*;
-import org.apache.flink.runtime.jobmaster.factories.JobMasterServiceFactory;
 import org.apache.flink.runtime.leaderelection.LeaderContender;
 import org.apache.flink.runtime.leaderelection.LeaderElectionService;
 import org.apache.flink.runtime.leaderelection.StandaloneLeaderElectionService;
@@ -43,8 +37,6 @@ import org.apache.flink.util.function.FunctionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nonnull;
-import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -233,7 +225,7 @@ public class StreamManagerRunnerImpl implements LeaderContender, StreamManagerRu
 	}
 
 	private CompletionStage<Void> startStreamManager(UUID leaderSessionId) {
-		log.debug("StreamManager runner for job {} ({}) was granted leadership with session id {} at {}.",
+		log.info("StreamManager runner for job {} ({}) was granted leadership with session id {} at {}.",
 			jobGraph.getName(), jobGraph.getJobID(), leaderSessionId, streamManagerService.getAddress());
 
 		final CompletableFuture<Acknowledge> startFuture;

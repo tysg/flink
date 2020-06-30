@@ -26,8 +26,6 @@ import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.rpc.FatalErrorHandler;
 import org.apache.flink.runtime.rpc.RpcService;
-import org.apache.flink.runtime.scheduler.SchedulerNGFactory;
-import org.apache.flink.runtime.shuffle.ShuffleMaster;
 
 /**
  * Default implementation of the {@link StreamManagerServiceFactory}.

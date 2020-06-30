@@ -20,6 +20,7 @@ package org.apache.flink.runtime.controlplane.rest;
 
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.blob.TransientBlobService;
+import org.apache.flink.runtime.controlplane.dispatcher.StreamManagerDispatcherGateway;
 import org.apache.flink.runtime.controlplane.dispatcher.StreamManagerDispatcherRestEndpoint;
 import org.apache.flink.runtime.controlplane.webmonitor.StreamManagerWebMonitorEndpoint;
 import org.apache.flink.runtime.dispatcher.DispatcherGateway;
@@ -37,13 +38,13 @@ import java.util.concurrent.ScheduledExecutorService;
 /**
  * {@link RestEndpointFactory} which creates a {@link DispatcherRestEndpoint}.
  */
-public enum SessionStreamManagerRestEndpointFactory implements StreamManagerRestEndpointFactory<DispatcherGateway> {
+public enum SessionStreamManagerRestEndpointFactory implements StreamManagerRestEndpointFactory<StreamManagerDispatcherGateway> {
 	INSTANCE;
 
 	@Override
-	public StreamManagerWebMonitorEndpoint<DispatcherGateway> createRestEndpoint(
+	public StreamManagerWebMonitorEndpoint<StreamManagerDispatcherGateway> createRestEndpoint(
 			Configuration configuration,
-			LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever,
+			LeaderGatewayRetriever<StreamManagerDispatcherGateway> dispatcherGatewayRetriever,
 			TransientBlobService transientBlobService,
 			ScheduledExecutorService executor,
 			MetricFetcher metricFetcher,

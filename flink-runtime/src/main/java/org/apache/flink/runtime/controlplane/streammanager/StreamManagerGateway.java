@@ -33,7 +33,7 @@ public interface StreamManagerGateway extends FencedRpcGateway<StreamManagerId> 
      * @param cause of the disconnect
      */
     void disconnectJobMaster(
-            final JobMasterId jobMasterId,
-            final Exception cause);
+		final JobMasterId jobMasterId,
+		final Exception cause);
 
 }

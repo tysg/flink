@@ -34,10 +34,10 @@ import org.apache.flink.runtime.rpc.RpcService;
 public interface StreamManagerRunnerFactory {
 
 	StreamManagerRunner createStreamManagerRunner(
-			JobGraph jobGraph,
-			Configuration configuration,
-			RpcService rpcService,
-			HighAvailabilityServices highAvailabilityServices,
-			HeartbeatServices heartbeatServices, // TODO: to be considered
-			FatalErrorHandler fatalErrorHandler) throws Exception;
+		JobGraph jobGraph,
+		Configuration configuration,
+		RpcService rpcService,
+		HighAvailabilityServices highAvailabilityServices,
+		HeartbeatServices heartbeatServices, // TODO: to be considered
+		FatalErrorHandler fatalErrorHandler) throws Exception;
 }

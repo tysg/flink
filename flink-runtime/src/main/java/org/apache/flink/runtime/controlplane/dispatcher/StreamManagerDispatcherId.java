@@ -18,6 +18,7 @@
 
 package org.apache.flink.runtime.controlplane.dispatcher;
 
+import org.apache.flink.runtime.dispatcher.Dispatcher;
 import org.apache.flink.util.AbstractID;
 
 import java.util.UUID;
@@ -25,10 +26,9 @@ import java.util.UUID;
 /**
  * Fencing token of the {@link StreamManagerDispatcher}.
  */
-
 public class StreamManagerDispatcherId extends AbstractID {
 
-	private static final long serialVersionUID = 1L; // TODO: generate real serialVersionUID with plugin
+	private static final long serialVersionUID = -1654056277003743966L;
 
 	private StreamManagerDispatcherId() {}
 
@@ -43,8 +43,8 @@ public class StreamManagerDispatcherId extends AbstractID {
 	/**
 	 * Generates a new random DispatcherId.
 	 */
-	public static org.apache.flink.runtime.controlplane.dispatcher.StreamManagerDispatcherId generate() {
-		return new org.apache.flink.runtime.controlplane.dispatcher.StreamManagerDispatcherId();
+	public static StreamManagerDispatcherId generate() {
+		return new StreamManagerDispatcherId();
 	}
 
 	/**

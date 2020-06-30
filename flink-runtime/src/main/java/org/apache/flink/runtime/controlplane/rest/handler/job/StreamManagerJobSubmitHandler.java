@@ -25,7 +25,7 @@ import org.apache.flink.core.fs.Path;
 import org.apache.flink.runtime.blob.BlobClient;
 import org.apache.flink.runtime.client.ClientUtils;
 import org.apache.flink.runtime.controlplane.rest.handler.AbstractStreamManagerRestHandler;
-import org.apache.flink.runtime.controlplane.webmonitor.StreamManagerDispatcherGateway;
+import org.apache.flink.runtime.controlplane.dispatcher.StreamManagerDispatcherGateway;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.rest.handler.HandlerRequest;

@@ -18,8 +18,8 @@
 
 package org.apache.flink.runtime.controlplane.dispatcher.runner;
 
+import org.apache.flink.runtime.controlplane.dispatcher.PartialStreamManagerDispatcherServices;
 import org.apache.flink.runtime.controlplane.dispatcher.StreamManagerDispatcherFactory;
-import org.apache.flink.runtime.dispatcher.PartialDispatcherServices;
 import org.apache.flink.runtime.jobmanager.JobGraphStoreFactory;
 import org.apache.flink.runtime.rpc.FatalErrorHandler;
 import org.apache.flink.runtime.rpc.RpcService;
@@ -42,9 +42,9 @@ public class SessionStreamManagerDispatcherLeaderProcessFactoryFactory implement
 			JobGraphStoreFactory jobGraphStoreFactory,
 			Executor ioExecutor,
 			RpcService rpcService,
-			PartialDispatcherServices partialDispatcherServices,
+			PartialStreamManagerDispatcherServices partialDispatcherServices,
 			FatalErrorHandler fatalErrorHandler) {
-		final AbstractStreamManagerDispatcherLeaderProcess.DispatcherGatewayServiceFactory dispatcherGatewayServiceFactory = new DefaultStreamManagerDispatcherGatewayServiceFactory(
+		final AbstractStreamManagerDispatcherLeaderProcess.StreamManagerDispatcherGatewayServiceFactory dispatcherGatewayServiceFactory = new DefaultStreamManagerDispatcherGatewayServiceFactory(
 			dispatcherFactory,
 			rpcService,
 			partialDispatcherServices);

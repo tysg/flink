@@ -19,41 +19,33 @@
 package org.apache.flink.runtime.controlplane.dispatcher.runner;
 
 import org.apache.flink.runtime.dispatcher.runner.DispatcherLeaderProcessFactory;
-import org.apache.flink.runtime.dispatcher.runner.SessionDispatcherLeaderProcess;
-import org.apache.flink.runtime.jobmanager.JobGraphStoreFactory;
+import org.apache.flink.runtime.dispatcher.runner.JobDispatcherLeaderProcess;
+import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.rpc.FatalErrorHandler;
 
 import java.util.UUID;
-import java.util.concurrent.Executor;
 
 /**
- * Factory for the {@link SessionDispatcherLeaderProcess}.
+ * Factory for the {@link JobDispatcherLeaderProcess}.
  */
-class SessionStreamManagerDispatcherLeaderProcessFactory implements StreamManagerDispatcherLeaderProcessFactory {
+public class JobStreamManagerDispatcherLeaderProcessFactory implements StreamManagerDispatcherLeaderProcessFactory {
+	private final AbstractStreamManagerDispatcherLeaderProcess.StreamManagerDispatcherGatewayServiceFactory smDispatcherGatewayServiceFactory;
 
-	private final AbstractStreamManagerDispatcherLeaderProcess.StreamManagerDispatcherGatewayServiceFactory dispatcherGatewayServiceFactory;
-	private final JobGraphStoreFactory jobGraphStoreFactory;
-	private final Executor ioExecutor;
+	private final JobGraph jobGraph;
+
 	private final FatalErrorHandler fatalErrorHandler;
 
-	SessionStreamManagerDispatcherLeaderProcessFactory(
-			AbstractStreamManagerDispatcherLeaderProcess.StreamManagerDispatcherGatewayServiceFactory dispatcherGatewayServiceFactory,
-			JobGraphStoreFactory jobGraphStoreFactory,
-			Executor ioExecutor,
+	JobStreamManagerDispatcherLeaderProcessFactory(
+			AbstractStreamManagerDispatcherLeaderProcess.StreamManagerDispatcherGatewayServiceFactory smDispatcherGatewayServiceFactory,
+			JobGraph jobGraph,
 			FatalErrorHandler fatalErrorHandler) {
-		this.dispatcherGatewayServiceFactory = dispatcherGatewayServiceFactory;
-		this.jobGraphStoreFactory = jobGraphStoreFactory;
-		this.ioExecutor = ioExecutor;
+		this.smDispatcherGatewayServiceFactory = smDispatcherGatewayServiceFactory;
+		this.jobGraph = jobGraph;
 		this.fatalErrorHandler = fatalErrorHandler;
 	}
 
 	@Override
 	public StreamManagerDispatcherLeaderProcess create(UUID leaderSessionID) {
-		return SessionStreamManagerDispatcherLeaderProcess.create(
-			leaderSessionID,
-			dispatcherGatewayServiceFactory,
-			jobGraphStoreFactory.create(),
-			ioExecutor,
-			fatalErrorHandler);
+		return new JobStreamManagerDispatcherLeaderProcess(leaderSessionID, smDispatcherGatewayServiceFactory, jobGraph, fatalErrorHandler);
 	}
 }

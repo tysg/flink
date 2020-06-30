@@ -19,15 +19,21 @@
 package org.apache.flink.runtime.controlplane.streammanager;
 
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.runtime.blob.TransientBlobService;
+import org.apache.flink.runtime.controlplane.dispatcher.StreamManagerDispatcherGateway;
+import org.apache.flink.runtime.controlplane.webmonitor.StreamManagerRestfulGateway;
 import org.apache.flink.runtime.controlplane.webmonitor.StreamManagerWebMonitorEndpoint;
 import org.apache.flink.runtime.dispatcher.DispatcherGateway;
 import org.apache.flink.runtime.entrypoint.JobClusterEntrypoint;
 import org.apache.flink.runtime.leaderelection.LeaderElectionService;
+import org.apache.flink.runtime.resourcemanager.ResourceManagerGateway;
 import org.apache.flink.runtime.rest.RestServerEndpointConfiguration;
 import org.apache.flink.runtime.rest.handler.RestHandlerConfiguration;
 import org.apache.flink.runtime.rest.handler.legacy.ExecutionGraphCache;
+import org.apache.flink.runtime.rest.handler.legacy.metrics.MetricFetcher;
 import org.apache.flink.runtime.rpc.FatalErrorHandler;
 import org.apache.flink.runtime.webmonitor.RestfulGateway;
+import org.apache.flink.runtime.webmonitor.WebMonitorEndpoint;
 import org.apache.flink.runtime.webmonitor.retriever.GatewayRetriever;
 
 import java.io.IOException;
@@ -36,11 +42,11 @@ import java.util.concurrent.ScheduledExecutorService;
 /**
  * REST endpoint for the {@link JobClusterEntrypoint}.
  */
-public class StreamManagerMiniDispatcherRestEndpoint extends StreamManagerWebMonitorEndpoint<RestfulGateway> {
+public class StreamManagerMiniDispatcherRestEndpoint extends StreamManagerWebMonitorEndpoint<StreamManagerRestfulGateway> {
 
 	public StreamManagerMiniDispatcherRestEndpoint(
 			RestServerEndpointConfiguration endpointConfiguration,
-			GatewayRetriever<? extends DispatcherGateway> leaderRetriever,
+			GatewayRetriever<? extends StreamManagerDispatcherGateway> leaderRetriever,
 			Configuration clusterConfiguration,
 			RestHandlerConfiguration restConfiguration,
 			ScheduledExecutorService executor,

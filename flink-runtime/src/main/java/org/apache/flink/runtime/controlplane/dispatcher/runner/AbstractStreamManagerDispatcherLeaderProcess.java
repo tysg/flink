@@ -1,4 +1,3 @@
-
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,17 +22,22 @@ import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.runtime.clusterframework.ApplicationStatus;
 import org.apache.flink.runtime.concurrent.FutureUtils;
+import org.apache.flink.runtime.controlplane.dispatcher.StreamManagerDispatcherGateway;
 import org.apache.flink.runtime.controlplane.dispatcher.StreamManagerDispatcherId;
-import org.apache.flink.runtime.controlplane.webmonitor.StreamManagerDispatcherGateway;
 import org.apache.flink.runtime.controlplane.webmonitor.StreamManagerRestfulGateway;
+import org.apache.flink.runtime.dispatcher.DispatcherGateway;
+import org.apache.flink.runtime.dispatcher.DispatcherId;
+import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobmanager.JobGraphWriter;
 import org.apache.flink.runtime.rpc.FatalErrorHandler;
+import org.apache.flink.runtime.webmonitor.RestfulGateway;
 import org.apache.flink.util.AutoCloseableAsync;
 import org.apache.flink.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
+import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -61,7 +65,7 @@ abstract class AbstractStreamManagerDispatcherLeaderProcess implements StreamMan
 	private State state;
 
 	@Nullable
-	private DispatcherGatewayService dispatcherService;
+	private StreamManagerDispatcherGatewayService dispatcherService;
 
 	AbstractStreamManagerDispatcherLeaderProcess(UUID leaderSessionId, FatalErrorHandler fatalErrorHandler) {
 		this.leaderSessionId = leaderSessionId;
@@ -101,7 +105,7 @@ abstract class AbstractStreamManagerDispatcherLeaderProcess implements StreamMan
 	}
 
 	@Override
-	public final CompletableFuture<StreamManagerDispatcherGateway> getDispatcherGateway() {
+	public final CompletableFuture<StreamManagerDispatcherGateway> getStreamManagerDispatcherGateway() {
 		return dispatcherGatewayFuture;
 	}
 
@@ -115,7 +119,7 @@ abstract class AbstractStreamManagerDispatcherLeaderProcess implements StreamMan
 		return shutDownFuture;
 	}
 
-	protected final Optional<DispatcherGatewayService> getDispatcherService() {
+	protected final Optional<StreamManagerDispatcherGatewayService> getStreamManagerDispatcherService() {
 		return Optional.ofNullable(dispatcherService);
 	}
 
@@ -158,13 +162,13 @@ abstract class AbstractStreamManagerDispatcherLeaderProcess implements StreamMan
 		return FutureUtils.completedVoidFuture();
 	}
 
-	final void completeDispatcherSetup(DispatcherGatewayService dispatcherService) {
+	final void completeDispatcherSetup(StreamManagerDispatcherGatewayService dispatcherService) {
 		runIfStateIs(
 			State.RUNNING,
 			() -> completeDispatcherSetupInternal(dispatcherService));
 	}
 
-	private void completeDispatcherSetupInternal(DispatcherGatewayService createdDispatcherService) {
+	private void completeDispatcherSetupInternal(StreamManagerDispatcherGatewayService createdDispatcherService) {
 		Preconditions.checkState(dispatcherService == null, "The DispatcherGatewayService can only be set once.");
 		dispatcherService = createdDispatcherService;
 		dispatcherGatewayFuture.complete(createdDispatcherService.getGateway());
@@ -234,14 +238,14 @@ abstract class AbstractStreamManagerDispatcherLeaderProcess implements StreamMan
 	// Internal classes
 	// ------------------------------------------------------------
 
-	interface DispatcherGatewayServiceFactory {
-		DispatcherGatewayService create(
+	interface StreamManagerDispatcherGatewayServiceFactory {
+		StreamManagerDispatcherGatewayService create(
 			StreamManagerDispatcherId fencingToken,
-//			Collection<JobGraph> recoveredJobs,
+			Collection<JobGraph> recoveredJobs,
 			JobGraphWriter jobGraphWriter);
 	}
 
-	interface DispatcherGatewayService extends AutoCloseableAsync {
+	interface StreamManagerDispatcherGatewayService extends AutoCloseableAsync {
 		StreamManagerDispatcherGateway getGateway();
 
 		CompletableFuture<Void> onRemovedJobGraph(JobID jobId);

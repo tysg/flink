@@ -61,13 +61,13 @@ public final class RestServerEndpointConfiguration {
 	private final Map<String, String> responseHeaders;
 
 	private RestServerEndpointConfiguration(
-		final String restAddress,
-		@Nullable String restBindAddress,
-		String restBindPortRange,
-		@Nullable SSLHandlerFactory sslHandlerFactory,
-		final Path uploadDir,
-		final int maxContentLength,
-		final Map<String, String> responseHeaders) {
+			final String restAddress,
+			@Nullable String restBindAddress,
+			String restBindPortRange,
+			@Nullable SSLHandlerFactory sslHandlerFactory,
+			final Path uploadDir,
+			final int maxContentLength,
+			final Map<String, String> responseHeaders) {
 
 		Preconditions.checkArgument(maxContentLength > 0, "maxContentLength must be positive, was: %s", maxContentLength);
 

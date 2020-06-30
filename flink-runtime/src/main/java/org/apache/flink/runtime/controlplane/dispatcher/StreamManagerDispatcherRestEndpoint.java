@@ -21,6 +21,7 @@ package org.apache.flink.runtime.controlplane.dispatcher;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.runtime.controlplane.rest.handler.job.StreamManagerJobSubmitHandler;
 import org.apache.flink.runtime.controlplane.webmonitor.StreamManagerWebMonitorEndpoint;
 import org.apache.flink.runtime.dispatcher.Dispatcher;
 import org.apache.flink.runtime.dispatcher.DispatcherGateway;
@@ -44,13 +45,13 @@ import java.util.concurrent.ScheduledExecutorService;
 /**
  * REST endpoint for the {@link Dispatcher} component.
  */
-public class StreamManagerDispatcherRestEndpoint extends StreamManagerWebMonitorEndpoint<DispatcherGateway> {
+public class StreamManagerDispatcherRestEndpoint extends StreamManagerWebMonitorEndpoint<StreamManagerDispatcherGateway> {
 
 	private WebMonitorExtension webSubmissionExtension;
 
 	public StreamManagerDispatcherRestEndpoint(
 		RestServerEndpointConfiguration endpointConfiguration,
-		GatewayRetriever<DispatcherGateway> leaderRetriever,
+		GatewayRetriever<StreamManagerDispatcherGateway> leaderRetriever,
 		Configuration clusterConfiguration,
 		RestHandlerConfiguration restConfiguration,
 		ScheduledExecutorService executor,
@@ -79,7 +80,7 @@ public class StreamManagerDispatcherRestEndpoint extends StreamManagerWebMonitor
 
 		final Time timeout = restConfiguration.getTimeout();
 
-		JobSubmitHandler jobSubmitHandler = new JobSubmitHandler(
+		StreamManagerJobSubmitHandler jobSubmitHandler = new StreamManagerJobSubmitHandler(
 			leaderRetriever,
 			timeout,
 			responseHeaders,

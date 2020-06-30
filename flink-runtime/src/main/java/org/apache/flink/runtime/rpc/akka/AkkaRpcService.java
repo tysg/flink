@@ -93,7 +93,8 @@ public class AkkaRpcService implements RpcService {
 	private final AkkaRpcServiceConfiguration configuration;
 
 	@GuardedBy("lock")
-	private final Map<ActorRef, RpcEndpoint> actors = new HashMap<>(4);
+	// TODO: just make this a bit bigger, could it be a problem?
+	private final Map<ActorRef, RpcEndpoint> actors = new HashMap<>(5);
 
 	private final String address;
 	private final int port;

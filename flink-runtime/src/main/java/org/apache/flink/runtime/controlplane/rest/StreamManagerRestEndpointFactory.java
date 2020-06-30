@@ -21,6 +21,7 @@ package org.apache.flink.runtime.controlplane.rest;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.blob.TransientBlobService;
+import org.apache.flink.runtime.controlplane.dispatcher.StreamManagerDispatcherGateway;
 import org.apache.flink.runtime.controlplane.webmonitor.StreamManagerRestfulGateway;
 import org.apache.flink.runtime.controlplane.webmonitor.StreamManagerWebMonitorEndpoint;
 import org.apache.flink.runtime.dispatcher.DispatcherGateway;
@@ -40,12 +41,11 @@ import java.util.concurrent.ScheduledExecutorService;
  *
  * @param <T> type of the {@link StreamManagerRestfulGateway}
  */
-public interface StreamManagerRestEndpointFactory<T extends RestfulGateway> {
+public interface StreamManagerRestEndpointFactory<T extends StreamManagerRestfulGateway> {
 
 	StreamManagerWebMonitorEndpoint<T> createRestEndpoint(
 		Configuration configuration,
-		// TODO: change it to StreamManagerDispatcherGateway
-		LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever,
+		LeaderGatewayRetriever<StreamManagerDispatcherGateway> dispatcherGatewayRetriever,
 		TransientBlobService transientBlobService,
 		ScheduledExecutorService executor,
 		MetricFetcher metricFetcher,

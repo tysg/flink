@@ -16,11 +16,12 @@
  * limitations under the License.
  */
 
-package org.apache.flink.runtime.controlplane.webmonitor;
+package org.apache.flink.runtime.controlplane.dispatcher;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.runtime.controlplane.dispatcher.StreamManagerDispatcherId;
+import org.apache.flink.runtime.controlplane.webmonitor.StreamManagerRestfulGateway;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.rpc.FencedRpcGateway;

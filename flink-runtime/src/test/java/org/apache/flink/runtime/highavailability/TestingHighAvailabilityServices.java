@@ -144,6 +144,11 @@ public class TestingHighAvailabilityServices implements HighAvailabilityServices
 	}
 
 	@Override
+	public LeaderRetrievalService getStreamManagerDispatcherLeaderRetriever() {
+		return null;
+	}
+
+	@Override
 	public LeaderRetrievalService getJobManagerLeaderRetriever(JobID jobID) {
 		LeaderRetrievalService service = jobMasterLeaderRetrievers.computeIfAbsent(jobID, jobMasterLeaderRetrieverFunction);
 		if (service != null) {
@@ -183,6 +188,11 @@ public class TestingHighAvailabilityServices implements HighAvailabilityServices
 		} else {
 			throw new IllegalStateException("DispatcherLeaderElectionService has not been set");
 		}
+	}
+
+	@Override
+	public LeaderElectionService getStreamManagerDispatcherLeaderElectionService() {
+		return null;
 	}
 
 	@Override

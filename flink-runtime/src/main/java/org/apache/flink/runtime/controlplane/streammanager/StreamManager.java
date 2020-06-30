@@ -21,12 +21,10 @@ package org.apache.flink.runtime.controlplane.streammanager;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
-import org.apache.flink.runtime.heartbeat.HeartbeatManager;
 import org.apache.flink.runtime.heartbeat.HeartbeatServices;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobmaster.JobMasterId;
-import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalService;
 import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.rpc.FatalErrorHandler;
 import org.apache.flink.runtime.rpc.FencedRpcEndpoint;
@@ -37,7 +35,6 @@ import org.apache.flink.runtime.rpc.akka.AkkaRpcServiceUtils;
 import java.util.concurrent.CompletableFuture;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
-import static org.apache.flink.util.Preconditions.checkState;
 
 /**
  * @author trx
@@ -47,7 +44,7 @@ import static org.apache.flink.util.Preconditions.checkState;
  * 1. decide other fields
  * 2. initialize other fields
  */
-public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements StreamManagerGateway, StreamManagerService{
+public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements StreamManagerGateway, StreamManagerService {
 
     /** Default names for Flink's distributed components. */
     public static final String Stream_Manager_NAME = "streammanager";
@@ -83,12 +80,12 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
     // ------------------------------------------------------------------------
 
     public StreamManager(RpcService rpcService,
-                         StreamManagerConfiguration streamManagerConfiguration,
-                         ResourceID resourceId,
-                         JobGraph jobGraph,
-                         HighAvailabilityServices highAvailabilityService,
-                         HeartbeatServices heartbeatServices,
-                         FatalErrorHandler fatalErrorHandler) throws Exception{
+						 StreamManagerConfiguration streamManagerConfiguration,
+						 ResourceID resourceId,
+						 JobGraph jobGraph,
+						 HighAvailabilityServices highAvailabilityService,
+						 HeartbeatServices heartbeatServices,
+						 FatalErrorHandler fatalErrorHandler) throws Exception{
         super(rpcService, AkkaRpcServiceUtils.createRandomName(Stream_Manager_NAME), null);
 
         this.streamManagerConfiguration = checkNotNull(streamManagerConfiguration);
@@ -102,7 +99,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
         final String jobName = jobGraph.getName();
         final JobID jid = jobGraph.getJobID();
 
-        log.debug("Initializing sm for job {} ({})", jobName, jid);
+		log.debug("Initializing sm for job {} ({})", jobName, jid);
+		log.info("Initializing sm for job {} ({})", jobName, jid);
 
         /*
         TODO: initialize other fields

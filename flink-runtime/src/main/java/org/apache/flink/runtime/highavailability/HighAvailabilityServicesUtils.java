@@ -19,14 +19,11 @@
 package org.apache.flink.runtime.highavailability;
 
 import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.configuration.Configuration;
-import org.apache.flink.configuration.HighAvailabilityOptions;
-import org.apache.flink.configuration.IllegalConfigurationException;
-import org.apache.flink.configuration.JobManagerOptions;
-import org.apache.flink.configuration.RestOptions;
+import org.apache.flink.configuration.*;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.runtime.blob.BlobStoreService;
 import org.apache.flink.runtime.blob.BlobUtils;
+import org.apache.flink.runtime.controlplane.dispatcher.StreamManagerDispatcher;
 import org.apache.flink.runtime.dispatcher.Dispatcher;
 import org.apache.flink.runtime.highavailability.nonha.embedded.EmbeddedHaServices;
 import org.apache.flink.runtime.highavailability.nonha.standalone.StandaloneClientHAServices;
@@ -116,11 +113,28 @@ public class HighAvailabilityServicesUtils {
 					configuration,
 					addressResolution);
 
+				final String smDispatcherRpcUrl = AkkaRpcServiceUtils.getRpcUrl(
+					hostnamePort.f0,
+					hostnamePort.f1,
+					StreamManagerDispatcher.DISPATCHER_NAME,
+					addressResolution,
+					configuration);
+
+//				final Tuple2<String, Integer> smHostnamePort = getStreamManagerAddress(configuration);
+//
+//				final String smDispatcherRpcUrl = AkkaRpcServiceUtils.getRpcUrl(
+//					smHostnamePort.f0,
+//					smHostnamePort.f1,
+//					StreamManagerDispatcher.DISPATCHER_NAME,
+//					addressResolution,
+//					configuration);
+
 				return new StandaloneHaServices(
 					resourceManagerRpcUrl,
 					dispatcherRpcUrl,
 					jobManagerRpcUrl,
-					webMonitorAddress);
+					webMonitorAddress,
+					smDispatcherRpcUrl);
 			case ZOOKEEPER:
 				BlobStoreService blobStoreService = BlobUtils.createBlobStoreFromConfig(configuration);
 
@@ -143,7 +157,9 @@ public class HighAvailabilityServicesUtils {
 
 		switch (highAvailabilityMode) {
 			case NONE:
-				final String webMonitorAddress = getWebMonitorAddress(configuration, AddressResolution.TRY_ADDRESS_RESOLUTION);
+//				final String webMonitorAddress = getWebMonitorAddress(configuration, AddressResolution.TRY_ADDRESS_RESOLUTION);
+				final String webMonitorAddress = getSmWebMonitorAddress(configuration, AddressResolution.TRY_ADDRESS_RESOLUTION);
+				System.out.println("client address: " + webMonitorAddress);
 				return new StandaloneClientHAServices(webMonitorAddress);
 			case ZOOKEEPER:
 				final CuratorFramework client = ZooKeeperUtils.startCuratorFramework(configuration);
@@ -183,6 +199,33 @@ public class HighAvailabilityServicesUtils {
 	}
 
 	/**
+	 * Returns the StreamManager's hostname and port extracted from the given
+	 * {@link Configuration}.
+	 *
+	 * @param configuration Configuration to extract the StreamManager's address from
+	 * @return The StreamManager's hostname and port
+	 * @throws ConfigurationException if the StreamManager's address cannot be extracted from the configuration
+	 */
+	public static Tuple2<String, Integer> getStreamManagerAddress(Configuration configuration) throws ConfigurationException {
+
+		final String hostname = configuration.getString(StreamManagerOptions.ADDRESS);
+		final int port = configuration.getInteger(StreamManagerOptions.PORT);
+
+		if (hostname == null) {
+			throw new ConfigurationException("Config parameter '" + StreamManagerOptions.ADDRESS +
+				"' is missing (hostname/address of JobManager to connect to).");
+		}
+
+		if (port <= 0 || port >= 65536) {
+			throw new ConfigurationException("Invalid value for '" + StreamManagerOptions.PORT +
+				"' (port of the JobManager actor system) : " + port +
+				".  it must be greater than 0 and less than 65536.");
+		}
+
+		return Tuple2.of(hostname, port);
+	}
+
+	/**
 	 * Get address of web monitor from configuration.
 	 *
 	 * @param configuration Configuration contains those for WebMonitor.
@@ -202,6 +245,32 @@ public class HighAvailabilityServicesUtils {
 		}
 
 		final int port = configuration.getInteger(RestOptions.PORT);
+		final boolean enableSSL = SSLUtils.isRestSSLEnabled(configuration);
+		final String protocol = enableSSL ? "https://" : "http://";
+
+		return String.format("%s%s:%s", protocol, address, port);
+	}
+
+	/**
+	 * Get address of web monitor from configuration.
+	 *
+	 * @param configuration Configuration contains those for WebMonitor.
+	 * @param resolution Whether to try address resolution of the given hostname or not.
+	 *                   This allows to fail fast in case that the hostname cannot be resolved.
+	 * @return Address of WebMonitor.
+	 */
+	public static String getSmWebMonitorAddress(
+		Configuration configuration,
+		HighAvailabilityServicesUtils.AddressResolution resolution) throws UnknownHostException {
+		final String address = checkNotNull(configuration.getString(StreamManagerRestOptions.ADDRESS), "%s must be set", RestOptions.ADDRESS.key());
+
+		if (resolution == HighAvailabilityServicesUtils.AddressResolution.TRY_ADDRESS_RESOLUTION) {
+			// Fail fast if the hostname cannot be resolved
+			//noinspection ResultOfMethodCallIgnored
+			InetAddress.getByName(address);
+		}
+
+		final int port = configuration.getInteger(StreamManagerRestOptions.PORT);
 		final boolean enableSSL = SSLUtils.isRestSSLEnabled(configuration);
 		final String protocol = enableSSL ? "https://" : "http://";
 

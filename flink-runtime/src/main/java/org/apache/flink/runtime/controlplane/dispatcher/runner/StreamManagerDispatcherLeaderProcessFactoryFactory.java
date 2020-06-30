@@ -18,7 +18,9 @@
 
 package org.apache.flink.runtime.controlplane.dispatcher.runner;
 
+import org.apache.flink.runtime.controlplane.dispatcher.PartialStreamManagerDispatcherServices;
 import org.apache.flink.runtime.dispatcher.PartialDispatcherServices;
+import org.apache.flink.runtime.dispatcher.runner.DispatcherLeaderProcessFactory;
 import org.apache.flink.runtime.jobmanager.JobGraphStoreFactory;
 import org.apache.flink.runtime.rpc.FatalErrorHandler;
 import org.apache.flink.runtime.rpc.RpcService;
@@ -26,7 +28,7 @@ import org.apache.flink.runtime.rpc.RpcService;
 import java.util.concurrent.Executor;
 
 /**
- * Factory for {@link StreamManagerDispatcherLeaderProcessFactory}.
+ * Factory for {@link DispatcherLeaderProcessFactory}.
  */
 public interface StreamManagerDispatcherLeaderProcessFactoryFactory {
 
@@ -34,6 +36,6 @@ public interface StreamManagerDispatcherLeaderProcessFactoryFactory {
 		JobGraphStoreFactory jobGraphStoreFactory,
 		Executor ioExecutor,
 		RpcService rpcService,
-		PartialDispatcherServices partialDispatcherServices,
+		PartialStreamManagerDispatcherServices partialDispatcherServices,
 		FatalErrorHandler fatalErrorHandler);
 }

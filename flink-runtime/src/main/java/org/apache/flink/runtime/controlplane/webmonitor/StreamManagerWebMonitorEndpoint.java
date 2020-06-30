@@ -21,6 +21,7 @@ package org.apache.flink.runtime.controlplane.webmonitor;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.runtime.blob.TransientBlobService;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.executiongraph.AccessExecutionGraph;
 import org.apache.flink.runtime.leaderelection.LeaderContender;
@@ -29,7 +30,9 @@ import org.apache.flink.runtime.rest.RestServerEndpoint;
 import org.apache.flink.runtime.rest.RestServerEndpointConfiguration;
 import org.apache.flink.runtime.rest.handler.RestHandlerConfiguration;
 import org.apache.flink.runtime.rest.handler.RestHandlerSpecification;
+import org.apache.flink.runtime.rest.handler.job.checkpoints.CheckpointStatsCache;
 import org.apache.flink.runtime.rest.handler.legacy.ExecutionGraphCache;
+import org.apache.flink.runtime.rest.handler.legacy.metrics.MetricFetcher;
 import org.apache.flink.runtime.rpc.FatalErrorHandler;
 import org.apache.flink.runtime.util.ExecutorThreadFactory;
 import org.apache.flink.runtime.webmonitor.RestfulGateway;
@@ -56,7 +59,7 @@ import java.util.concurrent.*;
  *
  * @param <T> type of the leader gateway
  */
-public class StreamManagerWebMonitorEndpoint<T extends RestfulGateway> extends RestServerEndpoint implements LeaderContender, JsonArchivist {
+public class StreamManagerWebMonitorEndpoint<T extends StreamManagerRestfulGateway> extends RestServerEndpoint implements LeaderContender, JsonArchivist {
 
 	protected final GatewayRetriever<? extends T> leaderRetriever;
 	protected final Configuration clusterConfiguration;

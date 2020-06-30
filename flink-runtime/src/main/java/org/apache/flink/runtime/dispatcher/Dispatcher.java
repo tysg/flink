@@ -32,10 +32,6 @@ import org.apache.flink.runtime.client.JobSubmissionException;
 import org.apache.flink.runtime.clusterframework.ApplicationStatus;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
-import org.apache.flink.runtime.controlplane.dispatcher.DefaultStreamManagerRunnerFactory;
-import org.apache.flink.runtime.controlplane.dispatcher.StreamManagerRunnerFactory;
-import org.apache.flink.runtime.controlplane.streammanager.StreamManager;
-import org.apache.flink.runtime.controlplane.streammanager.StreamManagerRunner;
 import org.apache.flink.runtime.executiongraph.ArchivedExecutionGraph;
 import org.apache.flink.runtime.heartbeat.HeartbeatServices;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
@@ -101,8 +97,6 @@ import java.util.stream.Collectors;
 public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<DispatcherId> implements DispatcherGateway {
 
 	public static final String DISPATCHER_NAME = "dispatcher";
-
-	public static final boolean TEST_FLAG = false; // TODO: set to true to run the Stream Manager Only.
 
 	private final Configuration configuration;
 
@@ -351,36 +345,13 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
 	private CompletableFuture<Void> persistAndRunJob(JobGraph jobGraph) throws Exception {
 		jobGraphWriter.putJobGraph(jobGraph);
 
-		if (!TEST_FLAG) {
-			final CompletableFuture<Void> runJobFuture = runJob(jobGraph);
+		final CompletableFuture<Void> runJobFuture = runJob(jobGraph);
 
-			return runJobFuture.whenComplete(BiConsumerWithException.unchecked((Object ignored, Throwable throwable) -> {
-				if (throwable != null) {
-					jobGraphWriter.removeJobGraph(jobGraph.getJobID());
-				}
-			}));
-		}
-
-		final CompletableFuture<Void> runSMFuture = runStream(jobGraph);
-		return runSMFuture.whenComplete(BiConsumerWithException.unchecked((Object ignored, Throwable throwable) -> {
+		return runJobFuture.whenComplete(BiConsumerWithException.unchecked((Object ignored, Throwable throwable) -> {
 			if (throwable != null) {
 				jobGraphWriter.removeJobGraph(jobGraph.getJobID());
 			}
 		}));
-	}
-
-	private CompletableFuture<Void> runStream(JobGraph jobGraph) {
-
-		final CompletableFuture<StreamManagerRunner> streamManagerRunnerFuture = createStreamManagerRunner(jobGraph);
-
-		return streamManagerRunnerFuture
-			.thenApply(FunctionUtils.uncheckedFunction(this::startStreamManagerRunner))
-			.thenApply(FunctionUtils.nullFn())
-			.whenCompleteAsync(
-					(ignored, throwable) -> {
-					},
-					getMainThreadExecutor());
-
 	}
 
 	private CompletableFuture<Void> runJob(JobGraph jobGraph) {
@@ -419,22 +390,6 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
 			rpcService.getExecutor());
 	}
 
-	private CompletableFuture<StreamManagerRunner> createStreamManagerRunner(JobGraph jobGraph) {
-		final RpcService rpcService = getRpcService();
-		StreamManagerRunnerFactory streamManagerRunnerFactory = DefaultStreamManagerRunnerFactory.INSTANCE;
-		return CompletableFuture.supplyAsync(
-				CheckedSupplier.unchecked(() ->
-					streamManagerRunnerFactory.createStreamManagerRunner(
-							jobGraph,
-							configuration,
-							rpcService,
-							highAvailabilityServices,
-							heartbeatServices,
-							fatalErrorHandler
-					)),
-				rpcService.getExecutor());
-	}
-
 	private JobManagerRunner startJobManagerRunner(JobManagerRunner jobManagerRunner) throws Exception {
 		final JobID jobId = jobManagerRunner.getJobID();
 
@@ -468,11 +423,6 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
 		jobManagerRunner.start();
 
 		return jobManagerRunner;
-	}
-
-	private StreamManagerRunner startStreamManagerRunner(StreamManagerRunner streamManagerRunner) throws Exception {
-		streamManagerRunner.start();
-		return streamManagerRunner;
 	}
 
 	@Override

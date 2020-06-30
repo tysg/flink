@@ -137,13 +137,11 @@ public class HadoopModule implements SecurityModule {
 				loginUser = UserGroupInformation.getLoginUser();
 			}
 
-			LOG.info("Hadoop user set to {}", loginUser);
+			boolean isCredentialsConfigured = HadoopUtils.isCredentialsConfigured(
+				loginUser, securityConfig.useTicketCache());
 
-			if (HadoopUtils.isKerberosSecurityEnabled(loginUser)) {
-				boolean isCredentialsConfigured = HadoopUtils.areKerberosCredentialsValid(loginUser, securityConfig.useTicketCache());
+			LOG.info("Hadoop user set to {}, credentials check status: {}", loginUser, isCredentialsConfigured);
 
-				LOG.info("Kerberos security is enabled and credentials are {}.", isCredentialsConfigured ? "valid" : "invalid");
-			}
 		} catch (Throwable ex) {
 			throw new SecurityInstallException("Unable to set the Hadoop login user", ex);
 		}

@@ -21,8 +21,8 @@ package org.apache.flink.runtime.controlplane.dispatcher.runner;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.runtime.client.DuplicateJobSubmissionException;
 import org.apache.flink.runtime.concurrent.FutureUtils;
+import org.apache.flink.runtime.controlplane.dispatcher.StreamManagerDispatcherGateway;
 import org.apache.flink.runtime.controlplane.dispatcher.StreamManagerDispatcherId;
-import org.apache.flink.runtime.controlplane.webmonitor.StreamManagerDispatcherGateway;
 import org.apache.flink.runtime.dispatcher.Dispatcher;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobmanager.JobGraphStore;
@@ -44,7 +44,7 @@ import java.util.concurrent.Executor;
  */
 public class SessionStreamManagerDispatcherLeaderProcess extends AbstractStreamManagerDispatcherLeaderProcess implements JobGraphStore.JobGraphListener {
 
-	private final DispatcherGatewayServiceFactory dispatcherGatewayServiceFactory;
+	private final StreamManagerDispatcherGatewayServiceFactory smDispatcherGatewayServiceFactory;
 
 	private final JobGraphStore jobGraphStore;
 
@@ -53,14 +53,14 @@ public class SessionStreamManagerDispatcherLeaderProcess extends AbstractStreamM
 	private CompletableFuture<Void> onGoingRecoveryOperation = FutureUtils.completedVoidFuture();
 
 	private SessionStreamManagerDispatcherLeaderProcess(
-		UUID leaderSessionId,
-		DispatcherGatewayServiceFactory dispatcherGatewayServiceFactory,
-		JobGraphStore jobGraphStore,
-		Executor ioExecutor,
-		FatalErrorHandler fatalErrorHandler) {
+			UUID leaderSessionId,
+			StreamManagerDispatcherGatewayServiceFactory smDispatcherGatewayServiceFactory,
+			JobGraphStore jobGraphStore,
+			Executor ioExecutor,
+			FatalErrorHandler fatalErrorHandler) {
 		super(leaderSessionId, fatalErrorHandler);
 
-		this.dispatcherGatewayServiceFactory = dispatcherGatewayServiceFactory;
+		this.smDispatcherGatewayServiceFactory = smDispatcherGatewayServiceFactory;
 		this.jobGraphStore = jobGraphStore;
 		this.ioExecutor = ioExecutor;
 	}
@@ -70,7 +70,7 @@ public class SessionStreamManagerDispatcherLeaderProcess extends AbstractStreamM
 		startServices();
 
 		onGoingRecoveryOperation = recoverJobsAsync()
-			.thenAccept(this::createDispatcherIfRunning)
+			.thenAccept(this::createStreamManagerDispatcherIfRunning)
 			.handle(this::onErrorIfRunning);
 	}
 
@@ -87,15 +87,15 @@ public class SessionStreamManagerDispatcherLeaderProcess extends AbstractStreamM
 		}
 	}
 
-	private void createDispatcherIfRunning(Collection<JobGraph> jobGraphs) {
-		runIfStateIs(State.RUNNING, () -> createDispatcher(jobGraphs));
+	private void createStreamManagerDispatcherIfRunning(Collection<JobGraph> jobGraphs) {
+		runIfStateIs(State.RUNNING, () -> createStreamManagerDispatcher(jobGraphs));
 	}
 
-	private void createDispatcher(Collection<JobGraph> jobGraphs) {
+	private void createStreamManagerDispatcher(Collection<JobGraph> jobGraphs) {
 
-		final DispatcherGatewayService dispatcherService = dispatcherGatewayServiceFactory.create(
+		final StreamManagerDispatcherGatewayService dispatcherService = smDispatcherGatewayServiceFactory.create(
 			StreamManagerDispatcherId.fromUuid(getLeaderSessionId()),
-//			jobGraphs,
+			jobGraphs,
 			jobGraphStore);
 
 		completeDispatcherSetup(dispatcherService);
@@ -195,7 +195,7 @@ public class SessionStreamManagerDispatcherLeaderProcess extends AbstractStreamM
 	}
 
 	private CompletableFuture<Void> submitAddedJob(JobGraph jobGraph) {
-		final StreamManagerDispatcherGateway dispatcherGateway = getDispatcherGatewayInternal();
+		final StreamManagerDispatcherGateway dispatcherGateway = getStreamManagerDispatcherGatewayInternal();
 
 		return dispatcherGateway
 			.submitJob(jobGraph, RpcUtils.INF_TIMEOUT)
@@ -216,8 +216,8 @@ public class SessionStreamManagerDispatcherLeaderProcess extends AbstractStreamM
 		}
 	}
 
-	private StreamManagerDispatcherGateway getDispatcherGatewayInternal() {
-		return Preconditions.checkNotNull(getDispatcherGateway().getNow(null));
+	private StreamManagerDispatcherGateway getStreamManagerDispatcherGatewayInternal() {
+		return Preconditions.checkNotNull(getStreamManagerDispatcherGateway().getNow(null));
 	}
 
 	private Optional<JobGraph> recoverJobIfRunning(JobID jobId) {
@@ -247,7 +247,7 @@ public class SessionStreamManagerDispatcherLeaderProcess extends AbstractStreamM
 	}
 
 	private CompletableFuture<Void> removeJobGraph(JobID jobId) {
-		return getDispatcherService().map(dispatcherService -> dispatcherService.onRemovedJobGraph(jobId))
+		return getStreamManagerDispatcherService().map(dispatcherService -> dispatcherService.onRemovedJobGraph(jobId))
 			.orElseGet(FutureUtils::completedVoidFuture);
 	}
 
@@ -256,11 +256,11 @@ public class SessionStreamManagerDispatcherLeaderProcess extends AbstractStreamM
 	// ---------------------------------------------------------------
 
 	public static SessionStreamManagerDispatcherLeaderProcess create(
-		UUID leaderSessionId,
-		DispatcherGatewayServiceFactory dispatcherFactory,
-		JobGraphStore jobGraphStore,
-		Executor ioExecutor,
-		FatalErrorHandler fatalErrorHandler) {
+			UUID leaderSessionId,
+			StreamManagerDispatcherGatewayServiceFactory dispatcherFactory,
+			JobGraphStore jobGraphStore,
+			Executor ioExecutor,
+			FatalErrorHandler fatalErrorHandler) {
 		return new SessionStreamManagerDispatcherLeaderProcess(
 			leaderSessionId,
 			dispatcherFactory,

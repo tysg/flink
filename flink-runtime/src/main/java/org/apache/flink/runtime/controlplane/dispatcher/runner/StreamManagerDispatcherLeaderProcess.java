@@ -19,8 +19,9 @@
 package org.apache.flink.runtime.controlplane.dispatcher.runner;
 
 import org.apache.flink.runtime.clusterframework.ApplicationStatus;
-import org.apache.flink.runtime.controlplane.webmonitor.StreamManagerDispatcherGateway;
+import org.apache.flink.runtime.controlplane.dispatcher.StreamManagerDispatcherGateway;
 import org.apache.flink.runtime.dispatcher.Dispatcher;
+import org.apache.flink.runtime.dispatcher.DispatcherGateway;
 import org.apache.flink.util.AutoCloseableAsync;
 
 import java.util.UUID;
@@ -35,7 +36,7 @@ interface StreamManagerDispatcherLeaderProcess extends AutoCloseableAsync {
 
 	UUID getLeaderSessionId();
 
-	CompletableFuture<StreamManagerDispatcherGateway> getDispatcherGateway();
+	CompletableFuture<StreamManagerDispatcherGateway> getStreamManagerDispatcherGateway();
 
 	CompletableFuture<String> getLeaderAddressFuture();
 

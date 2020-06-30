@@ -1,49 +1,69 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.flink.runtime.controlplane.dispatcher.runner;
 
-import org.apache.flink.runtime.controlplane.dispatcher.StreamManagerDispatcher;
-import org.apache.flink.runtime.controlplane.dispatcher.StreamManagerDispatcherFactory;
-import org.apache.flink.runtime.controlplane.dispatcher.StreamManagerDispatcherId;
-import org.apache.flink.runtime.dispatcher.PartialDispatcherServices;
+import org.apache.flink.runtime.controlplane.dispatcher.*;
+import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobmanager.JobGraphWriter;
 import org.apache.flink.runtime.rpc.RpcService;
 import org.apache.flink.util.FlinkRuntimeException;
 
+import java.util.Collection;
 
-public class DefaultStreamManagerDispatcherGatewayServiceFactory implements AbstractStreamManagerDispatcherLeaderProcess.DispatcherGatewayServiceFactory {
+/**
+ * Factory for the {@link DefaultStreamManagerDispatcherGatewayService}.
+ */
+class DefaultStreamManagerDispatcherGatewayServiceFactory implements AbstractStreamManagerDispatcherLeaderProcess.StreamManagerDispatcherGatewayServiceFactory {
 
-	private StreamManagerDispatcherFactory dispatcherFactory;
-	private RpcService rpcService;
-	private PartialDispatcherServices partialDispatcherServices;
+	private final StreamManagerDispatcherFactory smDispatcherFactory;
+
+	private final RpcService rpcService;
+
+	private final PartialStreamManagerDispatcherServices partialSmDispatcherServices;
 
 	DefaultStreamManagerDispatcherGatewayServiceFactory(
-		StreamManagerDispatcherFactory dispatcherFactory,
-		RpcService rpcService,
-		PartialDispatcherServices partialDispatcherServices) {
-
-		this.dispatcherFactory = dispatcherFactory;
+			StreamManagerDispatcherFactory smDispatcherFactory,
+			RpcService rpcService,
+			PartialStreamManagerDispatcherServices partialSmDispatcherServices) {
+		this.smDispatcherFactory = smDispatcherFactory;
 		this.rpcService = rpcService;
-		this.partialDispatcherServices = partialDispatcherServices;
+		this.partialSmDispatcherServices = partialSmDispatcherServices;
 	}
 
-
 	@Override
-	public AbstractStreamManagerDispatcherLeaderProcess.DispatcherGatewayService create(
-		StreamManagerDispatcherId fencingToken,
-		JobGraphWriter jobGraphWriter) {
-
-		final StreamManagerDispatcher dispatcher;
+	public AbstractStreamManagerDispatcherLeaderProcess.StreamManagerDispatcherGatewayService create(
+			StreamManagerDispatcherId fencingToken,
+			Collection<JobGraph> recoveredJobs,
+			JobGraphWriter jobGraphWriter) {
+		final StreamManagerDispatcher smDispatcher;
 		try {
-			dispatcher = dispatcherFactory.createStreamManagerDispatcher(
+			smDispatcher = smDispatcherFactory.createStreamManagerDispatcher(
 				rpcService,
-				fencingToken);
+				fencingToken,
+				recoveredJobs,
+				PartialStreamManagerDispatcherServicesWithJobGraphStore.from(partialSmDispatcherServices, jobGraphWriter));
 		} catch (Exception e) {
 			throw new FlinkRuntimeException("Could not create the Dispatcher rpc endpoint.", e);
 		}
 
-		dispatcher.start();
+		smDispatcher.start();
 
-		return DefaultStreamManagerDispatcherGatewayService.from(dispatcher);
+		return DefaultStreamManagerDispatcherGatewayService.from(smDispatcher);
 	}
-
-
 }

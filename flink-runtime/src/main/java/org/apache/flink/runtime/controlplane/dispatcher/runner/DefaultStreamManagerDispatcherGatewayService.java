@@ -20,20 +20,19 @@ package org.apache.flink.runtime.controlplane.dispatcher.runner;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.runtime.clusterframework.ApplicationStatus;
-import org.apache.flink.runtime.controlplane.dispatcher.ControlPlaneNotImplementedException;
 import org.apache.flink.runtime.controlplane.dispatcher.StreamManagerDispatcher;
-import org.apache.flink.runtime.controlplane.webmonitor.StreamManagerDispatcherGateway;
+import org.apache.flink.runtime.controlplane.dispatcher.StreamManagerDispatcherGateway;
 
 import java.util.concurrent.CompletableFuture;
 
-class DefaultStreamManagerDispatcherGatewayService implements AbstractStreamManagerDispatcherLeaderProcess.DispatcherGatewayService {
+class DefaultStreamManagerDispatcherGatewayService implements AbstractStreamManagerDispatcherLeaderProcess.StreamManagerDispatcherGatewayService {
 
-	private final StreamManagerDispatcher dispatcher;
+	private final StreamManagerDispatcher smDispatcher;
 	private final StreamManagerDispatcherGateway dispatcherGateway;
 
-	private DefaultStreamManagerDispatcherGatewayService(StreamManagerDispatcher dispatcher) {
-		this.dispatcher = dispatcher;
-		this.dispatcherGateway = dispatcher.getSelfGateway(StreamManagerDispatcherGateway.class);
+	private DefaultStreamManagerDispatcherGatewayService(StreamManagerDispatcher smDispatcher) {
+		this.smDispatcher = smDispatcher;
+		this.dispatcherGateway = smDispatcher.getSelfGateway(StreamManagerDispatcherGateway.class);
 	}
 
 	@Override
@@ -43,17 +42,17 @@ class DefaultStreamManagerDispatcherGatewayService implements AbstractStreamMana
 
 	@Override
 	public CompletableFuture<Void> onRemovedJobGraph(JobID jobId) {
-		return dispatcher.onRemovedJobGraph(jobId);
+		return smDispatcher.onRemovedJobGraph(jobId);
 	}
 
 	@Override
 	public CompletableFuture<ApplicationStatus> getShutDownFuture() {
-		return dispatcher.getShutDownFuture();
+		return smDispatcher.getShutDownFuture();
 	}
 
 	@Override
 	public CompletableFuture<Void> closeAsync() {
-		return dispatcher.closeAsync();
+		return smDispatcher.closeAsync();
 	}
 
 	public static DefaultStreamManagerDispatcherGatewayService from(StreamManagerDispatcher dispatcher) {

@@ -19,14 +19,16 @@
 package org.apache.flink.runtime.controlplane.dispatcher.runner;
 
 import org.apache.flink.runtime.clusterframework.ApplicationStatus;
-import org.apache.flink.runtime.controlplane.webmonitor.StreamManagerDispatcherGateway;
+import org.apache.flink.runtime.controlplane.dispatcher.StreamManagerDispatcherGateway;
+import org.apache.flink.runtime.dispatcher.DispatcherGateway;
+import org.apache.flink.runtime.dispatcher.runner.DefaultDispatcherRunner;
 
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 /**
  * {@link StreamManagerDispatcherLeaderProcess} implementation which is stopped. This class
- * is useful as the initial state of the {@link DefaultStreamManagerDispatcherRunner}.
+ * is useful as the initial state of the {@link DefaultDispatcherRunner}.
  */
 public enum StoppedStreamManagerDispatcherLeaderProcess implements StreamManagerDispatcherLeaderProcess {
 	INSTANCE;
@@ -44,7 +46,7 @@ public enum StoppedStreamManagerDispatcherLeaderProcess implements StreamManager
 	}
 
 	@Override
-	public CompletableFuture<StreamManagerDispatcherGateway> getDispatcherGateway() {
+	public CompletableFuture<StreamManagerDispatcherGateway> getStreamManagerDispatcherGateway() {
 		throw new UnsupportedOperationException("This method should never be called.");
 	}
 
