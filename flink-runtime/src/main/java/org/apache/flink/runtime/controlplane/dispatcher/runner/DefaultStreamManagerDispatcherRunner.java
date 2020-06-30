@@ -45,7 +45,7 @@ public final class DefaultStreamManagerDispatcherRunner implements StreamManager
 
 	private final FatalErrorHandler fatalErrorHandler;
 
-	private final DispatcherLeaderProcessFactory dispatcherLeaderProcessFactory;
+	private final StreamManagerDispatcherLeaderProcessFactory streamManagerDispatcherLeaderProcessFactory;
 
 	private final CompletableFuture<Void> terminationFuture;
 
@@ -53,22 +53,22 @@ public final class DefaultStreamManagerDispatcherRunner implements StreamManager
 
 	private boolean running;
 
-	private DispatcherLeaderProcess dispatcherLeaderProcess;
+	private StreamManagerDispatcherLeaderProcess streamManagerDispatcherLeaderProcess;
 
 	private CompletableFuture<Void> previousDispatcherLeaderProcessTerminationFuture;
 
 	private DefaultStreamManagerDispatcherRunner(
 			LeaderElectionService leaderElectionService,
 			FatalErrorHandler fatalErrorHandler,
-			DispatcherLeaderProcessFactory dispatcherLeaderProcessFactory) {
+			StreamManagerDispatcherLeaderProcessFactory streamManagerDispatcherLeaderProcessFactory) {
 		this.leaderElectionService = leaderElectionService;
 		this.fatalErrorHandler = fatalErrorHandler;
-		this.dispatcherLeaderProcessFactory = dispatcherLeaderProcessFactory;
+		this.streamManagerDispatcherLeaderProcessFactory = streamManagerDispatcherLeaderProcessFactory;
 		this.terminationFuture = new CompletableFuture<>();
 		this.shutDownFuture = new CompletableFuture<>();
 
 		this.running = true;
-		this.dispatcherLeaderProcess = StoppedDispatcherLeaderProcess.INSTANCE;
+		this.streamManagerDispatcherLeaderProcess = StoppedStreamManagerDispatcherLeaderProcess.INSTANCE;
 		this.previousDispatcherLeaderProcessTerminationFuture = CompletableFuture.completedFuture(null);
 	}
 
@@ -108,38 +108,38 @@ public final class DefaultStreamManagerDispatcherRunner implements StreamManager
 	private void startNewDispatcherLeaderProcess(UUID leaderSessionID) {
 		stopDispatcherLeaderProcess();
 
-		dispatcherLeaderProcess = createNewDispatcherLeaderProcess(leaderSessionID);
+		streamManagerDispatcherLeaderProcess = createNewDispatcherLeaderProcess(leaderSessionID);
 
-		final DispatcherLeaderProcess newDispatcherLeaderProcess = dispatcherLeaderProcess;
+		final StreamManagerDispatcherLeaderProcess newStreamManagerDispatcherLeaderProcess = streamManagerDispatcherLeaderProcess;
 		FutureUtils.assertNoException(
-			previousDispatcherLeaderProcessTerminationFuture.thenRun(newDispatcherLeaderProcess::start));
+			previousDispatcherLeaderProcessTerminationFuture.thenRun(newStreamManagerDispatcherLeaderProcess::start));
 	}
 
 	private void stopDispatcherLeaderProcess() {
-		final CompletableFuture<Void> terminationFuture = dispatcherLeaderProcess.closeAsync();
+		final CompletableFuture<Void> terminationFuture = streamManagerDispatcherLeaderProcess.closeAsync();
 		previousDispatcherLeaderProcessTerminationFuture = FutureUtils.completeAll(
 			Arrays.asList(
 				previousDispatcherLeaderProcessTerminationFuture,
 				terminationFuture));
 	}
 
-	private DispatcherLeaderProcess createNewDispatcherLeaderProcess(UUID leaderSessionID) {
-		LOG.debug("Create new {} with leader session id {}.", DispatcherLeaderProcess.class.getSimpleName(), leaderSessionID);
+	private StreamManagerDispatcherLeaderProcess createNewDispatcherLeaderProcess(UUID leaderSessionID) {
+		LOG.debug("Create new {} with leader session id {}.", StreamManagerDispatcherLeaderProcess.class.getSimpleName(), leaderSessionID);
 
-		final DispatcherLeaderProcess newDispatcherLeaderProcess = dispatcherLeaderProcessFactory.create(leaderSessionID);
+		final StreamManagerDispatcherLeaderProcess newStreamManagerDispatcherLeaderProcess = streamManagerDispatcherLeaderProcessFactory.create(leaderSessionID);
 
-		forwardShutDownFuture(newDispatcherLeaderProcess);
-		forwardConfirmLeaderSessionFuture(leaderSessionID, newDispatcherLeaderProcess);
+		forwardShutDownFuture(newStreamManagerDispatcherLeaderProcess);
+		forwardConfirmLeaderSessionFuture(leaderSessionID, newStreamManagerDispatcherLeaderProcess);
 
-		return newDispatcherLeaderProcess;
+		return newStreamManagerDispatcherLeaderProcess;
 	}
 
-	private void forwardShutDownFuture(DispatcherLeaderProcess newDispatcherLeaderProcess) {
-		newDispatcherLeaderProcess.getShutDownFuture().whenComplete(
+	private void forwardShutDownFuture(StreamManagerDispatcherLeaderProcess newStreamManagerDispatcherLeaderProcess) {
+		newStreamManagerDispatcherLeaderProcess.getShutDownFuture().whenComplete(
 			(applicationStatus, throwable) -> {
 				synchronized (lock) {
 					// ignore if no longer running or if leader processes is no longer valid
-					if (running && this.dispatcherLeaderProcess == newDispatcherLeaderProcess) {
+					if (running && this.streamManagerDispatcherLeaderProcess == newStreamManagerDispatcherLeaderProcess) {
 						if (throwable != null) {
 							shutDownFuture.completeExceptionally(throwable);
 						} else {
@@ -150,9 +150,9 @@ public final class DefaultStreamManagerDispatcherRunner implements StreamManager
 			});
 	}
 
-	private void forwardConfirmLeaderSessionFuture(UUID leaderSessionID, DispatcherLeaderProcess newDispatcherLeaderProcess) {
+	private void forwardConfirmLeaderSessionFuture(UUID leaderSessionID, StreamManagerDispatcherLeaderProcess newStreamManagerDispatcherLeaderProcess) {
 		FutureUtils.assertNoException(
-			newDispatcherLeaderProcess.getLeaderAddressFuture().thenAccept(
+			newStreamManagerDispatcherLeaderProcess.getLeaderAddressFuture().thenAccept(
 				leaderAddress -> {
 					if (leaderElectionService.hasLeadership(leaderSessionID)) {
 						leaderElectionService.confirmLeadership(leaderSessionID, leaderAddress);
@@ -186,11 +186,11 @@ public final class DefaultStreamManagerDispatcherRunner implements StreamManager
 	public static StreamManagerDispatcherRunner create(
 			LeaderElectionService leaderElectionService,
 			FatalErrorHandler fatalErrorHandler,
-			DispatcherLeaderProcessFactory dispatcherLeaderProcessFactory) throws Exception {
+			StreamManagerDispatcherLeaderProcessFactory streamManagerDispatcherLeaderProcessFactory) throws Exception {
 		final DefaultStreamManagerDispatcherRunner dispatcherRunner = new DefaultStreamManagerDispatcherRunner(
 			leaderElectionService,
 			fatalErrorHandler,
-			dispatcherLeaderProcessFactory);
-		return DispatcherRunnerLeaderElectionLifecycleManager.createFor(dispatcherRunner, leaderElectionService);
+			streamManagerDispatcherLeaderProcessFactory);
+		return StreamManagerDispatcherRunnerLeaderElectionLifecycleManager.createFor(dispatcherRunner, leaderElectionService);
 	}
 }

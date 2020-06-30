@@ -26,12 +26,12 @@ import org.apache.flink.runtime.controlplane.webmonitor.StreamManagerDispatcherG
 
 import java.util.concurrent.CompletableFuture;
 
-class DefaultDispatcherGatewayService implements AbstractDispatcherLeaderProcess.DispatcherGatewayService {
+class DefaultStreamManagerDispatcherGatewayService implements AbstractStreamManagerDispatcherLeaderProcess.DispatcherGatewayService {
 
 	private final StreamManagerDispatcher dispatcher;
 	private final StreamManagerDispatcherGateway dispatcherGateway;
 
-	private DefaultDispatcherGatewayService(StreamManagerDispatcher dispatcher) {
+	private DefaultStreamManagerDispatcherGatewayService(StreamManagerDispatcher dispatcher) {
 		this.dispatcher = dispatcher;
 		this.dispatcherGateway = dispatcher.getSelfGateway(StreamManagerDispatcherGateway.class);
 	}
@@ -56,7 +56,7 @@ class DefaultDispatcherGatewayService implements AbstractDispatcherLeaderProcess
 		return dispatcher.closeAsync();
 	}
 
-	public static DefaultDispatcherGatewayService from(StreamManagerDispatcher dispatcher) {
-		return new DefaultDispatcherGatewayService(dispatcher);
+	public static DefaultStreamManagerDispatcherGatewayService from(StreamManagerDispatcher dispatcher) {
+		return new DefaultStreamManagerDispatcherGatewayService(dispatcher);
 	}
 }
