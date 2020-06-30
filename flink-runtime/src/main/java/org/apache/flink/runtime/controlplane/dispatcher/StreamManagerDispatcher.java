@@ -91,7 +91,7 @@ public abstract class StreamManagerDispatcher
 
 	private CompletableFuture<Void> persistAndRunJob(JobGraph jobGraph) {
 		// TODO: jobGraphWriter
-		final CompletableFuture<Void> runSMFuture = runStream(jobGraph);
+		final CompletableFuture<Void> runSMFuture = runStreamManager(jobGraph);
 		return runSMFuture.whenComplete(BiConsumerWithException.unchecked((Object ignored, Throwable throwable) -> {
 			if (throwable != null) {
 				final Throwable strippedThrowable = ExceptionUtils.stripCompletionException(throwable);
