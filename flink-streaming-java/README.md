@@ -26,7 +26,7 @@ mvn clean install -Dcheckstyle.skip -DskipTests -Dmaven.javadoc.skip
 
 ## Run Entrypoint on IntelliJ IDEA
 
-1. Open the [StandaloneSessionStreamManagerEntrypoint.java](org/apache/flink/streaming/controlplane/entrypoint/StandaloneSessionStreamManagerEntrypoint.java)
+1. Open the [StandaloneSessionStreamManagerEntrypoint.java](src/main/java/org/apache/flink/streaming/controlplane/entrypoint/StandaloneSessionStreamManagerEntrypoint.java)
 
 2. Cilck the Run Button
 
