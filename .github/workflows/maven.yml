@@ -21,7 +21,12 @@ jobs:
     - name: Build with Maven
       run: |
         cd flink-core
+        mvn clean install -Dcheckstyle.skip -DskipTests
+        cd ../flink-filesystems
         mvn clean install -Dcheckstyle.skip -DskipTests 
         cd ../flink-runtime
-        mvn clean verify -Dcheckstyle.skip -DskipTests 
+        mvn clean install -Dcheckstyle.skip -DskipTests 
+        cd ../flink-streaming-java/
+        mvn clean install -Dcheckstyle.skip -DskipTests 
+
         
