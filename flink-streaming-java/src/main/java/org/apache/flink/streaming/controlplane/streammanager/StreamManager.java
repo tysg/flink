@@ -116,6 +116,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			gateway -> {
 				try {
 					log.info("connect successfully");
+					gateway.submitJob(jobGraph, Time.seconds(10));
 				} catch (Exception e) {
 					log.error("Error while invoking runtime dispatcher RMI.", e);
 				}
