@@ -25,8 +25,8 @@ jobs:
         cd ../flink-filesystems
         mvn clean install -Dcheckstyle.skip -DskipTests 
         cd ../flink-runtime
-        mvn clean verify -Dcheckstyle.skip -DskipTests 
+        mvn clean install -Dcheckstyle.skip -DskipTests 
         cd ../flink-streaming-java/
-        mvn clean verify -Dcheckstyle.skip -DskipTests 
+        mvn clean install -Dcheckstyle.skip -DskipTests 
 
         
