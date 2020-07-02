@@ -76,6 +76,11 @@ public class EmbeddedHaServices extends AbstractNonHaServices {
 	}
 
 	@Override
+	public LeaderRetrievalService getStreamManagerDispatcherLeaderRetriever() {
+		return null;
+	}
+
+	@Override
 	public LeaderElectionService getResourceManagerLeaderElectionService() {
 		return resourceManagerLeaderService.createLeaderElectionService();
 	}
@@ -83,6 +88,11 @@ public class EmbeddedHaServices extends AbstractNonHaServices {
 	@Override
 	public LeaderElectionService getDispatcherLeaderElectionService() {
 		return dispatcherLeaderService.createLeaderElectionService();
+	}
+
+	@Override
+	public LeaderElectionService getStreamManagerDispatcherLeaderElectionService() {
+		return null;
 	}
 
 	@Override

@@ -79,6 +79,12 @@ public interface HighAvailabilityServices extends ClientHighAvailabilityServices
 	LeaderRetrievalService getDispatcherLeaderRetriever();
 
 	/**
+	 * Gets the leader retriever for the dispatcher. This leader retrieval service
+	 * is not always accessible.
+	 */
+	LeaderRetrievalService getStreamManagerDispatcherLeaderRetriever();
+
+	/**
 	 * Gets the leader retriever for the job JobMaster which is responsible for the given job.
 	 *
 	 * @param jobID The identifier of the job.
@@ -129,6 +135,13 @@ public interface HighAvailabilityServices extends ClientHighAvailabilityServices
 	 * @return Leader election service for the dispatcher leader election
 	 */
 	LeaderElectionService getDispatcherLeaderElectionService();
+
+	/**
+	 * Gets the leader election service for the cluster's stream manager dispatcher.
+	 *
+	 * @return Leader election service for the dispatcher leader election
+	 */
+	LeaderElectionService getStreamManagerDispatcherLeaderElectionService();
 
 	/**
 	 * Gets the leader election service for the given job.

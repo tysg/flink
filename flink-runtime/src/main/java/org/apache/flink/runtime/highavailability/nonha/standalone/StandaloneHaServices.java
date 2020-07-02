@@ -48,6 +48,9 @@ public class StandaloneHaServices extends AbstractNonHaServices {
 	/** The fix address of the Dispatcher */
 	private final String dispatcherAddress;
 
+	/** The fix address of the streammanager Dispatcher */
+	private final String smDispatcherAddress;
+
 	/** The fix address of the JobManager */
 	private final String jobManagerAddress;
 
@@ -63,11 +66,14 @@ public class StandaloneHaServices extends AbstractNonHaServices {
 			String resourceManagerAddress,
 			String dispatcherAddress,
 			String jobManagerAddress,
-			String clusterRestEndpointAddress) {
+			String clusterRestEndpointAddress,
+			String smDispatcherAddress) {
 		this.resourceManagerAddress = checkNotNull(resourceManagerAddress, "resourceManagerAddress");
 		this.dispatcherAddress = checkNotNull(dispatcherAddress, "dispatcherAddress");
 		this.jobManagerAddress = checkNotNull(jobManagerAddress, "jobManagerAddress");
 		this.clusterRestEndpointAddress = checkNotNull(clusterRestEndpointAddress, clusterRestEndpointAddress);
+		this.smDispatcherAddress = checkNotNull(smDispatcherAddress, "smDispatcherAddress");
+
 	}
 
 	// ------------------------------------------------------------------------
@@ -94,6 +100,15 @@ public class StandaloneHaServices extends AbstractNonHaServices {
 	}
 
 	@Override
+	public LeaderRetrievalService getStreamManagerDispatcherLeaderRetriever() {
+		synchronized (lock) {
+			checkNotShutdown();
+
+			return new StandaloneLeaderRetrievalService(smDispatcherAddress, DEFAULT_LEADER_ID);
+		}
+	}
+
+	@Override
 	public LeaderElectionService getResourceManagerLeaderElectionService() {
 		synchronized (lock) {
 			checkNotShutdown();
@@ -104,6 +119,15 @@ public class StandaloneHaServices extends AbstractNonHaServices {
 
 	@Override
 	public LeaderElectionService getDispatcherLeaderElectionService() {
+		synchronized (lock) {
+			checkNotShutdown();
+
+			return new StandaloneLeaderElectionService();
+		}
+	}
+
+	@Override
+	public LeaderElectionService getStreamManagerDispatcherLeaderElectionService() {
 		synchronized (lock) {
 			checkNotShutdown();
 

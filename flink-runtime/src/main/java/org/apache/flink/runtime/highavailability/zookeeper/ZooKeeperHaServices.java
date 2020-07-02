@@ -141,6 +141,11 @@ public class ZooKeeperHaServices implements HighAvailabilityServices {
 	}
 
 	@Override
+	public LeaderRetrievalService getStreamManagerDispatcherLeaderRetriever() {
+		return null;
+	}
+
+	@Override
 	public LeaderRetrievalService getJobManagerLeaderRetriever(JobID jobID) {
 		return ZooKeeperUtils.createLeaderRetrievalService(client, configuration, getPathForJobManager(jobID));
 	}
@@ -163,6 +168,11 @@ public class ZooKeeperHaServices implements HighAvailabilityServices {
 	@Override
 	public LeaderElectionService getDispatcherLeaderElectionService() {
 		return ZooKeeperUtils.createLeaderElectionService(client, configuration, DISPATCHER_LEADER_PATH);
+	}
+
+	@Override
+	public LeaderElectionService getStreamManagerDispatcherLeaderElectionService() {
+		return null;
 	}
 
 	@Override

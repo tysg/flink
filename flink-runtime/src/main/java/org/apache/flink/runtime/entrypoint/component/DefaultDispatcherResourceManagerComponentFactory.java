@@ -25,15 +25,12 @@ import org.apache.flink.configuration.RestOptions;
 import org.apache.flink.runtime.blob.BlobServer;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
-import org.apache.flink.runtime.controlplane.dispatcher.SessionStreamManagerDispatcherFactory;
-import org.apache.flink.runtime.controlplane.dispatcher.runner.DefaultStreamManagerDispatcherRunnerFactory;
-import org.apache.flink.runtime.controlplane.dispatcher.runner.StreamManagerDispatcherRunner;
-import org.apache.flink.runtime.controlplane.dispatcher.runner.StreamManagerDispatcherRunnerFactory;
-import org.apache.flink.runtime.controlplane.rest.JobStreamManagerRestEndpointFactory;
-import org.apache.flink.runtime.controlplane.rest.SessionStreamManagerRestEndpointFactory;
-import org.apache.flink.runtime.controlplane.rest.StreamManagerRestEndpointFactory;
-import org.apache.flink.runtime.controlplane.webmonitor.StreamManagerWebMonitorEndpoint;
-import org.apache.flink.runtime.dispatcher.*;
+import org.apache.flink.runtime.dispatcher.ArchivedExecutionGraphStore;
+import org.apache.flink.runtime.dispatcher.DispatcherGateway;
+import org.apache.flink.runtime.dispatcher.DispatcherId;
+import org.apache.flink.runtime.dispatcher.HistoryServerArchivist;
+import org.apache.flink.runtime.dispatcher.PartialDispatcherServices;
+import org.apache.flink.runtime.dispatcher.SessionDispatcherFactory;
 import org.apache.flink.runtime.dispatcher.runner.DefaultDispatcherRunnerFactory;
 import org.apache.flink.runtime.dispatcher.runner.DispatcherRunner;
 import org.apache.flink.runtime.dispatcher.runner.DispatcherRunnerFactory;
@@ -64,10 +61,12 @@ import org.apache.flink.runtime.webmonitor.retriever.MetricQueryServiceRetriever
 import org.apache.flink.runtime.webmonitor.retriever.impl.RpcGatewayRetriever;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
@@ -90,45 +89,31 @@ public class DefaultDispatcherResourceManagerComponentFactory implements Dispatc
 	@Nonnull
 	private final RestEndpointFactory<?> restEndpointFactory;
 
-	//	@Nonnull
-	private final StreamManagerRestEndpointFactory<?> smRestEndpointFactory;
-	private StreamManagerDispatcherRunnerFactory smDispatcherRunnerFactory;
-
 	DefaultDispatcherResourceManagerComponentFactory(
-		@Nonnull DispatcherRunnerFactory dispatcherRunnerFactory,
-		@Nonnull ResourceManagerFactory<?> resourceManagerFactory,
-		@Nonnull RestEndpointFactory<?> restEndpointFactory,
-		@Nonnull StreamManagerRestEndpointFactory<?> smRestEndpointFactory) {
+			@Nonnull DispatcherRunnerFactory dispatcherRunnerFactory,
+			@Nonnull ResourceManagerFactory<?> resourceManagerFactory,
+			@Nonnull RestEndpointFactory<?> restEndpointFactory) {
 		this.dispatcherRunnerFactory = dispatcherRunnerFactory;
 		this.resourceManagerFactory = resourceManagerFactory;
 		this.restEndpointFactory = restEndpointFactory;
-		this.smRestEndpointFactory = smRestEndpointFactory;
 	}
-
-	DefaultDispatcherResourceManagerComponentFactory tempAddSmDispatcherRunnerFactory(
-		StreamManagerDispatcherRunnerFactory smDispatcherRunnerFactory) {
-		this.smDispatcherRunnerFactory = smDispatcherRunnerFactory;
-		return this;
-	}
-
 
 	@Override
 	public DispatcherResourceManagerComponent create(
-		Configuration configuration,
-		Executor ioExecutor,
-		RpcService rpcService,
-		HighAvailabilityServices highAvailabilityServices,
-		BlobServer blobServer,
-		HeartbeatServices heartbeatServices,
-		MetricRegistry metricRegistry,
-		ArchivedExecutionGraphStore archivedExecutionGraphStore,
-		MetricQueryServiceRetriever metricQueryServiceRetriever,
-		FatalErrorHandler fatalErrorHandler) throws Exception {
+			Configuration configuration,
+			Executor ioExecutor,
+			RpcService rpcService,
+			HighAvailabilityServices highAvailabilityServices,
+			BlobServer blobServer,
+			HeartbeatServices heartbeatServices,
+			MetricRegistry metricRegistry,
+			ArchivedExecutionGraphStore archivedExecutionGraphStore,
+			MetricQueryServiceRetriever metricQueryServiceRetriever,
+			FatalErrorHandler fatalErrorHandler) throws Exception {
 
 		LeaderRetrievalService dispatcherLeaderRetrievalService = null;
 		LeaderRetrievalService resourceManagerRetrievalService = null;
 		WebMonitorEndpoint<?> webMonitorEndpoint = null;
-		StreamManagerWebMonitorEndpoint<?> smWebMonitorEndpoint = null;
 		ResourceManager<?> resourceManager = null;
 		ResourceManagerMetricGroup resourceManagerMetricGroup = null;
 		DispatcherRunner dispatcherRunner = null;
@@ -161,10 +146,10 @@ public class DefaultDispatcherResourceManagerComponentFactory implements Dispatc
 			final MetricFetcher metricFetcher = updateInterval == 0
 				? VoidMetricFetcher.INSTANCE
 				: MetricFetcherImpl.fromConfiguration(
-				configuration,
-				metricQueryServiceRetriever,
-				dispatcherGatewayRetriever,
-				executor);
+					configuration,
+					metricQueryServiceRetriever,
+					dispatcherGatewayRetriever,
+					executor);
 
 			webMonitorEndpoint = restEndpointFactory.createRestEndpoint(
 				configuration,
@@ -178,18 +163,6 @@ public class DefaultDispatcherResourceManagerComponentFactory implements Dispatc
 
 			log.debug("Starting Dispatcher REST endpoint.");
 			webMonitorEndpoint.start();
-
-			smWebMonitorEndpoint = smRestEndpointFactory.createRestEndpoint(
-				configuration,
-				dispatcherGatewayRetriever,
-				blobServer,
-				executor,
-				metricFetcher,
-				highAvailabilityServices.getClusterRestEndpointLeaderElectionService(),
-				fatalErrorHandler);
-
-			log.debug("Starting StreamManagerDispatcher REST endpoint.");
-			smWebMonitorEndpoint.start();
 
 			final String hostname = RpcUtils.getHostname(rpcService);
 
@@ -228,16 +201,6 @@ public class DefaultDispatcherResourceManagerComponentFactory implements Dispatc
 				rpcService,
 				partialDispatcherServices);
 
-			/* todo StreamManagerDispatcher will remove to other module in future */
-			log.debug("Starting Stream Manager Dispatcher.");
-			StreamManagerDispatcherRunner smDispatcherRunner = smDispatcherRunnerFactory.createStreamManagerDispatcherRunner(
-				highAvailabilityServices.getDispatcherLeaderElectionService(),
-				fatalErrorHandler,
-				new HaServicesJobGraphStoreFactory(highAvailabilityServices),
-				ioExecutor,
-				rpcService,
-				partialDispatcherServices);
-
 			log.debug("Starting ResourceManager.");
 			resourceManager.start();
 
@@ -246,13 +209,10 @@ public class DefaultDispatcherResourceManagerComponentFactory implements Dispatc
 
 			return new DispatcherResourceManagerComponent(
 				dispatcherRunner,
-				smDispatcherRunner,
 				resourceManager,
 				dispatcherLeaderRetrievalService,
 				resourceManagerRetrievalService,
-				webMonitorEndpoint,
-				smWebMonitorEndpoint
-			);
+				webMonitorEndpoint);
 
 		} catch (Exception exception) {
 			// clean up all started components
@@ -303,26 +263,19 @@ public class DefaultDispatcherResourceManagerComponentFactory implements Dispatc
 	}
 
 	public static DefaultDispatcherResourceManagerComponentFactory createSessionComponentFactory(
-		ResourceManagerFactory<?> resourceManagerFactory) {
+			ResourceManagerFactory<?> resourceManagerFactory) {
 		return new DefaultDispatcherResourceManagerComponentFactory(
 			DefaultDispatcherRunnerFactory.createSessionRunner(SessionDispatcherFactory.INSTANCE),
 			resourceManagerFactory,
-			SessionRestEndpointFactory.INSTANCE,
-			SessionStreamManagerRestEndpointFactory.INSTANCE)
-			.tempAddSmDispatcherRunnerFactory(
-				DefaultStreamManagerDispatcherRunnerFactory.createSessionRunner(
-					SessionStreamManagerDispatcherFactory.INSTANCE));
+			SessionRestEndpointFactory.INSTANCE);
 	}
 
 	public static DefaultDispatcherResourceManagerComponentFactory createJobComponentFactory(
-		ResourceManagerFactory<?> resourceManagerFactory,
-		JobGraphRetriever jobGraphRetriever) {
-		// todo for sm job mode
+			ResourceManagerFactory<?> resourceManagerFactory,
+			JobGraphRetriever jobGraphRetriever) {
 		return new DefaultDispatcherResourceManagerComponentFactory(
 			DefaultDispatcherRunnerFactory.createJobRunner(jobGraphRetriever),
 			resourceManagerFactory,
-			JobRestEndpointFactory.INSTANCE,
-			JobStreamManagerRestEndpointFactory.INSTANCE)
-			.tempAddSmDispatcherRunnerFactory(DefaultStreamManagerDispatcherRunnerFactory.createJobRunner(null));
+			JobRestEndpointFactory.INSTANCE);
 	}
 }

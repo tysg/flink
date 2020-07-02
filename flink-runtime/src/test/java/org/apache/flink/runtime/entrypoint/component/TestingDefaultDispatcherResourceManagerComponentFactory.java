@@ -19,7 +19,6 @@
 package org.apache.flink.runtime.entrypoint.component;
 
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
-import org.apache.flink.runtime.controlplane.rest.SessionStreamManagerRestEndpointFactory;
 import org.apache.flink.runtime.dispatcher.runner.DispatcherRunnerFactory;
 import org.apache.flink.runtime.resourcemanager.ResourceManagerFactory;
 import org.apache.flink.runtime.rest.SessionRestEndpointFactory;
@@ -34,7 +33,6 @@ public class TestingDefaultDispatcherResourceManagerComponentFactory {
 		return new DefaultDispatcherResourceManagerComponentFactory(
 			dispatcherRunnerFactory,
 			resourceManagerFactory,
-			SessionRestEndpointFactory.INSTANCE,
-			SessionStreamManagerRestEndpointFactory.INSTANCE);
+			SessionRestEndpointFactory.INSTANCE);
 	}
 }
