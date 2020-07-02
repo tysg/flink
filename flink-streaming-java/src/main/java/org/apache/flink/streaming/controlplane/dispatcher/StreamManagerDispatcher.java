@@ -27,6 +27,9 @@ import org.apache.flink.runtime.client.DuplicateJobSubmissionException;
 import org.apache.flink.runtime.client.JobSubmissionException;
 import org.apache.flink.runtime.clusterframework.ApplicationStatus;
 import org.apache.flink.runtime.concurrent.FutureUtils;
+import org.apache.flink.runtime.dispatcher.DispatcherGateway;
+import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalService;
+import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
 import org.apache.flink.streaming.controlplane.streammanager.StreamManagerRunner;
 import org.apache.flink.runtime.dispatcher.ArchivedExecutionGraphStore;
 import org.apache.flink.runtime.dispatcher.DispatcherException;
@@ -92,12 +95,15 @@ public abstract class StreamManagerDispatcher extends PermanentlyFencedRpcEndpoi
 
 	protected final CompletableFuture<ApplicationStatus> shutDownFuture;
 
+	private final LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever;
+
 	public StreamManagerDispatcher(
-			RpcService rpcService,
-			String endpointId,
-			StreamManagerDispatcherId fencingToken,
-			Collection<JobGraph> recoveredJobs,
-			StreamManagerDispatcherServices dispatcherServices) throws Exception {
+		RpcService rpcService,
+		String endpointId,
+		StreamManagerDispatcherId fencingToken,
+		Collection<JobGraph> recoveredJobs,
+		StreamManagerDispatcherServices dispatcherServices,
+		LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever) throws Exception {
 		super(rpcService, endpointId, fencingToken);
 		Preconditions.checkNotNull(dispatcherServices);
 
@@ -125,6 +131,8 @@ public abstract class StreamManagerDispatcher extends PermanentlyFencedRpcEndpoi
 		this.shutDownFuture = new CompletableFuture<>();
 
 		this.recoveredJobs = new HashSet<>(recoveredJobs);
+
+		this.dispatcherGatewayRetriever = dispatcherGatewayRetriever;
 	}
 
 	//------------------------------------------------------
@@ -293,7 +301,7 @@ public abstract class StreamManagerDispatcher extends PermanentlyFencedRpcEndpoi
 					configuration, //configuration,
 					rpcService,
 					highAvailabilityServices, //highAvailabilityServices,
-					heartbeatServices, //heartbeatServices,
+					dispatcherGatewayRetriever, //heartbeatServices,
 					fatalErrorHandler //fatalErrorHandler
 				)),
 			rpcService.getExecutor());

@@ -91,14 +91,24 @@ public class DefaultStreamManagerDispatcherComponentFactory implements StreamMan
 		LeaderRetrievalService smDispatcherLeaderRetrievalService = null;
 		StreamManagerWebMonitorEndpoint<?> smWebMonitorEndpoint = null;
 		StreamManagerDispatcherRunner smDispatcherRunner = null;
+		LeaderRetrievalService dispatcherLeaderRetrievalService = null;
 
 		try {
 			smDispatcherLeaderRetrievalService = highAvailabilityServices.getStreamManagerDispatcherLeaderRetriever();
+
+			dispatcherLeaderRetrievalService = highAvailabilityServices.getDispatcherLeaderRetriever();
 
 			final LeaderGatewayRetriever<StreamManagerDispatcherGateway> smDispatcherGatewayRetriever = new RpcGatewayRetriever<>(
 				rpcService,
 				StreamManagerDispatcherGateway.class,
 				StreamManagerDispatcherId::fromUuid,
+				10,
+				Time.milliseconds(50L));
+
+			final LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever = new RpcGatewayRetriever<>(
+				rpcService,
+				DispatcherGateway.class,
+				DispatcherId::fromUuid,
 				10,
 				Time.milliseconds(50L));
 
@@ -134,10 +144,12 @@ public class DefaultStreamManagerDispatcherComponentFactory implements StreamMan
 				new HaServicesJobGraphStoreFactory(highAvailabilityServices),
 				ioExecutor,
 				rpcService,
-				partialSmDispatcherServices);
+				partialSmDispatcherServices,
+				dispatcherGatewayRetriever);
 
 
 			smDispatcherLeaderRetrievalService.start(smDispatcherGatewayRetriever);
+			dispatcherLeaderRetrievalService.start(dispatcherGatewayRetriever);
 
 			return new StreamManagerDispatcherComponent(
 				smDispatcherRunner,

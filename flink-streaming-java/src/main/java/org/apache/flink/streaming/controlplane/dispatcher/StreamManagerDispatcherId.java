@@ -27,6 +27,7 @@ import java.util.UUID;
  */
 public class StreamManagerDispatcherId extends AbstractID {
 
+	// TODO: UID should be different from previous.
 	private static final long serialVersionUID = -1654056277003743966L;
 
 	private StreamManagerDispatcherId() {}

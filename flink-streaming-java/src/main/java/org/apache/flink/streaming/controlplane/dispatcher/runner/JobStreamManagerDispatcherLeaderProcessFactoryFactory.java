@@ -18,6 +18,8 @@
 
 package org.apache.flink.streaming.controlplane.dispatcher.runner;
 
+import org.apache.flink.runtime.dispatcher.DispatcherGateway;
+import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
 import org.apache.flink.streaming.controlplane.dispatcher.JobStreamManagerDispatcherFactory;
 import org.apache.flink.streaming.controlplane.dispatcher.PartialStreamManagerDispatcherServices;
 import org.apache.flink.runtime.dispatcher.runner.JobDispatcherLeaderProcessFactory;
@@ -44,11 +46,12 @@ public class JobStreamManagerDispatcherLeaderProcessFactoryFactory implements St
 
 	@Override
 	public StreamManagerDispatcherLeaderProcessFactory createFactory(
-			JobGraphStoreFactory jobGraphStoreFactory,
-			Executor ioExecutor,
-			RpcService rpcService,
-			PartialStreamManagerDispatcherServices partialDispatcherServices,
-			FatalErrorHandler fatalErrorHandler) {
+		JobGraphStoreFactory jobGraphStoreFactory,
+		Executor ioExecutor,
+		RpcService rpcService,
+		PartialStreamManagerDispatcherServices partialDispatcherServices,
+		FatalErrorHandler fatalErrorHandler,
+		LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever) {
 
 		final JobGraph jobGraph;
 
@@ -61,7 +64,8 @@ public class JobStreamManagerDispatcherLeaderProcessFactoryFactory implements St
 		final DefaultStreamManagerDispatcherGatewayServiceFactory defaultDispatcherServiceFactory = new DefaultStreamManagerDispatcherGatewayServiceFactory(
 			JobStreamManagerDispatcherFactory.INSTANCE,
 			rpcService,
-			partialDispatcherServices);
+			partialDispatcherServices,
+			dispatcherGatewayRetriever);
 
 		return new JobStreamManagerDispatcherLeaderProcessFactory(
 			defaultDispatcherServiceFactory,

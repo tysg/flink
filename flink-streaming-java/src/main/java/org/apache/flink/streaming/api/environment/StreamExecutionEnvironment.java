@@ -187,7 +187,7 @@ public class StreamExecutionEnvironment {
 	 */
 	@PublicEvolving
 	public StreamExecutionEnvironment(final Configuration configuration) {
-		this(new DefaultExecutorServiceLoader(), configuration, null);
+		this(DefaultExecutorServiceLoader.INSTANCE, configuration, null);
 	}
 
 	/**

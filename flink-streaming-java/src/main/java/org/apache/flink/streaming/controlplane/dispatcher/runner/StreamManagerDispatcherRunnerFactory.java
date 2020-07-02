@@ -18,6 +18,8 @@
 
 package org.apache.flink.streaming.controlplane.dispatcher.runner;
 
+import org.apache.flink.runtime.dispatcher.DispatcherGateway;
+import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
 import org.apache.flink.streaming.controlplane.dispatcher.PartialStreamManagerDispatcherServices;
 import org.apache.flink.runtime.jobmanager.JobGraphStoreFactory;
 import org.apache.flink.runtime.leaderelection.LeaderElectionService;
@@ -37,5 +39,6 @@ public interface StreamManagerDispatcherRunnerFactory {
 		JobGraphStoreFactory jobGraphStoreFactory,
 		Executor ioExecutor,
 		RpcService rpcService,
-		PartialStreamManagerDispatcherServices partialDispatcherServices) throws Exception;
+		PartialStreamManagerDispatcherServices partialDispatcherServices,
+		LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever) throws Exception;
 }
