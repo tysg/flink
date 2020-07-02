@@ -20,6 +20,8 @@ package org.apache.flink.runtime.entrypoint.component;
 
 import org.apache.flink.runtime.clusterframework.ApplicationStatus;
 import org.apache.flink.runtime.concurrent.FutureUtils;
+import org.apache.flink.streaming.controlplane.dispatcher.runner.StreamManagerDispatcherRunner;
+import org.apache.flink.streaming.controlplane.webmonitor.StreamManagerWebMonitorEndpoint;
 import org.apache.flink.runtime.dispatcher.Dispatcher;
 import org.apache.flink.runtime.dispatcher.runner.DispatcherRunner;
 import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalService;
@@ -63,6 +65,15 @@ public class DispatcherResourceManagerComponent implements AutoCloseableAsync {
 	@Nonnull
 	private final WebMonitorEndpoint<?> webMonitorEndpoint;
 
+	@Nonnull
+	private final StreamManagerWebMonitorEndpoint<?> smWebMonitorEndpoint;
+
+	@Nonnull
+	private final StreamManagerDispatcherRunner smDispatcherRunner;
+
+	@Nonnull
+	private final LeaderRetrievalService smDispatcherLeaderRetrievalService;
+
 	private final CompletableFuture<Void> terminationFuture;
 
 	private final CompletableFuture<ApplicationStatus> shutDownFuture;
@@ -70,24 +81,32 @@ public class DispatcherResourceManagerComponent implements AutoCloseableAsync {
 	private final AtomicBoolean isRunning = new AtomicBoolean(true);
 
 	DispatcherResourceManagerComponent(
-			@Nonnull DispatcherRunner dispatcherRunner,
-			@Nonnull ResourceManager<?> resourceManager,
-			@Nonnull LeaderRetrievalService dispatcherLeaderRetrievalService,
-			@Nonnull LeaderRetrievalService resourceManagerRetrievalService,
-			@Nonnull WebMonitorEndpoint<?> webMonitorEndpoint) {
+		@Nonnull DispatcherRunner dispatcherRunner,
+		@Nonnull ResourceManager<?> resourceManager,
+		@Nonnull LeaderRetrievalService dispatcherLeaderRetrievalService,
+		@Nonnull LeaderRetrievalService resourceManagerRetrievalService,
+		@Nonnull WebMonitorEndpoint<?> webMonitorEndpoint,
+		@Nonnull StreamManagerWebMonitorEndpoint<?> smWebMonitorEndpoint,
+		@Nonnull StreamManagerDispatcherRunner smDispatcherRunner,
+		LeaderRetrievalService smDispatcherLeaderRetrievalService) {
 		this.dispatcherRunner = dispatcherRunner;
 		this.resourceManager = resourceManager;
 		this.dispatcherLeaderRetrievalService = dispatcherLeaderRetrievalService;
 		this.resourceManagerRetrievalService = resourceManagerRetrievalService;
 		this.webMonitorEndpoint = webMonitorEndpoint;
+		this.smWebMonitorEndpoint = smWebMonitorEndpoint;
 		this.terminationFuture = new CompletableFuture<>();
 		this.shutDownFuture = new CompletableFuture<>();
+		this.smDispatcherRunner = smDispatcherRunner;
+		this.smDispatcherLeaderRetrievalService = smDispatcherLeaderRetrievalService;
+
 
 		registerShutDownFuture();
 	}
 
 	private void registerShutDownFuture() {
 		FutureUtils.forward(dispatcherRunner.getShutDownFuture(), shutDownFuture);
+		FutureUtils.forward(smDispatcherRunner.getShutDownFuture(), shutDownFuture);
 	}
 
 	public final CompletableFuture<ApplicationStatus> getShutDownFuture() {
@@ -110,7 +129,10 @@ public class DispatcherResourceManagerComponent implements AutoCloseableAsync {
 			final CompletableFuture<Void> closeWebMonitorAndDeregisterAppFuture =
 				FutureUtils.composeAfterwards(webMonitorEndpoint.closeAsync(), () -> deregisterApplication(applicationStatus, diagnostics));
 
-			return FutureUtils.composeAfterwards(closeWebMonitorAndDeregisterAppFuture, this::closeAsyncInternal);
+			final CompletableFuture<Void> closeSMWebMonitorAndDeregisterAppFuture =
+				FutureUtils.composeAfterwards(closeWebMonitorAndDeregisterAppFuture, smWebMonitorEndpoint::closeAsync);
+
+			return FutureUtils.composeAfterwards(closeSMWebMonitorAndDeregisterAppFuture, this::closeAsyncInternal);
 		} else {
 			return terminationFuture;
 		}
@@ -138,12 +160,20 @@ public class DispatcherResourceManagerComponent implements AutoCloseableAsync {
 		}
 
 		try {
+			smDispatcherLeaderRetrievalService.stop();
+		} catch (Exception e) {
+			exception = ExceptionUtils.firstOrSuppressed(e, exception);
+		}
+
+		try {
 			resourceManagerRetrievalService.stop();
 		} catch (Exception e) {
 			exception = ExceptionUtils.firstOrSuppressed(e, exception);
 		}
 
 		terminationFutures.add(dispatcherRunner.closeAsync());
+
+		terminationFutures.add(smDispatcherRunner.closeAsync());
 
 		terminationFutures.add(resourceManager.closeAsync());
 

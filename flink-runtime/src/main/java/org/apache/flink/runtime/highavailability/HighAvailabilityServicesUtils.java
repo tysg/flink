@@ -23,7 +23,6 @@ import org.apache.flink.configuration.*;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.runtime.blob.BlobStoreService;
 import org.apache.flink.runtime.blob.BlobUtils;
-import org.apache.flink.runtime.controlplane.dispatcher.StreamManagerDispatcher;
 import org.apache.flink.runtime.dispatcher.Dispatcher;
 import org.apache.flink.runtime.highavailability.nonha.embedded.EmbeddedHaServices;
 import org.apache.flink.runtime.highavailability.nonha.standalone.StandaloneClientHAServices;
@@ -113,21 +112,22 @@ public class HighAvailabilityServicesUtils {
 					configuration,
 					addressResolution);
 
-				final String smDispatcherRpcUrl = AkkaRpcServiceUtils.getRpcUrl(
-					hostnamePort.f0,
-					hostnamePort.f1,
-					StreamManagerDispatcher.DISPATCHER_NAME,
-					addressResolution,
-					configuration);
-
-//				final Tuple2<String, Integer> smHostnamePort = getStreamManagerAddress(configuration);
-//
 //				final String smDispatcherRpcUrl = AkkaRpcServiceUtils.getRpcUrl(
-//					smHostnamePort.f0,
-//					smHostnamePort.f1,
+//					hostnamePort.f0,
+//					hostnamePort.f1,
 //					StreamManagerDispatcher.DISPATCHER_NAME,
 //					addressResolution,
 //					configuration);
+
+				final Tuple2<String, Integer> smHostnamePort = getStreamManagerAddress(configuration);
+
+				final String smDispatcherRpcUrl = AkkaRpcServiceUtils.getRpcUrl(
+					smHostnamePort.f0,
+					smHostnamePort.f1,
+					// TODO: we need to migrate this util to logical layer.
+					"smDispatcher",
+					addressResolution,
+					configuration);
 
 				return new StandaloneHaServices(
 					resourceManagerRpcUrl,
