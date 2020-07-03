@@ -20,7 +20,7 @@ package org.apache.flink.streaming.controlplane.dispatcher;
 
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.controlplane.streammanager.StreamManagerConfiguration;
-import org.apache.flink.streaming.controlplane.streammanager.StreamManagerRunner;
+import org.apache.flink.runtime.controlplane.streammanager.StreamManagerRunner;
 import org.apache.flink.streaming.controlplane.streammanager.StreamManagerRunnerImpl;
 import org.apache.flink.streaming.controlplane.streammanager.factories.DefaultStreamManagerServiceFactory;
 import org.apache.flink.streaming.controlplane.streammanager.factories.StreamManagerServiceFactory;

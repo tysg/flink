@@ -27,7 +27,7 @@ import org.apache.flink.runtime.client.DuplicateJobSubmissionException;
 import org.apache.flink.runtime.client.JobSubmissionException;
 import org.apache.flink.runtime.clusterframework.ApplicationStatus;
 import org.apache.flink.runtime.concurrent.FutureUtils;
-import org.apache.flink.streaming.controlplane.streammanager.StreamManagerRunner;
+import org.apache.flink.runtime.controlplane.streammanager.StreamManagerRunner;
 import org.apache.flink.runtime.dispatcher.ArchivedExecutionGraphStore;
 import org.apache.flink.runtime.dispatcher.DispatcherException;
 import org.apache.flink.runtime.heartbeat.HeartbeatServices;

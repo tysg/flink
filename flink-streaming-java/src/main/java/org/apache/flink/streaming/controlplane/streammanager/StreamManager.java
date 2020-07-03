@@ -21,11 +21,16 @@ package org.apache.flink.streaming.controlplane.streammanager;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
+import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
+import org.apache.flink.runtime.controlplane.streammanager.StreamManagerId;
+import org.apache.flink.runtime.controlplane.streammanager.StreamManagerService;
+import org.apache.flink.runtime.jobmaster.JobMaster;
 import org.apache.flink.runtime.heartbeat.HeartbeatServices;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobmaster.JobMasterId;
 import org.apache.flink.runtime.messages.Acknowledge;
+import org.apache.flink.runtime.registration.RegistrationResponse;
 import org.apache.flink.runtime.rpc.FatalErrorHandler;
 import org.apache.flink.runtime.rpc.FencedRpcEndpoint;
 import org.apache.flink.runtime.rpc.RpcService;
@@ -108,16 +113,6 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
     }
 
     /**
-     * Disconnects the job manager from the stream manager because of the given cause.
-     *
-     * @param jobMasterId identifying the job manager leader id
-     * @param cause       of the disconnect
-     */
-    @Override
-    public void disconnectJobMaster(JobMasterId jobMasterId, Exception cause) {
-    }
-
-    /**
      * Start the StreamManager service with the given {@link StreamManagerId}.
      *
      * @param newStreamManagerId to start the service with
@@ -146,6 +141,30 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
                 RpcUtils.INF_TIMEOUT);
         return suspendFuture.whenComplete(((acknowledge, throwable) -> stop()));
     }
+
+    // ------------------------------------------------------------------------
+    //  RPC methods
+    // ------------------------------------------------------------------------
+
+    @Override
+    public CompletableFuture<RegistrationResponse> registerJobManager(
+            final JobMasterId jobMasterId,
+            final ResourceID jobManagerResourceId,
+            final String jobManagerAddress,
+            final JobID jobId,
+            final Time timeout) {
+
+        checkNotNull(jobMasterId);
+        checkNotNull(jobManagerResourceId);
+        checkNotNull(jobManagerAddress);
+        checkNotNull(jobId);
+        return null; // TODO: to be implement
+    }
+
+    @Override
+    public void disconnectJobMaster(JobMasterId jobMasterId, Exception cause) {
+    }
+
 
     //----------------------------------------------------------------------------------------------
     // Internal methods

@@ -31,6 +31,8 @@ import org.apache.flink.runtime.checkpoint.TaskStateSnapshot;
 import org.apache.flink.runtime.clusterframework.types.AllocationID;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
+import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
+import org.apache.flink.runtime.controlplane.streammanager.StreamManagerId;
 import org.apache.flink.runtime.execution.ExecutionState;
 import org.apache.flink.runtime.executiongraph.ArchivedExecutionGraph;
 import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
@@ -90,6 +92,7 @@ import org.apache.flink.util.FlinkException;
 import org.apache.flink.util.InstantiationUtil;
 
 import org.slf4j.Logger;
+import scala.collection.immutable.Stream;
 
 import javax.annotation.Nullable;
 
@@ -1041,6 +1044,72 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		@Override
 		public void handleError(final Exception exception) {
 			handleJobMasterError(new Exception("Fatal error in the ResourceManager leader service", exception));
+		}
+	}
+
+	//----------------------------------------------------------------------------------------------
+
+	private class StreamManagerConnection
+			extends RegisteredRpcConnection<StreamManagerId, StreamManagerGateway, JobMasterRegistrationSuccess> {
+		private final JobID jobID;
+
+		private final ResourceID jobManagerResourceID;
+
+		private final String jobManagerRpcAddress;
+
+		private final JobMasterId jobMasterId;
+
+		public StreamManagerConnection(
+				final Logger log,
+				final JobID jobID,
+				final ResourceID jobManagerResourceID,
+				final String jobManagerRpcAddress,
+				final JobMasterId jobMasterId,
+				final String streamManagerAddress,
+				final StreamManagerId streamManagerId,
+				final Executor executor) {
+			super(log, streamManagerAddress, streamManagerId, executor);
+			this.jobID = checkNotNull(jobID);
+			this.jobManagerResourceID = checkNotNull(jobManagerResourceID);
+			this.jobManagerRpcAddress = checkNotNull(jobManagerRpcAddress);
+			this.jobMasterId = checkNotNull(jobMasterId);
+		}
+
+		@Override
+		protected RetryingRegistration<StreamManagerId, StreamManagerGateway, JobMasterRegistrationSuccess> generateRegistration() {
+			return new RetryingRegistration<StreamManagerId, StreamManagerGateway, JobMasterRegistrationSuccess>(
+					log,
+					getRpcService(),
+					"StreamManager",
+					StreamManagerGateway.class,
+					getTargetAddress(),
+					getTargetLeaderId(),
+					jobMasterConfiguration.getRetryingRegistrationConfiguration()) {
+				@Override
+				protected CompletableFuture<RegistrationResponse> invokeRegistration(
+						StreamManagerGateway gateway,
+						StreamManagerId fencingToken,
+						long timeoutMillis) throws Exception {
+					Time timeout = Time.milliseconds(timeoutMillis);
+
+					return gateway.registerJobManager(
+							jobMasterId,
+							jobManagerResourceID,
+							jobManagerRpcAddress,
+							jobID,
+							timeout);
+				}
+			};
+		}
+
+		@Override
+		protected void onRegistrationSuccess(JobMasterRegistrationSuccess success) {
+
+		}
+
+		@Override
+		protected void onRegistrationFailure(Throwable failure) {
+
 		}
 	}
 

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.streaming.controlplane.streammanager;
+package org.apache.flink.runtime.controlplane.streammanager;
 
 import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.util.AutoCloseableAsync;
@@ -52,7 +52,7 @@ public interface StreamManagerService extends AutoCloseableAsync {
 	 *
 	 * @return StreamManagerGateway belonging to this service
 	 */
-	StreamManager getGateway();
+	StreamManagerGateway getGateway();
 
 	/**
 	 * Get the address of the StreamManager service under which it is reachable.
