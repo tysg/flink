@@ -32,6 +32,8 @@ import org.apache.flink.runtime.entrypoint.ClusterEntrypointException;
 import org.apache.flink.runtime.entrypoint.EntrypointClusterConfiguration;
 import org.apache.flink.runtime.entrypoint.EntrypointClusterConfigurationParserFactory;
 import org.apache.flink.runtime.entrypoint.FlinkParseException;
+import org.apache.flink.runtime.entrypoint.component.DispatcherResourceManagerComponent;
+import org.apache.flink.runtime.entrypoint.component.DispatcherResourceManagerComponentFactory;
 import org.apache.flink.runtime.entrypoint.parser.CommandLineParser;
 import org.apache.flink.runtime.heartbeat.HeartbeatServices;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
@@ -76,13 +78,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *
  * <p>Specialization of this class can be used for the session mode and the per-job mode
  */
-public abstract class StreamManagerEntrypoint implements AutoCloseableAsync, FatalErrorHandler {
+public abstract class ClusterControllerEntrypoint implements AutoCloseableAsync, FatalErrorHandler {
 
 	public static final ConfigOption<String> EXECUTION_MODE = ConfigOptions
 		.key("internal.cluster.execution-mode")
 		.defaultValue(ExecutionMode.NORMAL.toString());
 
-	protected static final Logger LOG = LoggerFactory.getLogger(StreamManagerEntrypoint.class);
+	protected static final Logger LOG = LoggerFactory.getLogger(ClusterControllerEntrypoint.class);
 
 	protected static final int STARTUP_FAILURE_RETURN_CODE = 1;
 	protected static final int RUNTIME_FAILURE_RETURN_CODE = 2;
@@ -99,7 +101,16 @@ public abstract class StreamManagerEntrypoint implements AutoCloseableAsync, Fat
 	private final AtomicBoolean isShutDown = new AtomicBoolean(false);
 
 	@GuardedBy("lock")
+	private DispatcherResourceManagerComponent clusterComponent;
+
+	@GuardedBy("lock")
 	private StreamManagerDispatcherComponent smComponent;
+
+	@GuardedBy("lock")
+	private MetricRegistryImpl metricRegistry;
+
+	@GuardedBy("lock")
+	private ProcessMetricGroup processMetricGroup;
 
 	@GuardedBy("lock")
 	private HighAvailabilityServices haServices;
@@ -116,9 +127,11 @@ public abstract class StreamManagerEntrypoint implements AutoCloseableAsync, Fat
 	@GuardedBy("lock")
 	private ExecutorService ioExecutor;
 
+	private ArchivedExecutionGraphStore archivedExecutionGraphStore;
+
 	private final Thread shutDownHook;
 
-	protected StreamManagerEntrypoint(Configuration configuration) {
+	protected ClusterControllerEntrypoint(Configuration configuration) {
 		this.configuration = generateClusterConfiguration(configuration);
 		this.terminationFuture = new CompletableFuture<>();
 
@@ -129,7 +142,7 @@ public abstract class StreamManagerEntrypoint implements AutoCloseableAsync, Fat
 		return terminationFuture;
 	}
 
-	public void startCluster() throws ClusterEntrypointException {
+	public void startClusterController() throws ClusterEntrypointException {
 		LOG.info("Starting {}.", getClass().getSimpleName());
 
 		try {
@@ -139,7 +152,7 @@ public abstract class StreamManagerEntrypoint implements AutoCloseableAsync, Fat
 			SecurityContext securityContext = installSecurityContext(configuration);
 
 			securityContext.runSecured((Callable<Void>) () -> {
-				runCluster(configuration);
+				runClusterController(configuration);
 
 				return null;
 			});
@@ -175,13 +188,44 @@ public abstract class StreamManagerEntrypoint implements AutoCloseableAsync, Fat
 		return SecurityUtils.getInstalledContext();
 	}
 
-	private void runCluster(Configuration configuration) throws Exception {
+	private void runClusterController(Configuration configuration) throws Exception {
 		synchronized (lock) {
 			initializeServices(configuration);
 
 			// write host information into configuration
-			configuration.setString(StreamManagerOptions.ADDRESS, commonRpcService.getAddress());
-			configuration.setInteger(StreamManagerOptions.PORT, commonRpcService.getPort());
+			configuration.setString(JobManagerOptions.ADDRESS, commonRpcService.getAddress());
+			configuration.setInteger(JobManagerOptions.PORT, commonRpcService.getPort());
+
+			final DispatcherResourceManagerComponentFactory dispatcherResourceManagerComponentFactory = createDispatcherResourceManagerComponentFactory(configuration);
+
+			clusterComponent = dispatcherResourceManagerComponentFactory.create(
+				configuration,
+				ioExecutor,
+				commonRpcService,
+				haServices,
+				blobServer,
+				heartbeatServices,
+				metricRegistry,
+				archivedExecutionGraphStore,
+				new RpcMetricQueryServiceRetriever(metricRegistry.getMetricQueryServiceRpcService()),
+				this);
+
+			clusterComponent.getShutDownFuture().whenComplete(
+				(ApplicationStatus applicationStatus, Throwable throwable) -> {
+					if (throwable != null) {
+						shutDownAsync(
+							ApplicationStatus.UNKNOWN,
+							ExceptionUtils.stringifyException(throwable),
+							false);
+					} else {
+						// This is the general shutdown path. If a separate more specific shutdown was
+						// already triggered, this will do nothing
+						shutDownAsync(
+							applicationStatus,
+							null,
+							true);
+					}
+				});
 
 			final StreamManagerDispatcherComponentFactory smDispatcherComponentFactory = createStreamManagerDispatcherComponentFactory(configuration);
 
@@ -218,16 +262,15 @@ public abstract class StreamManagerEntrypoint implements AutoCloseableAsync, Fat
 		LOG.info("Initializing cluster services.");
 
 		synchronized (lock) {
-			final String bindAddress = configuration.getString(StreamManagerOptions.ADDRESS);
+			final String bindAddress = configuration.getString(JobManagerOptions.ADDRESS);
 			final String portRange = getRPCPortRange(configuration);
 
 			commonRpcService = createRpcService(configuration, bindAddress, portRange);
 
 			// update the configuration used to create the high availability services
-			configuration.setString(StreamManagerOptions.ADDRESS, commonRpcService.getAddress());
-			configuration.setInteger(StreamManagerOptions.PORT, commonRpcService.getPort());
+			configuration.setString(JobManagerOptions.ADDRESS, commonRpcService.getAddress());
+			configuration.setInteger(JobManagerOptions.PORT, commonRpcService.getPort());
 
-			// TODO: do we need to have our own entrypoint utilities?
 			ioExecutor = Executors.newFixedThreadPool(
 				ClusterEntrypointUtils.getPoolSize(configuration),
 				new ExecutorThreadFactory("cluster-io"));
@@ -235,6 +278,19 @@ public abstract class StreamManagerEntrypoint implements AutoCloseableAsync, Fat
 			blobServer = new BlobServer(configuration, haServices.createBlobStore());
 			blobServer.start();
 			heartbeatServices = createHeartbeatServices(configuration);
+			metricRegistry = createMetricRegistry(configuration);
+
+			final RpcService metricQueryServiceRpcService = MetricUtils.startMetricsRpcService(configuration, bindAddress);
+			metricRegistry.startQueryService(metricQueryServiceRpcService, null);
+
+			final String hostname = RpcUtils.getHostname(commonRpcService);
+
+			processMetricGroup = MetricUtils.instantiateProcessMetricGroup(
+				metricRegistry,
+				hostname,
+				ConfigurationUtils.getSystemResourceMetricsProbingInterval(configuration));
+
+			archivedExecutionGraphStore = createSerializableExecutionGraphStore(configuration, commonRpcService.getScheduledExecutor());
 		}
 	}
 
@@ -253,7 +309,7 @@ public abstract class StreamManagerEntrypoint implements AutoCloseableAsync, Fat
 		if (ZooKeeperUtils.isZooKeeperRecoveryMode(configuration)) {
 			return configuration.getString(HighAvailabilityOptions.HA_JOB_MANAGER_PORT_RANGE);
 		} else {
-			return String.valueOf(configuration.getInteger(StreamManagerOptions.PORT));
+			return String.valueOf(configuration.getInteger(JobManagerOptions.PORT));
 		}
 	}
 
@@ -270,6 +326,11 @@ public abstract class StreamManagerEntrypoint implements AutoCloseableAsync, Fat
 		return HeartbeatServices.fromConfiguration(configuration);
 	}
 
+	protected MetricRegistryImpl createMetricRegistry(Configuration configuration) {
+		return new MetricRegistryImpl(
+			MetricRegistryConfiguration.fromConfiguration(configuration),
+			ReporterSetup.fromConfiguration(configuration));
+	}
 
 	@Override
 	public CompletableFuture<Void> closeAsync() {
@@ -305,6 +366,22 @@ public abstract class StreamManagerEntrypoint implements AutoCloseableAsync, Fat
 				} catch (Throwable t) {
 					exception = ExceptionUtils.firstOrSuppressed(t, exception);
 				}
+			}
+
+			if (archivedExecutionGraphStore != null) {
+				try {
+					archivedExecutionGraphStore.close();
+				} catch (Throwable t) {
+					exception = ExceptionUtils.firstOrSuppressed(t, exception);
+				}
+			}
+
+			if (processMetricGroup != null) {
+				processMetricGroup.close();
+			}
+
+			if (metricRegistry != null) {
+				terminationFutures.add(metricRegistry.shutdown());
 			}
 
 			if (ioExecutor != null) {
@@ -388,8 +465,8 @@ public abstract class StreamManagerEntrypoint implements AutoCloseableAsync, Fat
 	 */
 	private CompletableFuture<Void> closeClusterComponent(ApplicationStatus applicationStatus, @Nullable String diagnostics) {
 		synchronized (lock) {
-			if (smComponent != null) {
-				return smComponent.deregisterApplicationAndClose(applicationStatus, diagnostics);
+			if (clusterComponent != null) {
+				return clusterComponent.deregisterApplicationAndClose(applicationStatus, diagnostics);
 			} else {
 				return CompletableFuture.completedFuture(null);
 			}
@@ -397,7 +474,7 @@ public abstract class StreamManagerEntrypoint implements AutoCloseableAsync, Fat
 	}
 
 	/**
-	 * Clean up of temporary directories created by the {@link StreamManagerEntrypoint}.
+	 * Clean up of temporary directories created by the {@link ClusterControllerEntrypoint}.
 	 *
 	 * @throws IOException if the temporary directories could not be cleaned up
 	 */
@@ -412,6 +489,8 @@ public abstract class StreamManagerEntrypoint implements AutoCloseableAsync, Fat
 	// --------------------------------------------------
 	// Abstract methods
 	// --------------------------------------------------
+
+	protected abstract DispatcherResourceManagerComponentFactory createDispatcherResourceManagerComponentFactory(Configuration configuration) throws IOException;
 
 	protected abstract StreamManagerDispatcherComponentFactory createStreamManagerDispatcherComponentFactory(Configuration configuration) throws IOException;
 
@@ -432,13 +511,13 @@ public abstract class StreamManagerEntrypoint implements AutoCloseableAsync, Fat
 		final int restPort = entrypointClusterConfiguration.getRestPort();
 
 		if (restPort >= 0) {
-			configuration.setInteger(StreamManagerRestOptions.PORT, restPort);
+			configuration.setInteger(RestOptions.PORT, restPort);
 		}
 
 		final String hostname = entrypointClusterConfiguration.getHostname();
 
 		if (hostname != null) {
-			configuration.setString(StreamManagerOptions.ADDRESS, hostname);
+			configuration.setString(JobManagerOptions.ADDRESS, hostname);
 		}
 
 		return configuration;
@@ -448,17 +527,17 @@ public abstract class StreamManagerEntrypoint implements AutoCloseableAsync, Fat
 	// Helper methods
 	// --------------------------------------------------
 
-	public static void runClusterEntrypoint(StreamManagerEntrypoint clusterEntrypoint) {
+	public static void runClusterControllerEntrypoint(ClusterControllerEntrypoint clusterControllerEntrypoint) {
 
-		final String clusterEntrypointName = clusterEntrypoint.getClass().getSimpleName();
+		final String clusterControllerEntrypointName = clusterControllerEntrypoint.getClass().getSimpleName();
 		try {
-			clusterEntrypoint.startCluster();
+			clusterControllerEntrypoint.startClusterController();
 		} catch (ClusterEntrypointException e) {
-			LOG.error(String.format("Could not start cluster entrypoint %s.", clusterEntrypointName), e);
+			LOG.error(String.format("Could not start cluster entrypoint %s.", clusterControllerEntrypointName), e);
 			System.exit(STARTUP_FAILURE_RETURN_CODE);
 		}
 
-		clusterEntrypoint.getTerminationFuture().whenComplete((applicationStatus, throwable) -> {
+		clusterControllerEntrypoint.getTerminationFuture().whenComplete((applicationStatus, throwable) -> {
 			final int returnCode;
 
 			if (throwable != null) {
@@ -467,7 +546,7 @@ public abstract class StreamManagerEntrypoint implements AutoCloseableAsync, Fat
 				returnCode = applicationStatus.processExitCode();
 			}
 
-			LOG.info("Terminating cluster entrypoint process {} with exit code {}.", clusterEntrypointName, returnCode, throwable);
+			LOG.info("Terminating cluster entrypoint process {} with exit code {}.", clusterControllerEntrypointName, returnCode, throwable);
 			System.exit(returnCode);
 		});
 	}

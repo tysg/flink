@@ -41,7 +41,6 @@ public class PartialStreamManagerDispatcherServicesWithJobGraphStore extends Par
 			@Nonnull HighAvailabilityServices highAvailabilityServices,
 			@Nonnull BlobServer blobServer,
 			@Nonnull HeartbeatServices heartbeatServices,
-			@Nonnull ArchivedExecutionGraphStore archivedExecutionGraphStore,
 			@Nonnull FatalErrorHandler fatalErrorHandler,
 			@Nonnull JobGraphWriter jobGraphWriter) {
 		super(
@@ -49,7 +48,6 @@ public class PartialStreamManagerDispatcherServicesWithJobGraphStore extends Par
 			highAvailabilityServices,
 			blobServer,
 			heartbeatServices,
-			archivedExecutionGraphStore,
 			fatalErrorHandler);
 		this.jobGraphWriter = jobGraphWriter;
 	}
@@ -65,7 +63,6 @@ public class PartialStreamManagerDispatcherServicesWithJobGraphStore extends Par
 			partialDispatcherServices.getHighAvailabilityServices(),
 			partialDispatcherServices.getBlobServer(),
 			partialDispatcherServices.getHeartbeatServices(),
-			partialDispatcherServices.getArchivedExecutionGraphStore(),
 			partialDispatcherServices.getFatalErrorHandler(),
 			jobGraphWriter);
 	}

@@ -78,7 +78,6 @@ public abstract class StreamManagerDispatcher extends PermanentlyFencedRpcEndpoi
 
 	private final HighAvailabilityServices highAvailabilityServices;
 	private final JobManagerSharedServices jobManagerSharedServices;
-	private final HeartbeatServices heartbeatServices;
 	private final BlobServer blobServer;
 
 	private final FatalErrorHandler fatalErrorHandler;
@@ -87,7 +86,6 @@ public abstract class StreamManagerDispatcher extends PermanentlyFencedRpcEndpoi
 
 	private final Collection<JobGraph> recoveredJobs;
 
-	private final ArchivedExecutionGraphStore archivedExecutionGraphStore;
 
 	private StreamManagerRunnerFactory streamManagerRunnerFactory;
 
@@ -109,7 +107,6 @@ public abstract class StreamManagerDispatcher extends PermanentlyFencedRpcEndpoi
 
 		this.configuration = dispatcherServices.getConfiguration();
 		this.highAvailabilityServices = dispatcherServices.getHighAvailabilityServices();
-		this.heartbeatServices = dispatcherServices.getHeartbeatServices();
 		this.blobServer = dispatcherServices.getBlobServer();
 		this.fatalErrorHandler = dispatcherServices.getFatalErrorHandler();
 		this.jobGraphWriter = dispatcherServices.getJobGraphWriter();
@@ -121,8 +118,6 @@ public abstract class StreamManagerDispatcher extends PermanentlyFencedRpcEndpoi
 		this.runningJobsRegistry = highAvailabilityServices.getRunningJobsRegistry();
 
 		jobManagerRunnerFutures = new HashMap<>(16);
-
-		this.archivedExecutionGraphStore = dispatcherServices.getArchivedExecutionGraphStore();
 
 		this.streamManagerRunnerFactory = dispatcherServices.getStreamManagerRunnerFactory();
 

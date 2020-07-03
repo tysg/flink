@@ -85,7 +85,6 @@ public class DefaultStreamManagerDispatcherComponentFactory implements StreamMan
 		HighAvailabilityServices highAvailabilityServices,
 		BlobServer blobServer,
 		HeartbeatServices heartbeatServices,
-		ArchivedExecutionGraphStore archivedExecutionGraphStore,
 		FatalErrorHandler fatalErrorHandler) throws Exception {
 
 		LeaderRetrievalService smDispatcherLeaderRetrievalService = null;
@@ -134,7 +133,6 @@ public class DefaultStreamManagerDispatcherComponentFactory implements StreamMan
 				highAvailabilityServices,
 				blobServer,
 				heartbeatServices,
-				archivedExecutionGraphStore,
 				fatalErrorHandler);
 
 			log.debug("Starting sm Dispatcher.");
@@ -154,7 +152,8 @@ public class DefaultStreamManagerDispatcherComponentFactory implements StreamMan
 			return new StreamManagerDispatcherComponent(
 				smDispatcherRunner,
 				smDispatcherLeaderRetrievalService,
-				smWebMonitorEndpoint);
+				smWebMonitorEndpoint,
+				dispatcherLeaderRetrievalService);
 
 		} catch (Exception exception) {
 			// clean up all started components
