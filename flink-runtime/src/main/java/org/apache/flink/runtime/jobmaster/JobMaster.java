@@ -31,6 +31,7 @@ import org.apache.flink.runtime.checkpoint.TaskStateSnapshot;
 import org.apache.flink.runtime.clusterframework.types.AllocationID;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
+import org.apache.flink.runtime.controlplane.streammanager.StreamManagerAddress;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerId;
 import org.apache.flink.runtime.execution.ExecutionState;
@@ -92,7 +93,6 @@ import org.apache.flink.util.FlinkException;
 import org.apache.flink.util.InstantiationUtil;
 
 import org.slf4j.Logger;
-import scala.collection.immutable.Stream;
 
 import javax.annotation.Nullable;
 
@@ -127,7 +127,9 @@ import static org.apache.flink.util.Preconditions.checkState;
  */
 public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMasterGateway, JobMasterService {
 
-	/** Default names for Flink's distributed components. */
+	/**
+	 * Default names for Flink's distributed components.
+	 */
 	public static final String JOB_MANAGER_NAME = "jobmanager";
 
 	// ------------------------------------------------------------------------
@@ -197,6 +199,12 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 	private ResourceManagerConnection resourceManagerConnection;
 
 	@Nullable
+	private StreamManagerAddress streamManagerAddress;
+
+	@Nullable
+	private StreamManagerConnection streamManagerConnection;
+
+	@Nullable
 	private EstablishedResourceManagerConnection establishedResourceManagerConnection;
 
 	private Map<String, Object> accumulators;
@@ -206,22 +214,59 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 	// ------------------------------------------------------------------------
 
 	public JobMaster(
-			RpcService rpcService,
-			JobMasterConfiguration jobMasterConfiguration,
-			ResourceID resourceId,
-			JobGraph jobGraph,
-			HighAvailabilityServices highAvailabilityService,
-			SlotPoolFactory slotPoolFactory,
-			SchedulerFactory schedulerFactory,
-			JobManagerSharedServices jobManagerSharedServices,
-			HeartbeatServices heartbeatServices,
-			JobManagerJobMetricGroupFactory jobMetricGroupFactory,
-			OnCompletionActions jobCompletionActions,
-			FatalErrorHandler fatalErrorHandler,
-			ClassLoader userCodeLoader,
-			SchedulerNGFactory schedulerNGFactory,
-			ShuffleMaster<?> shuffleMaster,
-			PartitionTrackerFactory partitionTrackerFactory) throws Exception {
+		RpcService rpcService,
+		JobMasterConfiguration jobMasterConfiguration,
+		ResourceID resourceId,
+		JobGraph jobGraph,
+		HighAvailabilityServices highAvailabilityService,
+		SlotPoolFactory slotPoolFactory,
+		SchedulerFactory schedulerFactory,
+		JobManagerSharedServices jobManagerSharedServices,
+		HeartbeatServices heartbeatServices,
+		JobManagerJobMetricGroupFactory jobMetricGroupFactory,
+		OnCompletionActions jobCompletionActions,
+		FatalErrorHandler fatalErrorHandler,
+		ClassLoader userCodeLoader,
+		SchedulerNGFactory schedulerNGFactory,
+		ShuffleMaster<?> shuffleMaster,
+		PartitionTrackerFactory partitionTrackerFactory) throws Exception {
+		this(rpcService,
+			jobMasterConfiguration,
+			resourceId,
+			jobGraph,
+			highAvailabilityService,
+			slotPoolFactory,
+			schedulerFactory,
+			jobManagerSharedServices,
+			heartbeatServices,
+			jobMetricGroupFactory,
+			jobCompletionActions,
+			fatalErrorHandler,
+			userCodeLoader,
+			schedulerNGFactory,
+			shuffleMaster,
+			partitionTrackerFactory,
+			null);
+	}
+
+	public JobMaster(
+		RpcService rpcService,
+		JobMasterConfiguration jobMasterConfiguration,
+		ResourceID resourceId,
+		JobGraph jobGraph,
+		HighAvailabilityServices highAvailabilityService,
+		SlotPoolFactory slotPoolFactory,
+		SchedulerFactory schedulerFactory,
+		JobManagerSharedServices jobManagerSharedServices,
+		HeartbeatServices heartbeatServices,
+		JobManagerJobMetricGroupFactory jobMetricGroupFactory,
+		OnCompletionActions jobCompletionActions,
+		FatalErrorHandler fatalErrorHandler,
+		ClassLoader userCodeLoader,
+		SchedulerNGFactory schedulerNGFactory,
+		ShuffleMaster<?> shuffleMaster,
+		PartitionTrackerFactory partitionTrackerFactory,
+		StreamManagerAddress streamManagerAddress) throws Exception {
 
 		super(rpcService, AkkaRpcServiceUtils.createRandomName(JOB_MANAGER_NAME), null);
 
@@ -275,6 +320,8 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		this.accumulators = new HashMap<>();
 		this.taskManagerHeartbeatManager = NoOpHeartbeatManager.getInstance();
 		this.resourceManagerHeartbeatManager = NoOpHeartbeatManager.getInstance();
+
+		this.streamManagerAddress = streamManagerAddress;
 	}
 
 	private SchedulerNG createScheduler(final JobManagerJobMetricGroup jobManagerJobMetricGroup) throws Exception {
@@ -327,8 +374,8 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 	 */
 	public CompletableFuture<Acknowledge> suspend(final Exception cause) {
 		CompletableFuture<Acknowledge> suspendFuture = callAsyncWithoutFencing(
-				() -> suspendExecution(cause),
-				RpcUtils.INF_TIMEOUT);
+			() -> suspendExecution(cause),
+			RpcUtils.INF_TIMEOUT);
 
 		return suspendFuture.whenComplete((acknowledge, throwable) -> stop());
 	}
@@ -377,7 +424,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 	 */
 	@Override
 	public CompletableFuture<Acknowledge> updateTaskExecutionState(
-			final TaskExecutionState taskExecutionState) {
+		final TaskExecutionState taskExecutionState) {
 		checkNotNull(taskExecutionState, "taskExecutionState");
 
 		if (schedulerNG.updateTaskExecutionState(taskExecutionState)) {
@@ -391,8 +438,8 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 
 	@Override
 	public CompletableFuture<SerializedInputSplit> requestNextInputSplit(
-			final JobVertexID vertexID,
-			final ExecutionAttemptID executionAttempt) {
+		final JobVertexID vertexID,
+		final ExecutionAttemptID executionAttempt) {
 
 		try {
 			return CompletableFuture.completedFuture(schedulerNG.requestNextInputSplit(vertexID, executionAttempt));
@@ -404,8 +451,8 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 
 	@Override
 	public CompletableFuture<ExecutionState> requestPartitionState(
-			final IntermediateDataSetID intermediateResultId,
-			final ResultPartitionID resultPartitionId) {
+		final IntermediateDataSetID intermediateResultId,
+		final ResultPartitionID resultPartitionId) {
 
 		try {
 			return CompletableFuture.completedFuture(schedulerNG.requestPartitionState(intermediateResultId, resultPartitionId));
@@ -417,8 +464,8 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 
 	@Override
 	public CompletableFuture<Acknowledge> scheduleOrUpdateConsumers(
-			final ResultPartitionID partitionID,
-			final Time timeout) {
+		final ResultPartitionID partitionID,
+		final Time timeout) {
 
 		schedulerNG.scheduleOrUpdateConsumers(partitionID);
 		return CompletableFuture.completedFuture(Acknowledge.get());
@@ -444,11 +491,11 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 	// TODO: This method needs a leader session ID
 	@Override
 	public void acknowledgeCheckpoint(
-			final JobID jobID,
-			final ExecutionAttemptID executionAttemptID,
-			final long checkpointId,
-			final CheckpointMetrics checkpointMetrics,
-			final TaskStateSnapshot checkpointState) {
+		final JobID jobID,
+		final ExecutionAttemptID executionAttemptID,
+		final long checkpointId,
+		final CheckpointMetrics checkpointMetrics,
+		final TaskStateSnapshot checkpointState) {
 
 		schedulerNG.acknowledgeCheckpoint(jobID, executionAttemptID, checkpointId, checkpointMetrics, checkpointState);
 	}
@@ -471,12 +518,12 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 
 	@Override
 	public CompletableFuture<Acknowledge> notifyKvStateRegistered(
-			final JobID jobId,
-			final JobVertexID jobVertexId,
-			final KeyGroupRange keyGroupRange,
-			final String registrationName,
-			final KvStateID kvStateId,
-			final InetSocketAddress kvStateServerAddress) {
+		final JobID jobId,
+		final JobVertexID jobVertexId,
+		final KeyGroupRange keyGroupRange,
+		final String registrationName,
+		final KvStateID kvStateId,
+		final InetSocketAddress kvStateServerAddress) {
 
 		try {
 			schedulerNG.notifyKvStateRegistered(jobId, jobVertexId, keyGroupRange, registrationName, kvStateId, kvStateServerAddress);
@@ -489,10 +536,10 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 
 	@Override
 	public CompletableFuture<Acknowledge> notifyKvStateUnregistered(
-			JobID jobId,
-			JobVertexID jobVertexId,
-			KeyGroupRange keyGroupRange,
-			String registrationName) {
+		JobID jobId,
+		JobVertexID jobVertexId,
+		KeyGroupRange keyGroupRange,
+		String registrationName) {
 		try {
 			schedulerNG.notifyKvStateUnregistered(jobId, jobVertexId, keyGroupRange, registrationName);
 			return CompletableFuture.completedFuture(Acknowledge.get());
@@ -504,9 +551,9 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 
 	@Override
 	public CompletableFuture<Collection<SlotOffer>> offerSlots(
-			final ResourceID taskManagerId,
-			final Collection<SlotOffer> slots,
-			final Time timeout) {
+		final ResourceID taskManagerId,
+		final Collection<SlotOffer> slots,
+		final Time timeout) {
 
 		Tuple2<TaskManagerLocation, TaskExecutorGateway> taskManager = registeredTaskManagers.get(taskManagerId);
 
@@ -528,15 +575,15 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 
 	@Override
 	public void failSlot(
-			final ResourceID taskManagerId,
-			final AllocationID allocationId,
-			final Exception cause) {
+		final ResourceID taskManagerId,
+		final AllocationID allocationId,
+		final Exception cause) {
 
 		if (registeredTaskManagers.containsKey(taskManagerId)) {
 			internalFailAllocation(allocationId, cause);
 		} else {
 			log.warn("Cannot fail slot " + allocationId + " because the TaskManager " +
-			taskManagerId + " is unknown.");
+				taskManagerId + " is unknown.");
 		}
 	}
 
@@ -555,9 +602,9 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 
 	@Override
 	public CompletableFuture<RegistrationResponse> registerTaskManager(
-			final String taskManagerRpcAddress,
-			final TaskManagerLocation taskManagerLocation,
-			final Time timeout) {
+		final String taskManagerRpcAddress,
+		final TaskManagerLocation taskManagerLocation,
+		final Time timeout) {
 
 		final ResourceID taskManagerId = taskManagerLocation.getResourceID();
 
@@ -597,8 +644,8 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 
 	@Override
 	public void disconnectResourceManager(
-			final ResourceManagerId resourceManagerId,
-			final Exception cause) {
+		final ResourceManagerId resourceManagerId,
+		final Exception cause) {
 
 		if (isConnectingToResourceManager(resourceManagerId)) {
 			reconnectToResourceManager(cause);
@@ -607,7 +654,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 
 	private boolean isConnectingToResourceManager(ResourceManagerId resourceManagerId) {
 		return resourceManagerAddress != null
-				&& resourceManagerAddress.getResourceManagerId().equals(resourceManagerId);
+			&& resourceManagerAddress.getResourceManagerId().equals(resourceManagerId);
 	}
 
 	@Override
@@ -637,18 +684,18 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 
 	@Override
 	public CompletableFuture<String> triggerSavepoint(
-			@Nullable final String targetDirectory,
-			final boolean cancelJob,
-			final Time timeout) {
+		@Nullable final String targetDirectory,
+		final boolean cancelJob,
+		final Time timeout) {
 
 		return schedulerNG.triggerSavepoint(targetDirectory, cancelJob);
 	}
 
 	@Override
 	public CompletableFuture<String> stopWithSavepoint(
-			@Nullable final String targetDirectory,
-			final boolean advanceToEndOfEventTime,
-			final Time timeout) {
+		@Nullable final String targetDirectory,
+		final boolean advanceToEndOfEventTime,
+		final Time timeout) {
 
 		return schedulerNG.stopWithSavepoint(targetDirectory, advanceToEndOfEventTime);
 	}
@@ -682,7 +729,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		}
 
 		Object accumulator = accumulators.get(aggregateName);
-		if(null == accumulator) {
+		if (null == accumulator) {
 			accumulator = aggregateFunction.createAccumulator();
 		}
 		accumulator = aggregateFunction.add(aggregand, accumulator);
@@ -729,6 +776,9 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		//TODO: Remove once the ZooKeeperLeaderRetrieval returns the stored address upon start
 		// try to reconnect to previously known leader
 		reconnectToResourceManager(new FlinkException("Starting JobMaster component."));
+
+		// simply connect to the target stream manager
+		connectToStreamManager();
 
 		// job is ready to go, try to establish connection with resource manager
 		//   - activate leader retrieval for the resource manager
@@ -810,8 +860,8 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 	}
 
 	private void assignScheduler(
-			SchedulerNG newScheduler,
-			JobManagerJobMetricGroup newJobManagerJobMetricGroup) {
+		SchedulerNG newScheduler,
+		JobManagerJobMetricGroup newJobManagerJobMetricGroup) {
 		validateRunsInMainThread();
 		checkState(schedulerNG.requestJobStatus().isTerminalState());
 		checkState(jobManagerJobMetricGroup == null);
@@ -889,9 +939,9 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 	}
 
 	private void jobStatusChanged(
-			final JobStatus newJobStatus,
-			long timestamp,
-			@Nullable final Throwable error) {
+		final JobStatus newJobStatus,
+		long timestamp,
+		@Nullable final Throwable error) {
 		validateRunsInMainThread();
 
 		if (newJobStatus.isGloballyTerminalState()) {
@@ -934,9 +984,9 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 	}
 
 	private void connectToResourceManager() {
-		assert(resourceManagerAddress != null);
-		assert(resourceManagerConnection == null);
-		assert(establishedResourceManagerConnection == null);
+		assert (resourceManagerAddress != null);
+		assert (resourceManagerConnection == null);
+		assert (establishedResourceManagerConnection == null);
 
 		log.info("Connecting to ResourceManager {}", resourceManagerAddress);
 
@@ -953,12 +1003,32 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		resourceManagerConnection.start();
 	}
 
-	private void establishResourceManagerConnection(final JobMasterRegistrationSuccess success) {
-		final ResourceManagerId resourceManagerId = success.getResourceManagerId();
+	private void connectToStreamManager() {
+		assert (streamManagerAddress != null);
+		assert (streamManagerConnection == null);
+//		assert (establishedResourceManagerConnection == null);
+
+		log.info("Connecting to ResourceManager {}", resourceManagerAddress);
+
+		streamManagerConnection = new StreamManagerConnection(
+			log,
+			jobGraph.getJobID(),
+			resourceId,
+			getAddress(),
+			getFencingToken(),
+			streamManagerAddress.getRpcAddress(),
+			streamManagerAddress.getStreamManagerId(),
+			scheduledExecutorService);
+
+		streamManagerConnection.start();
+	}
+
+	private void establishResourceManagerConnection(final JobMasterRegistrationSuccess<ResourceManagerId> success) {
+		final ResourceManagerId resourceManagerId = success.getRegistrationTargetId();
 
 		// verify the response with current connection
 		if (resourceManagerConnection != null
-				&& Objects.equals(resourceManagerConnection.getTargetLeaderId(), resourceManagerId)) {
+			&& Objects.equals(resourceManagerConnection.getTargetLeaderId(), resourceManagerId)) {
 
 			log.info("JobManager successfully registered at ResourceManager, leader id: {}.", resourceManagerId);
 
@@ -1050,7 +1120,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 	//----------------------------------------------------------------------------------------------
 
 	private class StreamManagerConnection
-			extends RegisteredRpcConnection<StreamManagerId, StreamManagerGateway, JobMasterRegistrationSuccess> {
+		extends RegisteredRpcConnection<StreamManagerId, StreamManagerGateway, JobMasterRegistrationSuccess<StreamManagerId>> {
 		private final JobID jobID;
 
 		private final ResourceID jobManagerResourceID;
@@ -1059,15 +1129,15 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 
 		private final JobMasterId jobMasterId;
 
-		public StreamManagerConnection(
-				final Logger log,
-				final JobID jobID,
-				final ResourceID jobManagerResourceID,
-				final String jobManagerRpcAddress,
-				final JobMasterId jobMasterId,
-				final String streamManagerAddress,
-				final StreamManagerId streamManagerId,
-				final Executor executor) {
+		StreamManagerConnection(
+			final Logger log,
+			final JobID jobID,
+			final ResourceID jobManagerResourceID,
+			final String jobManagerRpcAddress,
+			final JobMasterId jobMasterId,
+			final String streamManagerAddress,
+			final StreamManagerId streamManagerId,
+			final Executor executor) {
 			super(log, streamManagerAddress, streamManagerId, executor);
 			this.jobID = checkNotNull(jobID);
 			this.jobManagerResourceID = checkNotNull(jobManagerResourceID);
@@ -1076,85 +1146,20 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		}
 
 		@Override
-		protected RetryingRegistration<StreamManagerId, StreamManagerGateway, JobMasterRegistrationSuccess> generateRegistration() {
-			return new RetryingRegistration<StreamManagerId, StreamManagerGateway, JobMasterRegistrationSuccess>(
-					log,
-					getRpcService(),
-					"StreamManager",
-					StreamManagerGateway.class,
-					getTargetAddress(),
-					getTargetLeaderId(),
-					jobMasterConfiguration.getRetryingRegistrationConfiguration()) {
-				@Override
-				protected CompletableFuture<RegistrationResponse> invokeRegistration(
-						StreamManagerGateway gateway,
-						StreamManagerId fencingToken,
-						long timeoutMillis) throws Exception {
-					Time timeout = Time.milliseconds(timeoutMillis);
-
-					return gateway.registerJobManager(
-							jobMasterId,
-							jobManagerResourceID,
-							jobManagerRpcAddress,
-							jobID,
-							timeout);
-				}
-			};
-		}
-
-		@Override
-		protected void onRegistrationSuccess(JobMasterRegistrationSuccess success) {
-
-		}
-
-		@Override
-		protected void onRegistrationFailure(Throwable failure) {
-
-		}
-	}
-
-	//----------------------------------------------------------------------------------------------
-
-	private class ResourceManagerConnection
-			extends RegisteredRpcConnection<ResourceManagerId, ResourceManagerGateway, JobMasterRegistrationSuccess> {
-		private final JobID jobID;
-
-		private final ResourceID jobManagerResourceID;
-
-		private final String jobManagerRpcAddress;
-
-		private final JobMasterId jobMasterId;
-
-		ResourceManagerConnection(
-				final Logger log,
-				final JobID jobID,
-				final ResourceID jobManagerResourceID,
-				final String jobManagerRpcAddress,
-				final JobMasterId jobMasterId,
-				final String resourceManagerAddress,
-				final ResourceManagerId resourceManagerId,
-				final Executor executor) {
-			super(log, resourceManagerAddress, resourceManagerId, executor);
-			this.jobID = checkNotNull(jobID);
-			this.jobManagerResourceID = checkNotNull(jobManagerResourceID);
-			this.jobManagerRpcAddress = checkNotNull(jobManagerRpcAddress);
-			this.jobMasterId = checkNotNull(jobMasterId);
-		}
-
-		@Override
-		protected RetryingRegistration<ResourceManagerId, ResourceManagerGateway, JobMasterRegistrationSuccess> generateRegistration() {
-			return new RetryingRegistration<ResourceManagerId, ResourceManagerGateway, JobMasterRegistrationSuccess>(
+		protected RetryingRegistration<StreamManagerId, StreamManagerGateway, JobMasterRegistrationSuccess<StreamManagerId>> generateRegistration() {
+			return new RetryingRegistration<StreamManagerId, StreamManagerGateway, JobMasterRegistrationSuccess<StreamManagerId>>(
 				log,
 				getRpcService(),
-				"ResourceManager",
-				ResourceManagerGateway.class,
+				"StreamManager",
+				StreamManagerGateway.class,
 				getTargetAddress(),
 				getTargetLeaderId(),
 				jobMasterConfiguration.getRetryingRegistrationConfiguration()) {
-
 				@Override
 				protected CompletableFuture<RegistrationResponse> invokeRegistration(
-						ResourceManagerGateway gateway, ResourceManagerId fencingToken, long timeoutMillis) {
+					StreamManagerGateway gateway,
+					StreamManagerId fencingToken,
+					long timeoutMillis) throws Exception {
 					Time timeout = Time.milliseconds(timeoutMillis);
 
 					return gateway.registerJobManager(
@@ -1168,7 +1173,85 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		}
 
 		@Override
-		protected void onRegistrationSuccess(final JobMasterRegistrationSuccess success) {
+		protected void onRegistrationSuccess(JobMasterRegistrationSuccess success) {
+			runAsync(() -> {
+				// filter out outdated connections
+				//noinspection ObjectEquality
+				if (this == streamManagerConnection) {
+					StreamManagerGateway streamManagerGateway = streamManagerConnection.getTargetGateway();
+					streamManagerGateway.registerJobManager(
+						jobMasterId,
+						jobManagerResourceID,
+						jobManagerRpcAddress,
+						jobID,
+						Time.milliseconds(50L)
+					);
+				}
+			});
+		}
+
+		@Override
+		protected void onRegistrationFailure(Throwable failure) {
+
+		}
+	}
+
+	//----------------------------------------------------------------------------------------------
+
+	private class ResourceManagerConnection
+		extends RegisteredRpcConnection<ResourceManagerId, ResourceManagerGateway, JobMasterRegistrationSuccess<ResourceManagerId>> {
+		private final JobID jobID;
+
+		private final ResourceID jobManagerResourceID;
+
+		private final String jobManagerRpcAddress;
+
+		private final JobMasterId jobMasterId;
+
+		ResourceManagerConnection(
+			final Logger log,
+			final JobID jobID,
+			final ResourceID jobManagerResourceID,
+			final String jobManagerRpcAddress,
+			final JobMasterId jobMasterId,
+			final String resourceManagerAddress,
+			final ResourceManagerId resourceManagerId,
+			final Executor executor) {
+			super(log, resourceManagerAddress, resourceManagerId, executor);
+			this.jobID = checkNotNull(jobID);
+			this.jobManagerResourceID = checkNotNull(jobManagerResourceID);
+			this.jobManagerRpcAddress = checkNotNull(jobManagerRpcAddress);
+			this.jobMasterId = checkNotNull(jobMasterId);
+		}
+
+		@Override
+		protected RetryingRegistration<ResourceManagerId, ResourceManagerGateway, JobMasterRegistrationSuccess<ResourceManagerId>> generateRegistration() {
+			return new RetryingRegistration<ResourceManagerId, ResourceManagerGateway, JobMasterRegistrationSuccess<ResourceManagerId>>(
+				log,
+				getRpcService(),
+				"ResourceManager",
+				ResourceManagerGateway.class,
+				getTargetAddress(),
+				getTargetLeaderId(),
+				jobMasterConfiguration.getRetryingRegistrationConfiguration()) {
+
+				@Override
+				protected CompletableFuture<RegistrationResponse> invokeRegistration(
+					ResourceManagerGateway gateway, ResourceManagerId fencingToken, long timeoutMillis) {
+					Time timeout = Time.milliseconds(timeoutMillis);
+
+					return gateway.registerJobManager(
+						jobMasterId,
+						jobManagerResourceID,
+						jobManagerRpcAddress,
+						jobID,
+						timeout);
+				}
+			};
+		}
+
+		@Override
+		protected void onRegistrationSuccess(final JobMasterRegistrationSuccess<ResourceManagerId> success) {
 			runAsync(() -> {
 				// filter out outdated connections
 				//noinspection ObjectEquality
@@ -1192,10 +1275,10 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 
 		@Override
 		public void jobStatusChanges(
-				final JobID jobId,
-				final JobStatus newJobStatus,
-				final long timestamp,
-				final Throwable error) {
+			final JobID jobId,
+			final JobStatus newJobStatus,
+			final long timestamp,
+			final Throwable error) {
 
 			if (running) {
 				// run in rpc thread to avoid concurrency
