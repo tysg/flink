@@ -21,6 +21,7 @@ package org.apache.flink.streaming.controlplane.streammanager;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
+import org.apache.flink.runtime.dispatcher.DispatcherGateway;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerId;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerService;
@@ -29,6 +30,7 @@ import org.apache.flink.runtime.heartbeat.HeartbeatServices;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobmaster.JobMasterId;
+import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalService;
 import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.registration.RegistrationResponse;
 import org.apache.flink.runtime.rpc.FatalErrorHandler;
@@ -36,6 +38,8 @@ import org.apache.flink.runtime.rpc.FencedRpcEndpoint;
 import org.apache.flink.runtime.rpc.RpcService;
 import org.apache.flink.runtime.rpc.RpcUtils;
 import org.apache.flink.runtime.rpc.akka.AkkaRpcServiceUtils;
+import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
+import org.apache.flink.util.OptionalConsumer;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -66,7 +70,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
     private final FatalErrorHandler fatalErrorHandler;
 
-    private final HeartbeatServices heartbeatServices;
+    private final LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever;
 
     /*
 
@@ -89,7 +93,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						 ResourceID resourceId,
 						 JobGraph jobGraph,
 						 HighAvailabilityServices highAvailabilityService,
-						 HeartbeatServices heartbeatServices,
+						 LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever,
 						 FatalErrorHandler fatalErrorHandler) throws Exception{
         super(rpcService, AkkaRpcServiceUtils.createRandomName(Stream_Manager_NAME), null);
 
@@ -99,7 +103,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
         this.rpcTimeout = streamManagerConfiguration.getRpcTimeout();
         this.highAvailabilityServices = checkNotNull(highAvailabilityService);
         this.fatalErrorHandler = checkNotNull(fatalErrorHandler);
-        this.heartbeatServices = checkNotNull(heartbeatServices);
+        this.dispatcherGatewayRetriever = checkNotNull(dispatcherGatewayRetriever);
 
         final String jobName = jobGraph.getName();
         final JobID jid = jobGraph.getJobID();
@@ -110,6 +114,22 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
         /*
         TODO: initialize other fields
          */
+
+
+		OptionalConsumer<DispatcherGateway> optLeaderConsumer = OptionalConsumer.of(this.dispatcherGatewayRetriever.getNow());
+
+		optLeaderConsumer.ifPresent(
+			gateway -> {
+				try {
+					log.info("connect successfully");
+					gateway.submitJob(jobGraph, Time.seconds(10));
+				} catch (Exception e) {
+					log.error("Error while invoking runtime dispatcher RMI.", e);
+				}
+			}
+		).ifNotPresent(
+			() ->
+				log.error("Error while connecting runtime dispatcher."));
     }
 
     /**

@@ -19,6 +19,9 @@
 package org.apache.flink.streaming.controlplane.dispatcher;
 
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.runtime.dispatcher.DispatcherGateway;
+import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
+import org.apache.flink.streaming.controlplane.streammanager.StreamManagerRunner;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerRunner;
 import org.apache.flink.runtime.heartbeat.HeartbeatServices;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
@@ -38,6 +41,6 @@ public interface StreamManagerRunnerFactory {
 		Configuration configuration,
 		RpcService rpcService,
 		HighAvailabilityServices highAvailabilityServices,
-		HeartbeatServices heartbeatServices, // TODO: to be considered
+		LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever,
 		FatalErrorHandler fatalErrorHandler) throws Exception;
 }

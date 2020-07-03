@@ -18,6 +18,8 @@
 
 package org.apache.flink.streaming.controlplane.dispatcher.runner;
 
+import org.apache.flink.runtime.dispatcher.DispatcherGateway;
+import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
 import org.apache.flink.streaming.controlplane.dispatcher.PartialStreamManagerDispatcherServices;
 import org.apache.flink.runtime.dispatcher.runner.DispatcherLeaderProcessFactory;
 import org.apache.flink.runtime.jobmanager.JobGraphStoreFactory;
@@ -36,5 +38,6 @@ public interface StreamManagerDispatcherLeaderProcessFactoryFactory {
 		Executor ioExecutor,
 		RpcService rpcService,
 		PartialStreamManagerDispatcherServices partialDispatcherServices,
-		FatalErrorHandler fatalErrorHandler);
+		FatalErrorHandler fatalErrorHandler,
+		LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever);
 }

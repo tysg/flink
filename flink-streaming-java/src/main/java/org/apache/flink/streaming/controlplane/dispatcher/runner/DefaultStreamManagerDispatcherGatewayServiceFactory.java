@@ -18,6 +18,9 @@
 
 package org.apache.flink.streaming.controlplane.dispatcher.runner;
 
+import org.apache.flink.runtime.dispatcher.DispatcherGateway;
+import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalService;
+import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
 import org.apache.flink.streaming.controlplane.dispatcher.*;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobmanager.JobGraphWriter;
@@ -37,13 +40,17 @@ class DefaultStreamManagerDispatcherGatewayServiceFactory implements AbstractStr
 
 	private final PartialStreamManagerDispatcherServices partialSmDispatcherServices;
 
+	private final LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever;
+
 	DefaultStreamManagerDispatcherGatewayServiceFactory(
-			StreamManagerDispatcherFactory smDispatcherFactory,
-			RpcService rpcService,
-			PartialStreamManagerDispatcherServices partialSmDispatcherServices) {
+		StreamManagerDispatcherFactory smDispatcherFactory,
+		RpcService rpcService,
+		PartialStreamManagerDispatcherServices partialSmDispatcherServices,
+		LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever) {
 		this.smDispatcherFactory = smDispatcherFactory;
 		this.rpcService = rpcService;
 		this.partialSmDispatcherServices = partialSmDispatcherServices;
+		this.dispatcherGatewayRetriever = dispatcherGatewayRetriever;
 	}
 
 	@Override
@@ -57,7 +64,8 @@ class DefaultStreamManagerDispatcherGatewayServiceFactory implements AbstractStr
 				rpcService,
 				fencingToken,
 				recoveredJobs,
-				PartialStreamManagerDispatcherServicesWithJobGraphStore.from(partialSmDispatcherServices, jobGraphWriter));
+				PartialStreamManagerDispatcherServicesWithJobGraphStore.from(partialSmDispatcherServices, jobGraphWriter),
+				dispatcherGatewayRetriever);
 		} catch (Exception e) {
 			throw new FlinkRuntimeException("Could not create the Dispatcher rpc endpoint.", e);
 		}

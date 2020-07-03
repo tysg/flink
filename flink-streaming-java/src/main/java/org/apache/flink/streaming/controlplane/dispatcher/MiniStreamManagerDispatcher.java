@@ -21,11 +21,13 @@ package org.apache.flink.streaming.controlplane.dispatcher;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.runtime.clusterframework.ApplicationStatus;
+import org.apache.flink.runtime.dispatcher.DispatcherGateway;
 import org.apache.flink.runtime.entrypoint.ClusterEntrypoint;
 import org.apache.flink.runtime.entrypoint.JobClusterEntrypoint;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.rpc.RpcService;
+import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
 import org.apache.flink.util.FlinkException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,13 +56,15 @@ public class MiniStreamManagerDispatcher extends StreamManagerDispatcher {
 			StreamManagerDispatcherId fencingToken,
 			StreamManagerDispatcherServices dispatcherServices,
 			JobGraph jobGraph,
-			JobClusterEntrypoint.ExecutionMode executionMode) throws Exception {
+			JobClusterEntrypoint.ExecutionMode executionMode,
+			LeaderGatewayRetriever<DispatcherGateway> dispatcherLeaderRetrievalService) throws Exception {
 		super(
 			rpcService,
 			endpointId,
 			fencingToken,
 			Collections.singleton(jobGraph),
-			dispatcherServices);
+			dispatcherServices,
+			dispatcherLeaderRetrievalService);
 
 		this.executionMode = checkNotNull(executionMode);
 	}

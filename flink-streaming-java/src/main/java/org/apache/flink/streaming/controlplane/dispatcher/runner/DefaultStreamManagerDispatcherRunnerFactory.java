@@ -18,6 +18,8 @@
 
 package org.apache.flink.streaming.controlplane.dispatcher.runner;
 
+import org.apache.flink.runtime.dispatcher.DispatcherGateway;
+import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
 import org.apache.flink.streaming.controlplane.dispatcher.PartialStreamManagerDispatcherServices;
 import org.apache.flink.streaming.controlplane.dispatcher.StreamManagerDispatcherFactory;
 import org.apache.flink.runtime.dispatcher.runner.*;
@@ -42,19 +44,21 @@ public class DefaultStreamManagerDispatcherRunnerFactory implements StreamManage
 
 	@Override
 	public StreamManagerDispatcherRunner createStreamManagerDispatcherRunner(
-			LeaderElectionService leaderElectionService,
-			FatalErrorHandler fatalErrorHandler,
-			JobGraphStoreFactory jobGraphStoreFactory,
-			Executor ioExecutor,
-			RpcService rpcService,
-			PartialStreamManagerDispatcherServices partialDispatcherServices) throws Exception {
+		LeaderElectionService leaderElectionService,
+		FatalErrorHandler fatalErrorHandler,
+		JobGraphStoreFactory jobGraphStoreFactory,
+		Executor ioExecutor,
+		RpcService rpcService,
+		PartialStreamManagerDispatcherServices partialDispatcherServices,
+		LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever) throws Exception {
 
 		final StreamManagerDispatcherLeaderProcessFactory smDispatcherLeaderProcessFactory = smDispatcherLeaderProcessFactoryFactory.createFactory(
 			jobGraphStoreFactory,
 			ioExecutor,
 			rpcService,
 			partialDispatcherServices,
-			fatalErrorHandler);
+			fatalErrorHandler,
+			dispatcherGatewayRetriever);
 
 		return DefaultStreamManagerDispatcherRunner.create(
 			leaderElectionService,
