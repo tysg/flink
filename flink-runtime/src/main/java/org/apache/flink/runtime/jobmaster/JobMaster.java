@@ -199,7 +199,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 	private ResourceManagerConnection resourceManagerConnection;
 
 	@Nullable
-	private StreamManagerAddress streamManagerAddress;
+	private StreamManagerAddress streamManagerAddress = null;
 
 	@Nullable
 	private StreamManagerConnection streamManagerConnection;
@@ -230,43 +230,6 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		SchedulerNGFactory schedulerNGFactory,
 		ShuffleMaster<?> shuffleMaster,
 		PartitionTrackerFactory partitionTrackerFactory) throws Exception {
-		this(rpcService,
-			jobMasterConfiguration,
-			resourceId,
-			jobGraph,
-			highAvailabilityService,
-			slotPoolFactory,
-			schedulerFactory,
-			jobManagerSharedServices,
-			heartbeatServices,
-			jobMetricGroupFactory,
-			jobCompletionActions,
-			fatalErrorHandler,
-			userCodeLoader,
-			schedulerNGFactory,
-			shuffleMaster,
-			partitionTrackerFactory,
-			null);
-	}
-
-	public JobMaster(
-		RpcService rpcService,
-		JobMasterConfiguration jobMasterConfiguration,
-		ResourceID resourceId,
-		JobGraph jobGraph,
-		HighAvailabilityServices highAvailabilityService,
-		SlotPoolFactory slotPoolFactory,
-		SchedulerFactory schedulerFactory,
-		JobManagerSharedServices jobManagerSharedServices,
-		HeartbeatServices heartbeatServices,
-		JobManagerJobMetricGroupFactory jobMetricGroupFactory,
-		OnCompletionActions jobCompletionActions,
-		FatalErrorHandler fatalErrorHandler,
-		ClassLoader userCodeLoader,
-		SchedulerNGFactory schedulerNGFactory,
-		ShuffleMaster<?> shuffleMaster,
-		PartitionTrackerFactory partitionTrackerFactory,
-		StreamManagerAddress streamManagerAddress) throws Exception {
 
 		super(rpcService, AkkaRpcServiceUtils.createRandomName(JOB_MANAGER_NAME), null);
 
@@ -320,7 +283,9 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		this.accumulators = new HashMap<>();
 		this.taskManagerHeartbeatManager = NoOpHeartbeatManager.getInstance();
 		this.resourceManagerHeartbeatManager = NoOpHeartbeatManager.getInstance();
+	}
 
+	public void setStreamManagerAddress(@Nullable StreamManagerAddress streamManagerAddress) {
 		this.streamManagerAddress = streamManagerAddress;
 	}
 

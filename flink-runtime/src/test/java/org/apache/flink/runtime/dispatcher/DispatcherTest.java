@@ -31,6 +31,8 @@ import org.apache.flink.runtime.checkpoint.Checkpoints;
 import org.apache.flink.runtime.checkpoint.StandaloneCheckpointRecoveryFactory;
 import org.apache.flink.runtime.checkpoint.savepoint.SavepointV2;
 import org.apache.flink.runtime.client.JobSubmissionException;
+import org.apache.flink.runtime.controlplane.streammanager.StreamManagerAddress;
+import org.apache.flink.runtime.controlplane.streammanager.StreamManagerId;
 import org.apache.flink.runtime.executiongraph.ArchivedExecutionGraph;
 import org.apache.flink.runtime.executiongraph.ErrorInfo;
 import org.apache.flink.runtime.heartbeat.HeartbeatServices;
@@ -138,7 +140,9 @@ public class DispatcherTest extends TestLogger {
 
 	private BlobServer blobServer;
 
-	/** Instance under test. */
+	/**
+	 * Instance under test.
+	 */
 	private TestingDispatcher dispatcher;
 
 	private TestingHighAvailabilityServices haServices;
@@ -187,9 +191,9 @@ public class DispatcherTest extends TestLogger {
 
 	@Nonnull
 	private TestingDispatcher createAndStartDispatcher(
-			HeartbeatServices heartbeatServices,
-			TestingHighAvailabilityServices haServices,
-			JobManagerRunnerFactory jobManagerRunnerFactory) throws Exception {
+		HeartbeatServices heartbeatServices,
+		TestingHighAvailabilityServices haServices,
+		JobManagerRunnerFactory jobManagerRunnerFactory) throws Exception {
 		final TestingDispatcher dispatcher = new TestingDispatcherBuilder()
 			.setHaServices(haServices)
 			.setHeartbeatServices(heartbeatServices)
@@ -306,6 +310,28 @@ public class DispatcherTest extends TestLogger {
 	 * new JobManagerRunner.
 	 */
 	@Test
+	public void testJobSubmissionWithStreamManagerAddress() throws Exception {
+		dispatcher = createAndStartDispatcher(heartbeatServices, haServices, new ExpectedJobIdJobManagerRunnerFactory(TEST_JOB_ID, createdJobManagerRunnerLatch));
+
+		DispatcherGateway dispatcherGateway = dispatcher.getSelfGateway(DispatcherGateway.class);
+
+		CompletableFuture<Acknowledge> acknowledgeFuture = dispatcherGateway.submitJob(
+			jobGraph,
+			new StreamManagerAddress("local:8085", StreamManagerId.generate()),
+			TIMEOUT);
+
+		acknowledgeFuture.get();
+
+		assertTrue(
+			"jobManagerRunner was not started",
+			jobMasterLeaderElectionService.getStartFuture().isDone());
+	}
+
+	/**
+	 * Tests that we can submit a job to the Dispatcher which then spawns a
+	 * new JobManagerRunner.
+	 */
+	@Test
 	public void testJobSubmissionWithPartialResourceConfigured() throws Exception {
 		dispatcher = createAndStartDispatcher(heartbeatServices, haServices, new ExpectedJobIdJobManagerRunnerFactory(TEST_JOB_ID, createdJobManagerRunnerLatch));
 
@@ -327,8 +353,7 @@ public class DispatcherTest extends TestLogger {
 		try {
 			acknowledgeFuture.get();
 			fail("job submission should have failed");
-		}
-		catch (ExecutionException e) {
+		} catch (ExecutionException e) {
 			assertTrue(ExceptionUtils.findThrowable(e, JobSubmissionException.class).isPresent());
 		}
 	}
@@ -612,7 +637,8 @@ public class DispatcherTest extends TestLogger {
 		try {
 			removeJobGraphFuture.get(10L, TimeUnit.MILLISECONDS);
 			fail("onRemovedJobGraph should not remove the job from the JobGraphStore.");
-		} catch (TimeoutException expected) {}
+		} catch (TimeoutException expected) {
+		}
 	}
 
 	private static final class BlockingJobManagerRunnerFactory extends TestingJobManagerRunnerFactory {
@@ -668,14 +694,14 @@ public class DispatcherTest extends TestLogger {
 
 		@Override
 		public JobManagerRunner createJobManagerRunner(
-				JobGraph jobGraph,
-				Configuration configuration,
-				RpcService rpcService,
-				HighAvailabilityServices highAvailabilityServices,
-				HeartbeatServices heartbeatServices,
-				JobManagerSharedServices jobManagerSharedServices,
-				JobManagerJobMetricGroupFactory jobManagerJobMetricGroupFactory,
-				FatalErrorHandler fatalErrorHandler) throws Exception {
+			JobGraph jobGraph,
+			Configuration configuration,
+			RpcService rpcService,
+			HighAvailabilityServices highAvailabilityServices,
+			HeartbeatServices heartbeatServices,
+			JobManagerSharedServices jobManagerSharedServices,
+			JobManagerJobMetricGroupFactory jobManagerJobMetricGroupFactory,
+			FatalErrorHandler fatalErrorHandler) throws Exception {
 			assertEquals(expectedJobId, jobGraph.getJobID());
 
 			createdJobManagerRunnerLatch.countDown();
