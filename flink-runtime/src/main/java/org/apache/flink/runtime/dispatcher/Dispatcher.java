@@ -346,7 +346,7 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
 	private CompletableFuture<Acknowledge> internalSubmitJob(JobGraph jobGraph, StreamManagerAddress streamManagerAddress) {
 		log.info("Submitting job {} ({}).", jobGraph.getJobID(), jobGraph.getName());
 		final CompletableFuture<Acknowledge> persistAndRunFuture;
-		if (streamManagerAddress == null) {
+		if (streamManagerAddress != null) {
 			persistAndRunFuture = waitForTerminatingJobManager(
 				jobGraph.getJobID(),
 				jobGraph, streamManagerAddress,
