@@ -62,11 +62,6 @@ public class StreamingJobLeaderService {
 	private static final Logger LOG = LoggerFactory.getLogger(StreamingJobLeaderService.class);
 
 	/**
-	 * Self's location, used for the job manager connection.
-	 */
-	private final TaskManagerLocation ownLocation;
-
-	/**
 	 * The leader retrieval service and listener for each registered job.
 	 */
 	private final Map<JobID, Tuple2<LeaderRetrievalService, StreamManagerLeaderListener>> streamManagerLeaderServices;
@@ -99,9 +94,7 @@ public class StreamingJobLeaderService {
 	private StreamingJobLeaderListener streamManagerLeaderListener;
 
 	public StreamingJobLeaderService(
-		TaskManagerLocation location,
 		RetryingRegistrationConfiguration retryingRegistrationConfiguration) {
-		this.ownLocation = Preconditions.checkNotNull(location);
 		this.retryingRegistrationConfiguration = Preconditions.checkNotNull(retryingRegistrationConfiguration);
 
 		// Has to be a concurrent hash map because tests might access this service
@@ -410,8 +403,7 @@ public class StreamingJobLeaderService {
 					getTargetAddress(),
 					getTargetLeaderId(),
 					retryingRegistrationConfiguration,
-					ownerAddress,
-					ownLocation);
+					ownerAddress);
 			}
 
 			@Override
@@ -447,8 +439,6 @@ public class StreamingJobLeaderService {
 
 		private final String jobMasterRpcAddress;
 
-		private final TaskManagerLocation taskManagerLocation;
-
 		StreamManagerRetryingRegistration(
 			Logger log,
 			RpcService rpcService,
@@ -457,8 +447,7 @@ public class StreamingJobLeaderService {
 			String targetAddress,
 			StreamManagerId streamManagerId,
 			RetryingRegistrationConfiguration retryingRegistrationConfiguration,
-			String jobMasterRpcAddress,
-			TaskManagerLocation taskManagerLocation) {
+			String jobMasterRpcAddress) {
 			super(
 				log,
 				rpcService,
@@ -469,7 +458,6 @@ public class StreamingJobLeaderService {
 				retryingRegistrationConfiguration);
 
 			this.jobMasterRpcAddress = jobMasterRpcAddress;
-			this.taskManagerLocation = Preconditions.checkNotNull(taskManagerLocation);
 		}
 
 		@Override

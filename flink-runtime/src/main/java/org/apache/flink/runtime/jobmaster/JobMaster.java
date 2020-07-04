@@ -71,6 +71,7 @@ import org.apache.flink.runtime.query.UnknownKvStateLocation;
 import org.apache.flink.runtime.registration.RegisteredRpcConnection;
 import org.apache.flink.runtime.registration.RegistrationResponse;
 import org.apache.flink.runtime.registration.RetryingRegistration;
+import org.apache.flink.runtime.registration.RetryingRegistrationConfiguration;
 import org.apache.flink.runtime.resourcemanager.ResourceManagerGateway;
 import org.apache.flink.runtime.resourcemanager.ResourceManagerId;
 import org.apache.flink.runtime.rest.handler.legacy.backpressure.BackPressureStatsTracker;
@@ -286,8 +287,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		this.resourceManagerHeartbeatManager = NoOpHeartbeatManager.getInstance();
 
 		this.streamingJobLeaderService = new StreamingJobLeaderService(
-			null,
-			null
+			RetryingRegistrationConfiguration.defaultConfiguration()
 		);
 	}
 
