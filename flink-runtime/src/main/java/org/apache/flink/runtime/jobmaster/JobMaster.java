@@ -57,6 +57,7 @@ import org.apache.flink.runtime.jobmaster.slotpool.Scheduler;
 import org.apache.flink.runtime.jobmaster.slotpool.SchedulerFactory;
 import org.apache.flink.runtime.jobmaster.slotpool.SlotPool;
 import org.apache.flink.runtime.jobmaster.slotpool.SlotPoolFactory;
+import org.apache.flink.runtime.jobmaster.streaming.StreamingJobLeaderService;
 import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalListener;
 import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalService;
 import org.apache.flink.runtime.messages.Acknowledge;
@@ -211,6 +212,8 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 
 	private final JobMasterPartitionTracker partitionTracker;
 
+	private final StreamingJobLeaderService streamingJobLeaderService;
+
 	// ------------------------------------------------------------------------
 
 	public JobMaster(
@@ -283,6 +286,11 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		this.accumulators = new HashMap<>();
 		this.taskManagerHeartbeatManager = NoOpHeartbeatManager.getInstance();
 		this.resourceManagerHeartbeatManager = NoOpHeartbeatManager.getInstance();
+
+		this.streamingJobLeaderService = new StreamingJobLeaderService(
+			null,
+			null
+		);
 	}
 
 	public void setStreamManagerAddress(@Nullable StreamManagerAddress streamManagerAddress) {

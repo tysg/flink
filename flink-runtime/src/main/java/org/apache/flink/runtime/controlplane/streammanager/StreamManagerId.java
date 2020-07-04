@@ -24,7 +24,7 @@ import javax.annotation.Nullable;
 import java.util.UUID;
 
 /**
- * The {@link StreamManager} fencing token.
+ * The {@link StreamManagerGateway} fencing token.
  */
 public class StreamManagerId extends AbstractID {
 
