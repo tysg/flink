@@ -142,22 +142,22 @@ public class RemoteStreamEnvironment extends StreamExecutionEnvironment {
 	 */
 	@PublicEvolving
 	public RemoteStreamEnvironment(String host, int port, Configuration clientConfiguration, String[] jarFiles, URL[] globalClasspaths, SavepointRestoreSettings savepointRestoreSettings) {
-		this(DefaultExecutorServiceLoader.INSTANCE, host, port, clientConfiguration, jarFiles, globalClasspaths, savepointRestoreSettings);
+		this(new DefaultExecutorServiceLoader(), host, port, clientConfiguration, jarFiles, globalClasspaths, savepointRestoreSettings);
 	}
 
 	@PublicEvolving
 	public RemoteStreamEnvironment(
-			final PipelineExecutorServiceLoader executorServiceLoader,
-			final String host,
-			final int port,
-			final Configuration clientConfiguration,
-			final String[] jarFiles,
-			final URL[] globalClasspaths,
-			final SavepointRestoreSettings savepointRestoreSettings) {
+		final PipelineExecutorServiceLoader executorServiceLoader,
+		final String host,
+		final int port,
+		final Configuration clientConfiguration,
+		final String[] jarFiles,
+		final URL[] globalClasspaths,
+		final SavepointRestoreSettings savepointRestoreSettings) {
 		super(
-				executorServiceLoader,
-				validateAndGetEffectiveConfiguration(clientConfiguration, host, port, jarFiles, globalClasspaths, savepointRestoreSettings),
-				null
+			executorServiceLoader,
+			validateAndGetEffectiveConfiguration(clientConfiguration, host, port, jarFiles, globalClasspaths, savepointRestoreSettings),
+			null
 		);
 	}
 
@@ -170,29 +170,29 @@ public class RemoteStreamEnvironment extends StreamExecutionEnvironment {
 	}
 
 	private static Configuration validateAndGetEffectiveConfiguration(
-			final Configuration configuration,
-			final String host,
-			final int port,
-			final String[] jarFiles,
-			final URL[] classpaths,
-			final SavepointRestoreSettings savepointRestoreSettings) {
+		final Configuration configuration,
+		final String host,
+		final int port,
+		final String[] jarFiles,
+		final URL[] classpaths,
+		final SavepointRestoreSettings savepointRestoreSettings) {
 		RemoteEnvironmentConfigUtils.validate(host, port);
 		return getEffectiveConfiguration(
-				getClientConfiguration(configuration),
-				host,
-				port,
-				jarFiles,
-				getClasspathURLs(classpaths),
-				savepointRestoreSettings);
+			getClientConfiguration(configuration),
+			host,
+			port,
+			jarFiles,
+			getClasspathURLs(classpaths),
+			savepointRestoreSettings);
 	}
 
 	private static Configuration getEffectiveConfiguration(
-			final Configuration baseConfiguration,
-			final String host,
-			final int port,
-			final String[] jars,
-			final List<URL> classpaths,
-			final SavepointRestoreSettings savepointRestoreSettings) {
+		final Configuration baseConfiguration,
+		final String host,
+		final int port,
+		final String[] jars,
+		final List<URL> classpaths,
+		final SavepointRestoreSettings savepointRestoreSettings) {
 
 		final Configuration effectiveConfiguration = new Configuration(baseConfiguration);
 
