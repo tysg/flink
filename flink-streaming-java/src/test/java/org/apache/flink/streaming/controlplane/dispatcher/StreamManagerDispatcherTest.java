@@ -24,7 +24,6 @@ import org.apache.flink.api.common.operators.ResourceSpec;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.configuration.BlobServerOptions;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.core.testutils.OneShotLatch;
 import org.apache.flink.runtime.blob.BlobServer;
 import org.apache.flink.runtime.blob.VoidBlobStore;
 import org.apache.flink.runtime.checkpoint.Checkpoints;
@@ -33,11 +32,10 @@ import org.apache.flink.runtime.checkpoint.savepoint.SavepointV2;
 import org.apache.flink.runtime.client.JobSubmissionException;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerRunner;
 import org.apache.flink.runtime.dispatcher.*;
-import org.apache.flink.runtime.executiongraph.ArchivedExecutionGraph;
-import org.apache.flink.runtime.executiongraph.ErrorInfo;
 import org.apache.flink.runtime.heartbeat.HeartbeatServices;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
 import org.apache.flink.runtime.highavailability.TestingHighAvailabilityServices;
+import org.apache.flink.runtime.highavailability.TestingHighAvailabilityServicesBuilder;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobmanager.JobGraphWriter;
@@ -47,8 +45,8 @@ import org.apache.flink.runtime.leaderelection.TestingLeaderElectionService;
 import org.apache.flink.runtime.leaderretrieval.SettableLeaderRetrievalService;
 import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.messages.FlinkJobNotFoundException;
+import org.apache.flink.runtime.metrics.groups.UnregisteredMetricGroups;
 import org.apache.flink.runtime.resourcemanager.utils.TestingResourceManagerGateway;
-import org.apache.flink.runtime.rest.handler.legacy.utils.ArchivedExecutionGraphBuilder;
 import org.apache.flink.runtime.rpc.FatalErrorHandler;
 import org.apache.flink.runtime.rpc.RpcService;
 import org.apache.flink.runtime.rpc.RpcUtils;
@@ -58,6 +56,7 @@ import org.apache.flink.runtime.testtasks.NoOpInvokable;
 import org.apache.flink.runtime.testutils.TestingJobGraphStore;
 import org.apache.flink.runtime.util.TestingFatalErrorHandler;
 import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
+import org.apache.flink.runtime.webmonitor.retriever.impl.RpcGatewayRetriever;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkException;
 import org.apache.flink.util.TestLogger;
@@ -77,7 +76,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.*;
 
@@ -148,7 +146,7 @@ public class StreamManagerDispatcherTest extends TestLogger {
 
 		jobMasterLeaderElectionService = new TestingLeaderElectionService();
 
-		haServices = new TestingHighAvailabilityServices();
+		haServices = new TestingHighAvailabilityServicesBuilder().build();
 		haServices.setJobMasterLeaderElectionService(TEST_JOB_ID, jobMasterLeaderElectionService);
 		haServices.setCheckpointRecoveryFactory(new StandaloneCheckpointRecoveryFactory());
 		haServices.setResourceManagerLeaderRetriever(new SettableLeaderRetrievalService());
@@ -168,14 +166,19 @@ public class StreamManagerDispatcherTest extends TestLogger {
 		HeartbeatServices heartbeatServices,
 		TestingHighAvailabilityServices haServices,
 		StreamManagerRunnerFactory streamManagerRunnerFactory) throws Exception {
-		final TestingStreamManagerDispatcher dispatcher = new TestingDispatcherBuilder()
+		TestingDispatcherBuilder dispatcherBuilder = new TestingDispatcherBuilder()
 			.setHaServices(haServices)
 			.setHeartbeatServices(heartbeatServices)
-			.setStreamManagerRunnerFactory(streamManagerRunnerFactory)
-			.build();
-		dispatcher.start();
+			.setStreamManagerRunnerFactory(streamManagerRunnerFactory);
+		final TestingDispatcher runtimeDispatcher = dispatcherBuilder.buildRuntimeDispatcher();
 
-		return dispatcher;
+		runtimeDispatcher.start();
+
+		final TestingStreamManagerDispatcher streamManagerDispatcher = dispatcherBuilder.buildStreamManagerDispatcher();
+
+		streamManagerDispatcher.start();
+
+		return streamManagerDispatcher;
 	}
 
 	private class TestingDispatcherBuilder {
@@ -187,6 +190,8 @@ public class StreamManagerDispatcherTest extends TestLogger {
 		private HighAvailabilityServices haServices = StreamManagerDispatcherTest.this.haServices;
 
 		private StreamManagerRunnerFactory streamManagerRunnerFactory = DefaultStreamManagerRunnerFactory.INSTANCE;
+
+		private JobManagerRunnerFactory jobManagerRunnerFactory = DefaultJobManagerRunnerFactory.INSTANCE;
 
 		private JobGraphWriter jobGraphWriter = NoOpJobGraphWriter.INSTANCE;
 
@@ -215,7 +220,7 @@ public class StreamManagerDispatcherTest extends TestLogger {
 			return this;
 		}
 
-		TestingStreamManagerDispatcher build() throws Exception {
+		TestingStreamManagerDispatcher buildStreamManagerDispatcher() throws Exception {
 			TestingResourceManagerGateway resourceManagerGateway = new TestingResourceManagerGateway();
 
 			final MemoryArchivedExecutionGraphStore archivedExecutionGraphStore = new MemoryArchivedExecutionGraphStore();
@@ -233,7 +238,38 @@ public class StreamManagerDispatcherTest extends TestLogger {
 					fatalErrorHandler,
 					jobGraphWriter,
 					streamManagerRunnerFactory),
-				null);
+				new RpcGatewayRetriever<>(
+					rpcService,
+					DispatcherGateway.class,
+					DispatcherId::fromUuid,
+					10,
+					Time.milliseconds(50L))
+			);
+		}
+
+		TestingDispatcher buildRuntimeDispatcher() throws Exception {
+			TestingResourceManagerGateway resourceManagerGateway = new TestingResourceManagerGateway();
+
+			final MemoryArchivedExecutionGraphStore archivedExecutionGraphStore = new MemoryArchivedExecutionGraphStore();
+
+			return new TestingDispatcher(
+				rpcService,
+				Dispatcher.DISPATCHER_NAME + '_' + name.getMethodName(),
+				DispatcherId.generate(),
+				initialJobGraphs,
+				new DispatcherServices(
+					configuration,
+					haServices,
+					() -> CompletableFuture.completedFuture(resourceManagerGateway),
+					blobServer,
+					heartbeatServices,
+					archivedExecutionGraphStore,
+					fatalErrorHandler,
+					VoidHistoryServerArchivist.INSTANCE,
+					null,
+					UnregisteredMetricGroups.createUnregisteredJobManagerMetricGroup(),
+					jobGraphWriter,
+					jobManagerRunnerFactory));
 		}
 	}
 
@@ -262,9 +298,9 @@ public class StreamManagerDispatcherTest extends TestLogger {
 	 */
 	@Test
 	public void testJobSubmission() throws Exception {
-		dispatcher = createAndStartDispatcher(heartbeatServices, haServices, new ExpectedJobIdJobManagerRunnerFactory(TEST_JOB_ID, createdJobManagerRunnerLatch));
+		dispatcher = createAndStartDispatcher(heartbeatServices, haServices, new ExpectedJobIdStreamManagerRunnerFactory(TEST_JOB_ID, createdJobManagerRunnerLatch));
 
-		DispatcherGateway dispatcherGateway = dispatcher.getSelfGateway(DispatcherGateway.class);
+		StreamManagerDispatcherGateway dispatcherGateway = dispatcher.getSelfGateway(StreamManagerDispatcherGateway.class);
 
 		CompletableFuture<Acknowledge> acknowledgeFuture = dispatcherGateway.submitJob(jobGraph, TIMEOUT);
 
@@ -281,7 +317,7 @@ public class StreamManagerDispatcherTest extends TestLogger {
 	 */
 	@Test
 	public void testJobSubmissionWithPartialResourceConfigured() throws Exception {
-		dispatcher = createAndStartDispatcher(heartbeatServices, haServices, new ExpectedJobIdJobManagerRunnerFactory(TEST_JOB_ID, createdJobManagerRunnerLatch));
+		dispatcher = createAndStartDispatcher(heartbeatServices, haServices, new ExpectedJobIdStreamManagerRunnerFactory(TEST_JOB_ID, createdJobManagerRunnerLatch));
 
 		DispatcherGateway dispatcherGateway = dispatcher.getSelfGateway(DispatcherGateway.class);
 
@@ -309,7 +345,7 @@ public class StreamManagerDispatcherTest extends TestLogger {
 
 	@Test
 	public void testThrowExceptionIfJobExecutionResultNotFound() throws Exception {
-		dispatcher = createAndStartDispatcher(heartbeatServices, haServices, new ExpectedJobIdJobManagerRunnerFactory(TEST_JOB_ID, createdJobManagerRunnerLatch));
+		dispatcher = createAndStartDispatcher(heartbeatServices, haServices, new ExpectedJobIdStreamManagerRunnerFactory(TEST_JOB_ID, createdJobManagerRunnerLatch));
 
 		final DispatcherGateway dispatcherGateway = dispatcher.getSelfGateway(DispatcherGateway.class);
 		try {
@@ -328,7 +364,7 @@ public class StreamManagerDispatcherTest extends TestLogger {
 		final URI externalPointer = createTestingSavepoint();
 		final Path savepointPath = Paths.get(externalPointer);
 
-		dispatcher = createAndStartDispatcher(heartbeatServices, haServices, new ExpectedJobIdJobManagerRunnerFactory(TEST_JOB_ID, createdJobManagerRunnerLatch));
+		dispatcher = createAndStartDispatcher(heartbeatServices, haServices, new ExpectedJobIdStreamManagerRunnerFactory(TEST_JOB_ID, createdJobManagerRunnerLatch));
 
 		final DispatcherGateway dispatcherGateway = dispatcher.getSelfGateway(DispatcherGateway.class);
 
@@ -363,7 +399,7 @@ public class StreamManagerDispatcherTest extends TestLogger {
 	 */
 	@Test
 	public void testWaitingForJobMasterLeadership() throws Exception {
-		dispatcher = createAndStartDispatcher(heartbeatServices, haServices, new ExpectedJobIdJobManagerRunnerFactory(TEST_JOB_ID, createdJobManagerRunnerLatch));
+		dispatcher = createAndStartDispatcher(heartbeatServices, haServices, new ExpectedJobIdStreamManagerRunnerFactory(TEST_JOB_ID, createdJobManagerRunnerLatch));
 
 		final DispatcherGateway dispatcherGateway = dispatcher.getSelfGateway(DispatcherGateway.class);
 
@@ -397,7 +433,7 @@ public class StreamManagerDispatcherTest extends TestLogger {
 
 		dispatcher = new TestingDispatcherBuilder()
 			.setInitialJobGraphs(Collections.singleton(failingJobGraph))
-			.build();
+			.buildStreamManagerDispatcher();
 
 		dispatcher.start();
 
@@ -417,7 +453,7 @@ public class StreamManagerDispatcherTest extends TestLogger {
 
 		dispatcher = new TestingDispatcherBuilder()
 			.setJobGraphWriter(submittedJobGraphStore)
-			.build();
+			.buildStreamManagerDispatcher();
 
 		dispatcher.start();
 
@@ -436,7 +472,7 @@ public class StreamManagerDispatcherTest extends TestLogger {
 	 */
 	@Test
 	public void testJobSuspensionWhenDispatcherIsTerminated() throws Exception {
-		dispatcher = createAndStartDispatcher(heartbeatServices, haServices, new ExpectedJobIdJobManagerRunnerFactory(TEST_JOB_ID, createdJobManagerRunnerLatch));
+		dispatcher = createAndStartDispatcher(heartbeatServices, haServices, new ExpectedJobIdStreamManagerRunnerFactory(TEST_JOB_ID, createdJobManagerRunnerLatch));
 
 		DispatcherGateway dispatcherGateway = dispatcher.getSelfGateway(DispatcherGateway.class);
 
@@ -476,7 +512,7 @@ public class StreamManagerDispatcherTest extends TestLogger {
 		dispatcher = new TestingDispatcherBuilder()
 			.setInitialJobGraphs(Collections.singleton(jobGraph))
 			.setJobGraphWriter(testingJobGraphStore)
-			.build();
+			.buildStreamManagerDispatcher();
 		dispatcher.start();
 
 		final CompletableFuture<Void> processFuture = dispatcher.onRemovedJobGraph(jobGraph.getJobID());
@@ -530,13 +566,13 @@ public class StreamManagerDispatcherTest extends TestLogger {
 		}
 	}
 
-	private static final class ExpectedJobIdJobManagerRunnerFactory implements StreamManagerRunnerFactory {
+	private static final class ExpectedJobIdStreamManagerRunnerFactory implements StreamManagerRunnerFactory {
 
 		private final JobID expectedJobId;
 
 		private final CountDownLatch createdJobManagerRunnerLatch;
 
-		private ExpectedJobIdJobManagerRunnerFactory(JobID expectedJobId, CountDownLatch createdJobManagerRunnerLatch) {
+		private ExpectedJobIdStreamManagerRunnerFactory(JobID expectedJobId, CountDownLatch createdJobManagerRunnerLatch) {
 			this.expectedJobId = expectedJobId;
 			this.createdJobManagerRunnerLatch = createdJobManagerRunnerLatch;
 		}
