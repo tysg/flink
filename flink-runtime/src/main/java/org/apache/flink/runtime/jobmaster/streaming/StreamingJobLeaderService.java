@@ -121,6 +121,7 @@ public class StreamingJobLeaderService {
 	// -------------------------------------------------------------------------------
 
 	/**
+	 * todo this method only connect the corresponding job manager
 	 * Start the job leader service with the given services.
 	 *
 	 * @param initialOwnerAddress             to be used for establishing connections (source address)
@@ -132,7 +133,7 @@ public class StreamingJobLeaderService {
 		final String initialOwnerAddress,
 		final RpcService initialRpcService,
 		final HighAvailabilityServices initialHighAvailabilityServices,
-		final StreamingJobLeaderListener initialStreamingJobLeaderListener) {
+		final StreamingJobLeaderListener initialStreamingJobLeaderListener) throws Exception {
 
 		if (StreamingJobLeaderService.State.CREATED != state) {
 			throw new IllegalStateException("The service has already been started.");
