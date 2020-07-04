@@ -21,6 +21,7 @@ package org.apache.flink.streaming.controlplane.dispatcher;
 import org.apache.flink.runtime.dispatcher.*;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.rpc.RpcService;
+import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
 
 import java.util.Collection;
 
@@ -35,13 +36,15 @@ public enum SessionStreamManagerDispatcherFactory implements StreamManagerDispat
 		RpcService rpcService,
 		StreamManagerDispatcherId fencingToken,
 		Collection<JobGraph> recoveredJobs,
-		PartialStreamManagerDispatcherServicesWithJobGraphStore partialSmDispatcherServicesWithJobGraphStore) throws Exception {
+		PartialStreamManagerDispatcherServicesWithJobGraphStore partialSmDispatcherServicesWithJobGraphStore,
+		LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever) throws Exception {
 		// create the default dispatcher
 		return new StandaloneStreamManagerDispatcher(
 			rpcService,
 			getEndpointId(),
 			fencingToken,
 			recoveredJobs,
-			StreamManagerDispatcherServices.from(partialSmDispatcherServicesWithJobGraphStore, DefaultStreamManagerRunnerFactory.INSTANCE));
+			StreamManagerDispatcherServices.from(partialSmDispatcherServicesWithJobGraphStore, DefaultStreamManagerRunnerFactory.INSTANCE),
+			dispatcherGatewayRetriever);
 	}
 }

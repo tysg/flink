@@ -18,9 +18,12 @@
 
 package org.apache.flink.streaming.controlplane.dispatcher;
 
+import org.apache.flink.runtime.dispatcher.DispatcherGateway;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobmaster.JobMaster;
+import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalService;
 import org.apache.flink.runtime.rpc.RpcService;
+import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
 
 import java.util.Collection;
 
@@ -31,16 +34,18 @@ import java.util.Collection;
  */
 public class StandaloneStreamManagerDispatcher extends StreamManagerDispatcher {
 	public StandaloneStreamManagerDispatcher(
-			RpcService rpcService,
-			String endpointId,
-			StreamManagerDispatcherId fencingToken,
-			Collection<JobGraph> recoveredJobs,
-			StreamManagerDispatcherServices dispatcherServices) throws Exception {
+		RpcService rpcService,
+		String endpointId,
+		StreamManagerDispatcherId fencingToken,
+		Collection<JobGraph> recoveredJobs,
+		StreamManagerDispatcherServices dispatcherServices,
+		LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever) throws Exception {
 		super(
 			rpcService,
 			endpointId,
 			fencingToken,
 			recoveredJobs,
-			dispatcherServices);
+			dispatcherServices,
+			dispatcherGatewayRetriever);
 	}
 }

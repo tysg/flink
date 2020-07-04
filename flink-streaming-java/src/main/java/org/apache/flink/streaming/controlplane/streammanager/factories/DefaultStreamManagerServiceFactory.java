@@ -19,9 +19,11 @@
 package org.apache.flink.streaming.controlplane.streammanager.factories;
 
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
+import org.apache.flink.runtime.dispatcher.DispatcherGateway;
+import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalService;
+import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
 import org.apache.flink.streaming.controlplane.streammanager.StreamManager;
 import org.apache.flink.streaming.controlplane.streammanager.StreamManagerConfiguration;
-import org.apache.flink.runtime.heartbeat.HeartbeatServices;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.rpc.FatalErrorHandler;
@@ -44,20 +46,20 @@ public class DefaultStreamManagerServiceFactory implements StreamManagerServiceF
 	// TODO: May need StreamManagerSharedServices
 
 
-	private final HeartbeatServices heartbeatServices;
+	private final LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever;
 
 	private final FatalErrorHandler fatalErrorHandler;
 
 	public DefaultStreamManagerServiceFactory(
-			StreamManagerConfiguration streamManagerConfiguration,
-			RpcService rpcService,
-			HighAvailabilityServices haServices,
-			HeartbeatServices heartbeatServices,
-			FatalErrorHandler fatalErrorHandler) {
+		StreamManagerConfiguration streamManagerConfiguration,
+		RpcService rpcService,
+		HighAvailabilityServices haServices,
+		LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever,
+		FatalErrorHandler fatalErrorHandler) {
 		this.streamManagerConfiguration = streamManagerConfiguration;
 		this.rpcService = rpcService;
 		this.haServices = haServices;
-		this.heartbeatServices = heartbeatServices;
+		this.dispatcherGatewayRetriever = dispatcherGatewayRetriever;
 		this.fatalErrorHandler = fatalErrorHandler;
 	}
 
@@ -71,7 +73,7 @@ public class DefaultStreamManagerServiceFactory implements StreamManagerServiceF
 			ResourceID.generate(),
 			jobGraph,
 			haServices,
-			heartbeatServices,
+			dispatcherGatewayRetriever,
 			fatalErrorHandler);
 	}
 }

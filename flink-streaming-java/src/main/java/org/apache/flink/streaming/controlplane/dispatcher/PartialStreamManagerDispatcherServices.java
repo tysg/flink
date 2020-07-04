@@ -46,23 +46,18 @@ public class PartialStreamManagerDispatcherServices {
 	private final HeartbeatServices heartbeatServices;
 
 	@Nonnull
-	private final ArchivedExecutionGraphStore archivedExecutionGraphStore;
-
-	@Nonnull
 	private final FatalErrorHandler fatalErrorHandler;
 
 	public PartialStreamManagerDispatcherServices(
-			@Nonnull Configuration configuration,
-			@Nonnull HighAvailabilityServices highAvailabilityServices,
-			@Nonnull BlobServer blobServer,
-			@Nonnull HeartbeatServices heartbeatServices,
-			@Nonnull ArchivedExecutionGraphStore archivedExecutionGraphStore,
-			@Nonnull FatalErrorHandler fatalErrorHandler) {
+		@Nonnull Configuration configuration,
+		@Nonnull HighAvailabilityServices highAvailabilityServices,
+		@Nonnull BlobServer blobServer,
+		@Nonnull HeartbeatServices heartbeatServices,
+		@Nonnull FatalErrorHandler fatalErrorHandler) {
 		this.configuration = configuration;
 		this.highAvailabilityServices = highAvailabilityServices;
 		this.blobServer = blobServer;
 		this.heartbeatServices = heartbeatServices;
-		this.archivedExecutionGraphStore = archivedExecutionGraphStore;
 		this.fatalErrorHandler = fatalErrorHandler;
 	}
 
@@ -84,11 +79,6 @@ public class PartialStreamManagerDispatcherServices {
 	@Nonnull
 	public HeartbeatServices getHeartbeatServices() {
 		return heartbeatServices;
-	}
-
-	@Nonnull
-	public ArchivedExecutionGraphStore getArchivedExecutionGraphStore() {
-		return archivedExecutionGraphStore;
 	}
 
 	@Nonnull

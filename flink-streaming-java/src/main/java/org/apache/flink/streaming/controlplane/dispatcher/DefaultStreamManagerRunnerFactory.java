@@ -19,12 +19,13 @@
 package org.apache.flink.streaming.controlplane.dispatcher;
 
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.runtime.dispatcher.DispatcherGateway;
+import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
 import org.apache.flink.streaming.controlplane.streammanager.StreamManagerConfiguration;
 import org.apache.flink.streaming.controlplane.streammanager.StreamManagerRunner;
 import org.apache.flink.streaming.controlplane.streammanager.StreamManagerRunnerImpl;
 import org.apache.flink.streaming.controlplane.streammanager.factories.DefaultStreamManagerServiceFactory;
 import org.apache.flink.streaming.controlplane.streammanager.factories.StreamManagerServiceFactory;
-import org.apache.flink.runtime.heartbeat.HeartbeatServices;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.rpc.FatalErrorHandler;
@@ -44,12 +45,12 @@ public enum DefaultStreamManagerRunnerFactory implements StreamManagerRunnerFact
 
     @Override
     public StreamManagerRunner createStreamManagerRunner(
-            JobGraph jobGraph,
-            Configuration configuration,
-            RpcService rpcService,
-            HighAvailabilityServices highAvailabilityServices,
-            HeartbeatServices heartbeatServices,
-            FatalErrorHandler fatalErrorHandler) throws Exception {
+		JobGraph jobGraph,
+		Configuration configuration,
+		RpcService rpcService,
+		HighAvailabilityServices highAvailabilityServices,
+		LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever,
+		FatalErrorHandler fatalErrorHandler) throws Exception {
 
         final StreamManagerConfiguration streamManagerConfiguration = StreamManagerConfiguration.fromConfiguration(configuration);
 
@@ -57,7 +58,7 @@ public enum DefaultStreamManagerRunnerFactory implements StreamManagerRunnerFact
                 streamManagerConfiguration,
                 rpcService,
                 highAvailabilityServices,
-                heartbeatServices,
+				dispatcherGatewayRetriever,
                 fatalErrorHandler
         );
 

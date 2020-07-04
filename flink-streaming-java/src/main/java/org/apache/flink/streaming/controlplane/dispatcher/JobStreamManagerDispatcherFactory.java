@@ -23,6 +23,7 @@ import org.apache.flink.runtime.dispatcher.*;
 import org.apache.flink.runtime.entrypoint.ClusterEntrypoint;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.rpc.RpcService;
+import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
 import org.apache.flink.shaded.guava18.com.google.common.collect.Iterables;
 
 import java.util.Collection;
@@ -38,10 +39,11 @@ public enum JobStreamManagerDispatcherFactory implements StreamManagerDispatcher
 	@Override
 //	public MiniStreamManagerDispatcher createStreamManagerDispatcher(
 	public StreamManagerDispatcher createStreamManagerDispatcher(
-			RpcService rpcService,
-			StreamManagerDispatcherId fencingToken,
-			Collection<JobGraph> recoveredJobs,
-			PartialStreamManagerDispatcherServicesWithJobGraphStore partialDispatcherServicesWithJobGraphStore) throws Exception {
+		RpcService rpcService,
+		StreamManagerDispatcherId fencingToken,
+		Collection<JobGraph> recoveredJobs,
+		PartialStreamManagerDispatcherServicesWithJobGraphStore partialDispatcherServicesWithJobGraphStore,
+		LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever) throws Exception {
 		final JobGraph jobGraph = Iterables.getOnlyElement(recoveredJobs);
 
 		final Configuration configuration = partialDispatcherServicesWithJobGraphStore.getConfiguration();

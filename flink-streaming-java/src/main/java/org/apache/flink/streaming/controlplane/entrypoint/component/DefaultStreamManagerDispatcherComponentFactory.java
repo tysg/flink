@@ -85,20 +85,29 @@ public class DefaultStreamManagerDispatcherComponentFactory implements StreamMan
 		HighAvailabilityServices highAvailabilityServices,
 		BlobServer blobServer,
 		HeartbeatServices heartbeatServices,
-		ArchivedExecutionGraphStore archivedExecutionGraphStore,
 		FatalErrorHandler fatalErrorHandler) throws Exception {
 
 		LeaderRetrievalService smDispatcherLeaderRetrievalService = null;
 		StreamManagerWebMonitorEndpoint<?> smWebMonitorEndpoint = null;
 		StreamManagerDispatcherRunner smDispatcherRunner = null;
+		LeaderRetrievalService dispatcherLeaderRetrievalService = null;
 
 		try {
 			smDispatcherLeaderRetrievalService = highAvailabilityServices.getStreamManagerDispatcherLeaderRetriever();
+
+			dispatcherLeaderRetrievalService = highAvailabilityServices.getDispatcherLeaderRetriever();
 
 			final LeaderGatewayRetriever<StreamManagerDispatcherGateway> smDispatcherGatewayRetriever = new RpcGatewayRetriever<>(
 				rpcService,
 				StreamManagerDispatcherGateway.class,
 				StreamManagerDispatcherId::fromUuid,
+				10,
+				Time.milliseconds(50L));
+
+			final LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever = new RpcGatewayRetriever<>(
+				rpcService,
+				DispatcherGateway.class,
+				DispatcherId::fromUuid,
 				10,
 				Time.milliseconds(50L));
 
@@ -124,7 +133,6 @@ public class DefaultStreamManagerDispatcherComponentFactory implements StreamMan
 				highAvailabilityServices,
 				blobServer,
 				heartbeatServices,
-				archivedExecutionGraphStore,
 				fatalErrorHandler);
 
 			log.debug("Starting sm Dispatcher.");
@@ -134,15 +142,18 @@ public class DefaultStreamManagerDispatcherComponentFactory implements StreamMan
 				new HaServicesJobGraphStoreFactory(highAvailabilityServices),
 				ioExecutor,
 				rpcService,
-				partialSmDispatcherServices);
+				partialSmDispatcherServices,
+				dispatcherGatewayRetriever);
 
 
 			smDispatcherLeaderRetrievalService.start(smDispatcherGatewayRetriever);
+			dispatcherLeaderRetrievalService.start(dispatcherGatewayRetriever);
 
 			return new StreamManagerDispatcherComponent(
 				smDispatcherRunner,
 				smDispatcherLeaderRetrievalService,
-				smWebMonitorEndpoint);
+				smWebMonitorEndpoint,
+				dispatcherLeaderRetrievalService);
 
 		} catch (Exception exception) {
 			// clean up all started components

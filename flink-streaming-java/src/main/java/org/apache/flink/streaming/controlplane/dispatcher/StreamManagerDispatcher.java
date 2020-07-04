@@ -27,6 +27,9 @@ import org.apache.flink.runtime.client.DuplicateJobSubmissionException;
 import org.apache.flink.runtime.client.JobSubmissionException;
 import org.apache.flink.runtime.clusterframework.ApplicationStatus;
 import org.apache.flink.runtime.concurrent.FutureUtils;
+import org.apache.flink.runtime.dispatcher.DispatcherGateway;
+import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalService;
+import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
 import org.apache.flink.streaming.controlplane.streammanager.StreamManagerRunner;
 import org.apache.flink.runtime.dispatcher.ArchivedExecutionGraphStore;
 import org.apache.flink.runtime.dispatcher.DispatcherException;
@@ -75,7 +78,6 @@ public abstract class StreamManagerDispatcher extends PermanentlyFencedRpcEndpoi
 
 	private final HighAvailabilityServices highAvailabilityServices;
 	private final JobManagerSharedServices jobManagerSharedServices;
-	private final HeartbeatServices heartbeatServices;
 	private final BlobServer blobServer;
 
 	private final FatalErrorHandler fatalErrorHandler;
@@ -84,7 +86,6 @@ public abstract class StreamManagerDispatcher extends PermanentlyFencedRpcEndpoi
 
 	private final Collection<JobGraph> recoveredJobs;
 
-	private final ArchivedExecutionGraphStore archivedExecutionGraphStore;
 
 	private StreamManagerRunnerFactory streamManagerRunnerFactory;
 
@@ -92,18 +93,20 @@ public abstract class StreamManagerDispatcher extends PermanentlyFencedRpcEndpoi
 
 	protected final CompletableFuture<ApplicationStatus> shutDownFuture;
 
+	private final LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever;
+
 	public StreamManagerDispatcher(
-			RpcService rpcService,
-			String endpointId,
-			StreamManagerDispatcherId fencingToken,
-			Collection<JobGraph> recoveredJobs,
-			StreamManagerDispatcherServices dispatcherServices) throws Exception {
+		RpcService rpcService,
+		String endpointId,
+		StreamManagerDispatcherId fencingToken,
+		Collection<JobGraph> recoveredJobs,
+		StreamManagerDispatcherServices dispatcherServices,
+		LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever) throws Exception {
 		super(rpcService, endpointId, fencingToken);
 		Preconditions.checkNotNull(dispatcherServices);
 
 		this.configuration = dispatcherServices.getConfiguration();
 		this.highAvailabilityServices = dispatcherServices.getHighAvailabilityServices();
-		this.heartbeatServices = dispatcherServices.getHeartbeatServices();
 		this.blobServer = dispatcherServices.getBlobServer();
 		this.fatalErrorHandler = dispatcherServices.getFatalErrorHandler();
 		this.jobGraphWriter = dispatcherServices.getJobGraphWriter();
@@ -116,8 +119,6 @@ public abstract class StreamManagerDispatcher extends PermanentlyFencedRpcEndpoi
 
 		jobManagerRunnerFutures = new HashMap<>(16);
 
-		this.archivedExecutionGraphStore = dispatcherServices.getArchivedExecutionGraphStore();
-
 		this.streamManagerRunnerFactory = dispatcherServices.getStreamManagerRunnerFactory();
 
 		this.jobManagerTerminationFutures = new HashMap<>(2);
@@ -125,6 +126,8 @@ public abstract class StreamManagerDispatcher extends PermanentlyFencedRpcEndpoi
 		this.shutDownFuture = new CompletableFuture<>();
 
 		this.recoveredJobs = new HashSet<>(recoveredJobs);
+
+		this.dispatcherGatewayRetriever = dispatcherGatewayRetriever;
 	}
 
 	//------------------------------------------------------
@@ -293,7 +296,7 @@ public abstract class StreamManagerDispatcher extends PermanentlyFencedRpcEndpoi
 					configuration, //configuration,
 					rpcService,
 					highAvailabilityServices, //highAvailabilityServices,
-					heartbeatServices, //heartbeatServices,
+					dispatcherGatewayRetriever, //heartbeatServices,
 					fatalErrorHandler //fatalErrorHandler
 				)),
 			rpcService.getExecutor());
