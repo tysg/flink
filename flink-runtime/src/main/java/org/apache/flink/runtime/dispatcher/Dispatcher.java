@@ -67,7 +67,10 @@ import org.apache.flink.runtime.webmonitor.retriever.GatewayRetriever;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkException;
 import org.apache.flink.util.Preconditions;
-import org.apache.flink.util.function.*;
+import org.apache.flink.util.function.BiConsumerWithException;
+import org.apache.flink.util.function.CheckedSupplier;
+import org.apache.flink.util.function.FunctionUtils;
+import org.apache.flink.util.function.FunctionWithException;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -298,7 +301,7 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
 					new JobSubmissionException(jobGraph.getJobID(), "Currently jobs is not supported if parts of the vertices have " +
 						"resources configured. The limitation will be removed in future versions."));
 			} else {
-				return internalSubmitJob(jobGraph, streamManagerAddress);
+				return internalSubmitJob(jobGraph);
 			}
 		} catch (FlinkException e) {
 			return FutureUtils.completedExceptionally(e);
@@ -343,18 +346,12 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
 		return false;
 	}
 
-	private CompletableFuture<Acknowledge> internalSubmitJob(JobGraph jobGraph, StreamManagerAddress streamManagerAddress) {
+	private CompletableFuture<Acknowledge> internalSubmitJob(JobGraph jobGraph) {
 		log.info("Submitting job {} ({}).", jobGraph.getJobID(), jobGraph.getName());
-		final CompletableFuture<Acknowledge> persistAndRunFuture;
-		if (streamManagerAddress != null) {
-			persistAndRunFuture = waitForTerminatingJobManager(
-				jobGraph.getJobID(),
-				jobGraph, streamManagerAddress,
-				this::persistAndRunJob).thenApply(ignored -> Acknowledge.get());
-		} else {
-			persistAndRunFuture = waitForTerminatingJobManager(jobGraph.getJobID(), jobGraph, this::persistAndRunJob)
-				.thenApply(ignored -> Acknowledge.get());
-		}
+
+		final CompletableFuture<Acknowledge> persistAndRunFuture = waitForTerminatingJobManager(jobGraph.getJobID(), jobGraph, this::persistAndRunJob)
+			.thenApply(ignored -> Acknowledge.get());
+
 		return persistAndRunFuture.handleAsync((acknowledge, throwable) -> {
 			if (throwable != null) {
 				cleanUpJobData(jobGraph.getJobID(), true);
@@ -369,27 +366,10 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
 		}, getRpcService().getExecutor());
 	}
 
-
-	private CompletableFuture<Acknowledge> internalSubmitJob(JobGraph jobGraph) {
-		return internalSubmitJob(jobGraph, null);
-	}
-
 	private CompletableFuture<Void> persistAndRunJob(JobGraph jobGraph) throws Exception {
 		jobGraphWriter.putJobGraph(jobGraph);
 
 		final CompletableFuture<Void> runJobFuture = runJob(jobGraph);
-
-		return runJobFuture.whenComplete(BiConsumerWithException.unchecked((Object ignored, Throwable throwable) -> {
-			if (throwable != null) {
-				jobGraphWriter.removeJobGraph(jobGraph.getJobID());
-			}
-		}));
-	}
-
-	private CompletableFuture<Void> persistAndRunJob(JobGraph jobGraph, StreamManagerAddress streamManagerAddress) throws Exception {
-		jobGraphWriter.putJobGraph(jobGraph);
-
-		final CompletableFuture<Void> runJobFuture = runJob(jobGraph, streamManagerAddress);
 
 		return runJobFuture.whenComplete(BiConsumerWithException.unchecked((Object ignored, Throwable throwable) -> {
 			if (throwable != null) {
@@ -417,48 +397,12 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
 				getMainThreadExecutor());
 	}
 
-	private CompletableFuture<Void> runJob(JobGraph jobGraph, StreamManagerAddress streamManagerAddress) {
-		Preconditions.checkState(!jobManagerRunnerFutures.containsKey(jobGraph.getJobID()));
-
-		final CompletableFuture<JobManagerRunner> jobManagerRunnerFuture = createJobManagerRunner(jobGraph, streamManagerAddress);
-
-		jobManagerRunnerFutures.put(jobGraph.getJobID(), jobManagerRunnerFuture);
-
-		return jobManagerRunnerFuture
-			.thenApply(FunctionUtils.uncheckedFunction(this::startJobManagerRunner))
-			.thenApply(FunctionUtils.nullFn())
-			.whenCompleteAsync(
-				(ignored, throwable) -> {
-					if (throwable != null) {
-						jobManagerRunnerFutures.remove(jobGraph.getJobID());
-					}
-				},
-				getMainThreadExecutor());
-	}
-
 	private CompletableFuture<JobManagerRunner> createJobManagerRunner(JobGraph jobGraph) {
 		final RpcService rpcService = getRpcService();
 
 		return CompletableFuture.supplyAsync(
 			CheckedSupplier.unchecked(() ->
 				jobManagerRunnerFactory.createJobManagerRunner(
-					jobGraph,
-					configuration,
-					rpcService,
-					highAvailabilityServices,
-					heartbeatServices,
-					jobManagerSharedServices,
-					new DefaultJobManagerJobMetricGroupFactory(jobManagerMetricGroup),
-					fatalErrorHandler)),
-			rpcService.getExecutor());
-	}
-
-	private CompletableFuture<JobManagerRunner> createJobManagerRunner(JobGraph jobGraph, StreamManagerAddress address) {
-		final RpcService rpcService = getRpcService();
-
-		return CompletableFuture.supplyAsync(
-			CheckedSupplier.unchecked(() ->
-				new StreamingJobManagerRunnerFactory(address).createJobManagerRunner(
 					jobGraph,
 					configuration,
 					rpcService,
@@ -915,27 +859,6 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
 			FunctionUtils.uncheckedFunction((ignored) -> {
 				jobManagerTerminationFutures.remove(jobId);
 				return action.apply(jobGraph);
-			}),
-			getMainThreadExecutor());
-	}
-
-	private CompletableFuture<Void> waitForTerminatingJobManager(
-		JobID jobId,
-		JobGraph jobGraph,
-		StreamManagerAddress streamManagerAddress,
-		BiFunctionWithException<JobGraph, StreamManagerAddress, CompletableFuture<Void>, ?> action) {
-		final CompletableFuture<Void> jobManagerTerminationFuture = getJobTerminationFuture(jobId)
-			.exceptionally((Throwable throwable) -> {
-				throw new CompletionException(
-					new DispatcherException(
-						String.format("Termination of previous JobManager for job %s failed. Cannot submit job under the same job id.", jobId),
-						throwable));
-			});
-
-		return jobManagerTerminationFuture.thenComposeAsync(
-			FunctionUtils.uncheckedFunction((ignored) -> {
-				jobManagerTerminationFutures.remove(jobId);
-				return action.apply(jobGraph, streamManagerAddress);
 			}),
 			getMainThreadExecutor());
 	}

@@ -47,14 +47,14 @@ public enum DefaultJobManagerRunnerFactory implements JobManagerRunnerFactory {
 
 	@Override
 	public JobManagerRunner createJobManagerRunner(
-		JobGraph jobGraph,
-		Configuration configuration,
-		RpcService rpcService,
-		HighAvailabilityServices highAvailabilityServices,
-		HeartbeatServices heartbeatServices,
-		JobManagerSharedServices jobManagerServices,
-		JobManagerJobMetricGroupFactory jobManagerJobMetricGroupFactory,
-		FatalErrorHandler fatalErrorHandler) throws Exception {
+			JobGraph jobGraph,
+			Configuration configuration,
+			RpcService rpcService,
+			HighAvailabilityServices highAvailabilityServices,
+			HeartbeatServices heartbeatServices,
+			JobManagerSharedServices jobManagerServices,
+			JobManagerJobMetricGroupFactory jobManagerJobMetricGroupFactory,
+			FatalErrorHandler fatalErrorHandler) throws Exception {
 
 		final JobMasterConfiguration jobMasterConfiguration = JobMasterConfiguration.fromConfiguration(configuration);
 

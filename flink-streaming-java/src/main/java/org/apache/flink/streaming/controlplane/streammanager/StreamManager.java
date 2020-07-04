@@ -21,27 +21,33 @@ package org.apache.flink.streaming.controlplane.streammanager;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
+import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerAddress;
 import org.apache.flink.runtime.dispatcher.DispatcherGateway;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerId;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerService;
-import org.apache.flink.runtime.jobmaster.JobMaster;
-import org.apache.flink.runtime.heartbeat.HeartbeatServices;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
 import org.apache.flink.runtime.jobgraph.JobGraph;
+import org.apache.flink.runtime.jobmaster.JobMasterGateway;
 import org.apache.flink.runtime.jobmaster.JobMasterId;
+import org.apache.flink.runtime.jobmaster.JobMasterRegistrationSuccess;
 import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalService;
 import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.registration.RegistrationResponse;
+import org.apache.flink.runtime.resourcemanager.JobLeaderIdService;
+import org.apache.flink.runtime.resourcemanager.exceptions.ResourceManagerException;
+import org.apache.flink.runtime.resourcemanager.registration.JobManagerRegistration;
 import org.apache.flink.runtime.rpc.FatalErrorHandler;
 import org.apache.flink.runtime.rpc.FencedRpcEndpoint;
 import org.apache.flink.runtime.rpc.RpcService;
 import org.apache.flink.runtime.rpc.RpcUtils;
 import org.apache.flink.runtime.rpc.akka.AkkaRpcServiceUtils;
 import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
+import org.apache.flink.streaming.controlplane.streammanager.exceptions.StreamManagerException;
 import org.apache.flink.util.OptionalConsumer;
 
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -81,13 +87,11 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
     private final LeaderRetrievalService jobManagerLeaderRetriever;
 
-    // -------- Mutable fields ---------
-
-    private HeartbeatManager<Void, Void> jobManagerHeartbeatManager;
-
-    TODO: other connection and listener related
-
     */
+
+	private final JobLeaderIdService jobLeaderIdService;
+
+	private JobManagerRegistration jobManagerRegistration = null;
 
 	// ------------------------------------------------------------------------
 
@@ -96,6 +100,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						 ResourceID resourceId,
 						 JobGraph jobGraph,
 						 HighAvailabilityServices highAvailabilityService,
+						 JobLeaderIdService jobLeaderIdService,
 						 LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever,
 						 FatalErrorHandler fatalErrorHandler) throws Exception {
 		super(rpcService, AkkaRpcServiceUtils.createRandomName(Stream_Manager_NAME), null);
@@ -106,6 +111,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		this.rpcTimeout = streamManagerConfiguration.getRpcTimeout();
 		this.highAvailabilityServices = checkNotNull(highAvailabilityService);
 		this.fatalErrorHandler = checkNotNull(fatalErrorHandler);
+		this.jobLeaderIdService = checkNotNull(jobLeaderIdService);
 		this.dispatcherGatewayRetriever = checkNotNull(dispatcherGatewayRetriever);
 
 		final String jobName = jobGraph.getName();
@@ -183,17 +189,138 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		checkNotNull(jobManagerResourceId);
 		checkNotNull(jobManagerAddress);
 		checkNotNull(jobId);
-		return null; // TODO: to be implement
+
+		if (!jobLeaderIdService.containsJob(jobId)) {
+			try {
+				jobLeaderIdService.addJob(jobId);
+			} catch (Exception e) {
+				StreamManagerException exception = new StreamManagerException("Could not add the job " +
+						jobId + " to the job id leader service.", e);
+
+				onFatalError(exception);
+				log.error("Could not add job {} to job leader id service.", jobId, e);
+				return FutureUtils.completedExceptionally(exception);
+			}
+		}
+
+		log.info("Registering job manager {}@{} for job {}.", jobMasterId, jobManagerAddress, jobId);
+
+		CompletableFuture<JobMasterId> jobMasterIdFuture;
+
+		try {
+			jobMasterIdFuture = jobLeaderIdService.getLeaderId(jobId);
+		} catch (Exception e) {
+			// we cannot check the job leader id so let's fail
+			// TODO: Maybe it's also ok to skip this check in case that we cannot check the leader id
+			StreamManagerException exception = new StreamManagerException("Cannot obtain the " +
+					"job leader id future to verify the correct job leader.", e);
+
+			onFatalError(exception);
+
+			log.debug("Could not obtain the job leader id future to verify the correct job leader.");
+			return FutureUtils.completedExceptionally(exception);
+		}
+
+		CompletableFuture<JobMasterGateway> jobMasterGatewayFuture = getRpcService().connect(jobManagerAddress, jobMasterId, JobMasterGateway.class);
+
+		CompletableFuture<RegistrationResponse> registrationResponseFuture = jobMasterGatewayFuture.thenCombineAsync(
+				jobMasterIdFuture,
+				(JobMasterGateway jobMasterGateway, JobMasterId leadingJobMasterId) -> {
+					if (Objects.equals(leadingJobMasterId, jobMasterId)) {
+						return registerJobMasterInternal(
+								jobMasterGateway,
+								jobId,
+								jobManagerAddress,
+								jobManagerResourceId);
+					} else {
+						final String declineMessage = String.format(
+								"The leading JobMaster id %s did not match the received JobMaster id %s. " +
+										"This indicates that a JobMaster leader change has happened.",
+								leadingJobMasterId,
+								jobMasterId);
+						log.debug(declineMessage);
+						return new RegistrationResponse.Decline(declineMessage);
+					}
+				},
+				getMainThreadExecutor());
+
+		// handle exceptions which might have occurred in one of the futures inputs of combine
+		return registrationResponseFuture.handleAsync(
+				(RegistrationResponse registrationResponse, Throwable throwable) -> {
+					if (throwable != null) {
+						if (log.isDebugEnabled()) {
+							log.debug("Registration of job manager {}@{} failed.", jobMasterId, jobManagerAddress, throwable);
+						} else {
+							log.info("Registration of job manager {}@{} failed.", jobMasterId, jobManagerAddress);
+						}
+
+						return new RegistrationResponse.Decline(throwable.getMessage());
+					} else {
+						return registrationResponse;
+					}
+				},
+				getRpcService().getExecutor());
 	}
 
 	@Override
-	public void disconnectJobMaster(JobMasterId jobMasterId, Exception cause) {
+	public void disconnectJobManager(JobID jobId, Exception cause) {
+		closeJobManagerConnection(jobId, cause);
 	}
 
 
 	//----------------------------------------------------------------------------------------------
 	// Internal methods
 	//----------------------------------------------------------------------------------------------
+
+
+	/**
+	 * Registers a new JobMaster.
+	 *
+	 * @param jobMasterGateway to communicate with the registering JobMaster
+	 * @param jobId of the job for which the JobMaster is responsible
+	 * @param jobManagerAddress address of the JobMaster
+	 * @param jobManagerResourceId ResourceID of the JobMaster
+	 * @return RegistrationResponse
+	 */
+	private RegistrationResponse registerJobMasterInternal(
+			final JobMasterGateway jobMasterGateway,
+			JobID jobId,
+			String jobManagerAddress,
+			ResourceID jobManagerResourceId) {
+		if (jobManagerRegistration != null) {
+			JobManagerRegistration oldJobManagerRegistration = jobManagerRegistration;
+			if (Objects.equals(oldJobManagerRegistration.getJobMasterId(), jobMasterGateway.getFencingToken())) {
+				// same registration
+				log.debug("Job manager {}@{} was already registered.", jobMasterGateway.getFencingToken(), jobManagerAddress);
+			} else {
+				disconnectJobManager(
+						oldJobManagerRegistration.getJobID(),
+						new Exception("New job leader for job " + jobId));
+
+				this.jobManagerRegistration = new JobManagerRegistration(
+						jobId,
+						jobManagerResourceId,
+						jobMasterGateway);
+			}
+		} else {
+			this.jobManagerRegistration = new JobManagerRegistration(
+					jobId,
+					jobManagerResourceId,
+					jobMasterGateway);
+		}
+
+		log.info("Registered job manager {}@{} for job {}.", jobMasterGateway.getFencingToken(), jobManagerAddress, jobId);
+
+		// TODO: HeartBeatService
+
+		return new JobMasterRegistrationSuccess<StreamManagerId>(
+				getFencingToken(),
+				resourceId);
+	}
+
+	protected void closeJobManagerConnection(JobID jobID, Exception cause) {
+		// TODO: To be implemented
+	}
 
 	private Acknowledge startStreamManagement(StreamManagerId newStreamManagerId) throws Exception {
 
@@ -241,5 +368,23 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	@Override
 	public StreamManager getGateway() {
 		return getSelfGateway(StreamManager.class);
+	}
+
+	// ------------------------------------------------------------------------
+	//  Error Handling
+	// ------------------------------------------------------------------------
+
+	/**
+	 * Notifies the ResourceManager that a fatal error has occurred and it cannot proceed.
+	 *
+	 * @param t The exception describing the fatal error
+	 */
+	protected void onFatalError(Throwable t) {
+		try {
+			log.error("Fatal error occurred in ResourceManager.", t);
+		} catch (Throwable ignored) {}
+
+		// The fatal error handler implementation should make sure that this call is non-blocking
+		fatalErrorHandler.onFatalError(t);
 	}
 }
