@@ -117,24 +117,6 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
         /*
         TODO: initialize other fields
          */
-
-
-		OptionalConsumer<DispatcherGateway> optLeaderConsumer = OptionalConsumer.of(this.dispatcherGatewayRetriever.getNow());
-
-		optLeaderConsumer.ifPresent(
-			gateway -> {
-				try {
-					log.info("connect successfully");
-					gateway.submitJob(jobGraph,
-						new StreamManagerAddress(this.getAddress(), getFencingToken()),
-						Time.seconds(10));
-				} catch (Exception e) {
-					log.error("Error while invoking runtime dispatcher RMI.", e);
-				}
-			}
-		).ifNotPresent(
-			() ->
-				log.error("Error while connecting runtime dispatcher."));
 	}
 
 	/**
@@ -198,6 +180,23 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	private Acknowledge startStreamManagement(StreamManagerId newStreamManagerId) throws Exception {
 
 		validateRunsInMainThread();
+
+		OptionalConsumer<DispatcherGateway> optLeaderConsumer = OptionalConsumer.of(this.dispatcherGatewayRetriever.getNow());
+
+		optLeaderConsumer.ifPresent(
+			gateway -> {
+				try {
+					log.info("connect successfully");
+					gateway.submitJob(jobGraph,
+						new StreamManagerAddress(this.getAddress(), getFencingToken()),
+						Time.seconds(10));
+				} catch (Exception e) {
+					log.error("Error while invoking runtime dispatcher RMI.", e);
+				}
+			}
+		).ifNotPresent(
+			() ->
+				log.error("Error while connecting runtime dispatcher."));
 
 		checkNotNull(newStreamManagerId, "The new StreamManagerId must not be null");
 
