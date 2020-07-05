@@ -43,6 +43,7 @@ import org.apache.flink.runtime.jobmaster.*;
 import org.apache.flink.runtime.jobmaster.factories.JobManagerJobMetricGroupFactory;
 import org.apache.flink.runtime.leaderelection.TestingLeaderElectionService;
 import org.apache.flink.runtime.leaderretrieval.SettableLeaderRetrievalService;
+import org.apache.flink.runtime.leaderretrieval.StandaloneLeaderRetrievalService;
 import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.messages.FlinkJobNotFoundException;
 import org.apache.flink.runtime.metrics.groups.UnregisteredMetricGroups;
@@ -173,6 +174,8 @@ public class StreamManagerDispatcherTest extends TestLogger {
 		final TestingDispatcher runtimeDispatcher = dispatcherBuilder.buildRuntimeDispatcher();
 
 		runtimeDispatcher.start();
+		haServices.setDispatcherLeaderRetriever(
+			new StandaloneLeaderRetrievalService(runtimeDispatcher.getAddress(), runtimeDispatcher.getFencingToken().toUUID()));
 
 		final TestingStreamManagerDispatcher streamManagerDispatcher = dispatcherBuilder.buildStreamManagerDispatcher();
 
@@ -297,7 +300,10 @@ public class StreamManagerDispatcherTest extends TestLogger {
 	 */
 	@Test
 	public void testGetRuntimeDispatcherGateway() throws Exception {
-		dispatcher = createAndStartDispatcher(heartbeatServices, haServices, new ExpectedJobIdStreamManagerRunnerFactory(TEST_JOB_ID, createdJobManagerRunnerLatch));
+		dispatcher = createAndStartDispatcher(
+			heartbeatServices,
+			haServices,
+			new ExpectedJobIdStreamManagerRunnerFactory(TEST_JOB_ID, createdJobManagerRunnerLatch));
 
 		try {
 			dispatcher.getStartedDispatcherRetriever().getFuture().get();
