@@ -40,17 +40,13 @@ class DefaultStreamManagerDispatcherGatewayServiceFactory implements AbstractStr
 
 	private final PartialStreamManagerDispatcherServices partialSmDispatcherServices;
 
-	private final LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever;
-
 	DefaultStreamManagerDispatcherGatewayServiceFactory(
 		StreamManagerDispatcherFactory smDispatcherFactory,
 		RpcService rpcService,
-		PartialStreamManagerDispatcherServices partialSmDispatcherServices,
-		LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever) {
+		PartialStreamManagerDispatcherServices partialSmDispatcherServices) {
 		this.smDispatcherFactory = smDispatcherFactory;
 		this.rpcService = rpcService;
 		this.partialSmDispatcherServices = partialSmDispatcherServices;
-		this.dispatcherGatewayRetriever = dispatcherGatewayRetriever;
 	}
 
 	@Override
@@ -64,8 +60,8 @@ class DefaultStreamManagerDispatcherGatewayServiceFactory implements AbstractStr
 				rpcService,
 				fencingToken,
 				recoveredJobs,
-				PartialStreamManagerDispatcherServicesWithJobGraphStore.from(partialSmDispatcherServices, jobGraphWriter),
-				dispatcherGatewayRetriever);
+				PartialStreamManagerDispatcherServicesWithJobGraphStore.from(partialSmDispatcherServices, jobGraphWriter)
+			);
 		} catch (Exception e) {
 			throw new FlinkRuntimeException("Could not create the Dispatcher rpc endpoint.", e);
 		}

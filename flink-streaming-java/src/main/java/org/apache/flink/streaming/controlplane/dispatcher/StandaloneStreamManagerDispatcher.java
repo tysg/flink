@@ -38,14 +38,13 @@ public class StandaloneStreamManagerDispatcher extends StreamManagerDispatcher {
 		String endpointId,
 		StreamManagerDispatcherId fencingToken,
 		Collection<JobGraph> recoveredJobs,
-		StreamManagerDispatcherServices dispatcherServices,
-		LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever) throws Exception {
+		StreamManagerDispatcherServices dispatcherServices) throws Exception {
 		super(
 			rpcService,
 			endpointId,
 			fencingToken,
 			recoveredJobs,
-			dispatcherServices,
-			dispatcherGatewayRetriever);
+			dispatcherServices
+		);
 	}
 }

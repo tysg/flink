@@ -28,8 +28,10 @@ import org.apache.flink.runtime.client.JobSubmissionException;
 import org.apache.flink.runtime.clusterframework.ApplicationStatus;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.dispatcher.DispatcherGateway;
+import org.apache.flink.runtime.dispatcher.DispatcherId;
 import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalService;
 import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
+import org.apache.flink.runtime.webmonitor.retriever.impl.RpcGatewayRetriever;
 import org.apache.flink.streaming.controlplane.streammanager.StreamManagerRunner;
 import org.apache.flink.runtime.dispatcher.ArchivedExecutionGraphStore;
 import org.apache.flink.runtime.dispatcher.DispatcherException;
@@ -93,15 +95,17 @@ public abstract class StreamManagerDispatcher extends PermanentlyFencedRpcEndpoi
 
 	protected final CompletableFuture<ApplicationStatus> shutDownFuture;
 
+	private final LeaderRetrievalService dispatcherLeaderRetrievalService;
+
 	private final LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever;
+
 
 	public StreamManagerDispatcher(
 		RpcService rpcService,
 		String endpointId,
 		StreamManagerDispatcherId fencingToken,
 		Collection<JobGraph> recoveredJobs,
-		StreamManagerDispatcherServices dispatcherServices,
-		LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever) throws Exception {
+		StreamManagerDispatcherServices dispatcherServices) throws Exception {
 		super(rpcService, endpointId, fencingToken);
 		Preconditions.checkNotNull(dispatcherServices);
 
@@ -127,7 +131,14 @@ public abstract class StreamManagerDispatcher extends PermanentlyFencedRpcEndpoi
 
 		this.recoveredJobs = new HashSet<>(recoveredJobs);
 
-		this.dispatcherGatewayRetriever = dispatcherGatewayRetriever;
+		dispatcherLeaderRetrievalService = highAvailabilityServices.getDispatcherLeaderRetriever();
+		dispatcherGatewayRetriever = new RpcGatewayRetriever<>(
+			rpcService,
+			DispatcherGateway.class,
+			DispatcherId::fromUuid,
+			10,
+			Time.milliseconds(50L));
+
 	}
 
 	//------------------------------------------------------
@@ -156,11 +167,12 @@ public abstract class StreamManagerDispatcher extends PermanentlyFencedRpcEndpoi
 	}
 
 	private void startDispatcherServices() throws Exception {
-//		try {
-//			registerDispatcherMetrics(jobManagerMetricGroup);
-//		} catch (Exception e) {
-//			handleStartDispatcherServicesException(e);
-//		}
+		try {
+			// set up the connection in dispatcherGatewayRetriever.
+			dispatcherLeaderRetrievalService.start(dispatcherGatewayRetriever);
+		} catch (Exception e) {
+			handleStartDispatcherServicesException(e);
+		}
 		log.info("start dispatcher services");
 	}
 
@@ -206,6 +218,7 @@ public abstract class StreamManagerDispatcher extends PermanentlyFencedRpcEndpoi
 	private void stopDispatcherServices() throws Exception {
 		Exception exception = null;
 		try {
+			dispatcherLeaderRetrievalService.stop();
 			jobManagerSharedServices.shutdown();
 		} catch (Exception e) {
 			exception = e;

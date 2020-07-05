@@ -39,8 +39,7 @@ public interface StreamManagerDispatcherFactory {
 		RpcService rpcService,
 		StreamManagerDispatcherId fencingToken,
 		Collection<JobGraph> recoveredJobs,
-		PartialStreamManagerDispatcherServicesWithJobGraphStore partialDispatcherServicesWithJobGraphStore,
-		LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever) throws Exception;
+		PartialStreamManagerDispatcherServicesWithJobGraphStore partialDispatcherServicesWithJobGraphStore) throws Exception;
 
 	default String generateEndpointIdWithUUID() {
 		return getEndpointId() + UUID.randomUUID();

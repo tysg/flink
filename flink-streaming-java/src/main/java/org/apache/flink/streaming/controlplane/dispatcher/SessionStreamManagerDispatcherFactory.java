@@ -36,15 +36,14 @@ public enum SessionStreamManagerDispatcherFactory implements StreamManagerDispat
 		RpcService rpcService,
 		StreamManagerDispatcherId fencingToken,
 		Collection<JobGraph> recoveredJobs,
-		PartialStreamManagerDispatcherServicesWithJobGraphStore partialSmDispatcherServicesWithJobGraphStore,
-		LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever) throws Exception {
+		PartialStreamManagerDispatcherServicesWithJobGraphStore partialSmDispatcherServicesWithJobGraphStore) throws Exception {
 		// create the default dispatcher
 		return new StandaloneStreamManagerDispatcher(
 			rpcService,
 			getEndpointId(),
 			fencingToken,
 			recoveredJobs,
-			StreamManagerDispatcherServices.from(partialSmDispatcherServicesWithJobGraphStore, DefaultStreamManagerRunnerFactory.INSTANCE),
-			dispatcherGatewayRetriever);
+			StreamManagerDispatcherServices.from(partialSmDispatcherServicesWithJobGraphStore, DefaultStreamManagerRunnerFactory.INSTANCE)
+		);
 	}
 }

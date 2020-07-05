@@ -51,20 +51,19 @@ public class MiniStreamManagerDispatcher extends StreamManagerDispatcher {
 	private final JobClusterEntrypoint.ExecutionMode executionMode;
 
 	public MiniStreamManagerDispatcher(
-			RpcService rpcService,
-			String endpointId,
-			StreamManagerDispatcherId fencingToken,
-			StreamManagerDispatcherServices dispatcherServices,
-			JobGraph jobGraph,
-			JobClusterEntrypoint.ExecutionMode executionMode,
-			LeaderGatewayRetriever<DispatcherGateway> dispatcherLeaderRetrievalService) throws Exception {
+		RpcService rpcService,
+		String endpointId,
+		StreamManagerDispatcherId fencingToken,
+		StreamManagerDispatcherServices dispatcherServices,
+		JobGraph jobGraph,
+		JobClusterEntrypoint.ExecutionMode executionMode) throws Exception {
 		super(
 			rpcService,
 			endpointId,
 			fencingToken,
 			Collections.singleton(jobGraph),
-			dispatcherServices,
-			dispatcherLeaderRetrievalService);
+			dispatcherServices
+		);
 
 		this.executionMode = checkNotNull(executionMode);
 	}

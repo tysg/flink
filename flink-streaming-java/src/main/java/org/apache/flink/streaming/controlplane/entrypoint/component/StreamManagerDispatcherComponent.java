@@ -53,9 +53,6 @@ public class StreamManagerDispatcherComponent implements AutoCloseableAsync {
 	private final LeaderRetrievalService smDispatcherLeaderRetrievalService;
 
 	@Nonnull
-	private final LeaderRetrievalService dispatcherLeaderRetrievalService;
-
-	@Nonnull
 	private final StreamManagerWebMonitorEndpoint<?> smWebMonitorEndpoint;
 
 	private final CompletableFuture<Void> terminationFuture;
@@ -67,12 +64,10 @@ public class StreamManagerDispatcherComponent implements AutoCloseableAsync {
 	StreamManagerDispatcherComponent(
 		@Nonnull StreamManagerDispatcherRunner smDispatcherRunner,
 		@Nonnull LeaderRetrievalService smDispatcherLeaderRetrievalService,
-		@Nonnull StreamManagerWebMonitorEndpoint<?> smWebMonitorEndpoint,
-		@Nonnull LeaderRetrievalService dispatcherLeaderRetrievalService) {
+		@Nonnull StreamManagerWebMonitorEndpoint<?> smWebMonitorEndpoint) {
 		this.smDispatcherRunner = smDispatcherRunner;
 		this.smDispatcherLeaderRetrievalService = smDispatcherLeaderRetrievalService;
 		this.smWebMonitorEndpoint = smWebMonitorEndpoint;
-		this.dispatcherLeaderRetrievalService = dispatcherLeaderRetrievalService;
 		this.terminationFuture = new CompletableFuture<>();
 		this.shutDownFuture = new CompletableFuture<>();
 
@@ -118,12 +113,6 @@ public class StreamManagerDispatcherComponent implements AutoCloseableAsync {
 
 		try {
 			smDispatcherLeaderRetrievalService.stop();
-		} catch (Exception e) {
-			exception = ExceptionUtils.firstOrSuppressed(e, exception);
-		}
-
-		try {
-			dispatcherLeaderRetrievalService.stop();
 		} catch (Exception e) {
 			exception = ExceptionUtils.firstOrSuppressed(e, exception);
 		}

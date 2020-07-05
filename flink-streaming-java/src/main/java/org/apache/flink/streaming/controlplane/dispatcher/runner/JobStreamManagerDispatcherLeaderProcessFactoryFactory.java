@@ -50,8 +50,7 @@ public class JobStreamManagerDispatcherLeaderProcessFactoryFactory implements St
 		Executor ioExecutor,
 		RpcService rpcService,
 		PartialStreamManagerDispatcherServices partialDispatcherServices,
-		FatalErrorHandler fatalErrorHandler,
-		LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever) {
+		FatalErrorHandler fatalErrorHandler) {
 
 		final JobGraph jobGraph;
 
@@ -64,8 +63,8 @@ public class JobStreamManagerDispatcherLeaderProcessFactoryFactory implements St
 		final DefaultStreamManagerDispatcherGatewayServiceFactory defaultDispatcherServiceFactory = new DefaultStreamManagerDispatcherGatewayServiceFactory(
 			JobStreamManagerDispatcherFactory.INSTANCE,
 			rpcService,
-			partialDispatcherServices,
-			dispatcherGatewayRetriever);
+			partialDispatcherServices
+		);
 
 		return new JobStreamManagerDispatcherLeaderProcessFactory(
 			defaultDispatcherServiceFactory,

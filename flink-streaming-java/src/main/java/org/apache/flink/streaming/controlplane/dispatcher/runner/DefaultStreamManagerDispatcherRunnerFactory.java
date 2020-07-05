@@ -49,16 +49,15 @@ public class DefaultStreamManagerDispatcherRunnerFactory implements StreamManage
 		JobGraphStoreFactory jobGraphStoreFactory,
 		Executor ioExecutor,
 		RpcService rpcService,
-		PartialStreamManagerDispatcherServices partialDispatcherServices,
-		LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever) throws Exception {
+		PartialStreamManagerDispatcherServices partialDispatcherServices) throws Exception {
 
 		final StreamManagerDispatcherLeaderProcessFactory smDispatcherLeaderProcessFactory = smDispatcherLeaderProcessFactoryFactory.createFactory(
 			jobGraphStoreFactory,
 			ioExecutor,
 			rpcService,
 			partialDispatcherServices,
-			fatalErrorHandler,
-			dispatcherGatewayRetriever);
+			fatalErrorHandler
+		);
 
 		return DefaultStreamManagerDispatcherRunner.create(
 			leaderElectionService,
