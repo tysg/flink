@@ -319,7 +319,7 @@ public class StreamManagerDispatcherTest extends TestLogger {
 		CompletableFuture<Acknowledge> acknowledgeFuture = dispatcherGateway.submitJob(jobGraph, RpcUtils.INF_TIMEOUT);
 
 		assertEquals(Acknowledge.get(), acknowledgeFuture.get());
-		assertEquals(Acknowledge.get(), isRegisterJobManagerFuture.get(3, TimeUnit.MINUTES));
+		assertEquals(Acknowledge.get(), isRegisterJobManagerFuture.get(3, TimeUnit.SECONDS));
 	}
 
 	@Test

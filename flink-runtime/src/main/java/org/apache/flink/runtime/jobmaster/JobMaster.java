@@ -57,8 +57,8 @@ import org.apache.flink.runtime.jobmaster.slotpool.Scheduler;
 import org.apache.flink.runtime.jobmaster.slotpool.SchedulerFactory;
 import org.apache.flink.runtime.jobmaster.slotpool.SlotPool;
 import org.apache.flink.runtime.jobmaster.slotpool.SlotPoolFactory;
-import org.apache.flink.runtime.jobmaster.streaming.StreamingJobLeaderListener;
-import org.apache.flink.runtime.jobmaster.streaming.StreamingJobLeaderService;
+import org.apache.flink.runtime.jobmaster.streaming.StreamingLeaderListener;
+import org.apache.flink.runtime.jobmaster.streaming.StreamingLeaderService;
 import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalListener;
 import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalService;
 import org.apache.flink.runtime.messages.Acknowledge;
@@ -211,7 +211,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 
 	private final JobMasterPartitionTracker partitionTracker;
 
-	private final StreamingJobLeaderService streamingJobLeaderService;
+	private final StreamingLeaderService streamingLeaderService;
 
 	// ------------------------------------------------------------------------
 
@@ -286,7 +286,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		this.taskManagerHeartbeatManager = NoOpHeartbeatManager.getInstance();
 		this.resourceManagerHeartbeatManager = NoOpHeartbeatManager.getInstance();
 
-		this.streamingJobLeaderService = new StreamingJobLeaderService(
+		this.streamingLeaderService = new StreamingLeaderService(
 			RetryingRegistrationConfiguration.defaultConfiguration()
 		);
 	}
@@ -979,14 +979,17 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 
 		log.info("Connecting to StreamManager ...");
 
-		this.streamingJobLeaderService.start(
-			getAddress(),
+		this.streamingLeaderService.start(
+			new StreamingLeaderService.JobMasterLocation(getFencingToken(),
+				resourceId,
+				getAddress(),
+				jobGraph.getJobID()),
 			getRpcService(),
 			highAvailabilityServices,
-			new StreamingJobLeaderListenerImpl(jobGraph.getJobID(), resourceId, getAddress(), getFencingToken())
+			new StreamingLeaderListenerImpl(jobGraph.getJobID(), resourceId, getAddress(), getFencingToken())
 		);
 
-		this.streamingJobLeaderService.addJob(jobGraph.getJobID(), this.streamManagerAddress.getRpcAddress());
+		this.streamingLeaderService.addJob(jobGraph.getJobID(), this.streamManagerAddress.getRpcAddress());
 	}
 
 	private void establishResourceManagerConnection(final JobMasterRegistrationSuccess<ResourceManagerId> success) {
@@ -1085,7 +1088,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 
 	//----------------------------------------------------------------------------------------------
 
-	private class StreamingJobLeaderListenerImpl implements StreamingJobLeaderListener {
+	private class StreamingLeaderListenerImpl implements StreamingLeaderListener {
 
 		private final JobID jobID;
 
@@ -1095,7 +1098,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 
 		private final JobMasterId jobMasterId;
 
-		StreamingJobLeaderListenerImpl(
+		StreamingLeaderListenerImpl(
 			final JobID jobID,
 			final ResourceID jobManagerResourceID,
 			final String jobManagerRpcAddress,
@@ -1109,13 +1112,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 
 		@Override
 		public void streamManagerGainedLeadership(JobID jobId, StreamManagerGateway streamManagerGateway, JMTMRegistrationSuccess registrationMessage) {
-			streamManagerGateway.registerJobManager(
-				jobMasterId,
-				jobManagerResourceID,
-				jobManagerRpcAddress,
-				jobID,
-				Time.milliseconds(50L)
-			);
+			runAsync(() -> log.info("a new stream mamanger gained Leadership"));
 		}
 
 		@Override

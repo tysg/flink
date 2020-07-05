@@ -32,7 +32,7 @@ import org.apache.flink.runtime.taskexecutor.JobLeaderService;
  * Furthermore, the listener is notified when a job manager loses leadership for a job. In case
  * of an error, the {@link #handleError(Throwable)}} is called.
  */
-public interface StreamingJobLeaderListener {
+public interface StreamingLeaderListener {
 
 	/**
 	 * Callback if a job manager has gained leadership for the job identified by the job id and a
