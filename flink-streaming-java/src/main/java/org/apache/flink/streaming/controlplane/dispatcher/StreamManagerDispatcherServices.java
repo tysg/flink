@@ -46,9 +46,6 @@ public class StreamManagerDispatcherServices {
 	private final HeartbeatServices heartbeatServices;
 
 	@Nonnull
-	private final ArchivedExecutionGraphStore archivedExecutionGraphStore;
-
-	@Nonnull
 	private final FatalErrorHandler fatalErrorHandler;
 
 	@Nonnull
@@ -62,7 +59,6 @@ public class StreamManagerDispatcherServices {
 			@Nonnull HighAvailabilityServices highAvailabilityServices,
 			@Nonnull BlobServer blobServer,
 			@Nonnull HeartbeatServices heartbeatServices,
-			@Nonnull ArchivedExecutionGraphStore archivedExecutionGraphStore,
 			@Nonnull FatalErrorHandler fatalErrorHandler,
 			@Nonnull JobGraphWriter jobGraphWriter,
 			@Nonnull StreamManagerRunnerFactory streamManagerRunnerFactory) {
@@ -70,7 +66,6 @@ public class StreamManagerDispatcherServices {
 		this.highAvailabilityServices = highAvailabilityServices;
 		this.blobServer = blobServer;
 		this.heartbeatServices = heartbeatServices;
-		this.archivedExecutionGraphStore = archivedExecutionGraphStore;
 		this.fatalErrorHandler = fatalErrorHandler;
 		this.jobGraphWriter = jobGraphWriter;
 		this.streamManagerRunnerFactory = streamManagerRunnerFactory;
@@ -97,11 +92,6 @@ public class StreamManagerDispatcherServices {
 	}
 
 	@Nonnull
-	public ArchivedExecutionGraphStore getArchivedExecutionGraphStore() {
-		return archivedExecutionGraphStore;
-	}
-
-	@Nonnull
 	public FatalErrorHandler getFatalErrorHandler() {
 		return fatalErrorHandler;
 	}
@@ -124,7 +114,6 @@ public class StreamManagerDispatcherServices {
 			partialDispatcherServicesWithJobGraphStore.getHighAvailabilityServices(),
 			partialDispatcherServicesWithJobGraphStore.getBlobServer(),
 			partialDispatcherServicesWithJobGraphStore.getHeartbeatServices(),
-			partialDispatcherServicesWithJobGraphStore.getArchivedExecutionGraphStore(),
 			partialDispatcherServicesWithJobGraphStore.getFatalErrorHandler(),
 			partialDispatcherServicesWithJobGraphStore.getJobGraphWriter(),
 			streamManagerRunnerFactory);

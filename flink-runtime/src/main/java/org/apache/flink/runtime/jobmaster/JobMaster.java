@@ -57,6 +57,8 @@ import org.apache.flink.runtime.jobmaster.slotpool.Scheduler;
 import org.apache.flink.runtime.jobmaster.slotpool.SchedulerFactory;
 import org.apache.flink.runtime.jobmaster.slotpool.SlotPool;
 import org.apache.flink.runtime.jobmaster.slotpool.SlotPoolFactory;
+import org.apache.flink.runtime.jobmaster.streaming.StreamingJobLeaderListener;
+import org.apache.flink.runtime.jobmaster.streaming.StreamingJobLeaderService;
 import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalListener;
 import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalService;
 import org.apache.flink.runtime.messages.Acknowledge;
@@ -69,6 +71,7 @@ import org.apache.flink.runtime.query.UnknownKvStateLocation;
 import org.apache.flink.runtime.registration.RegisteredRpcConnection;
 import org.apache.flink.runtime.registration.RegistrationResponse;
 import org.apache.flink.runtime.registration.RetryingRegistration;
+import org.apache.flink.runtime.registration.RetryingRegistrationConfiguration;
 import org.apache.flink.runtime.resourcemanager.ResourceManagerGateway;
 import org.apache.flink.runtime.resourcemanager.ResourceManagerId;
 import org.apache.flink.runtime.rest.handler.legacy.backpressure.BackPressureStatsTracker;
@@ -202,14 +205,13 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 	private StreamManagerAddress streamManagerAddress;
 
 	@Nullable
-	private StreamManagerConnection streamManagerConnection;
-
-	@Nullable
 	private EstablishedResourceManagerConnection establishedResourceManagerConnection;
 
 	private Map<String, Object> accumulators;
 
 	private final JobMasterPartitionTracker partitionTracker;
+
+	private final StreamingJobLeaderService streamingJobLeaderService;
 
 	// ------------------------------------------------------------------------
 
@@ -230,43 +232,6 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		SchedulerNGFactory schedulerNGFactory,
 		ShuffleMaster<?> shuffleMaster,
 		PartitionTrackerFactory partitionTrackerFactory) throws Exception {
-		this(rpcService,
-			jobMasterConfiguration,
-			resourceId,
-			jobGraph,
-			highAvailabilityService,
-			slotPoolFactory,
-			schedulerFactory,
-			jobManagerSharedServices,
-			heartbeatServices,
-			jobMetricGroupFactory,
-			jobCompletionActions,
-			fatalErrorHandler,
-			userCodeLoader,
-			schedulerNGFactory,
-			shuffleMaster,
-			partitionTrackerFactory,
-			null);
-	}
-
-	public JobMaster(
-		RpcService rpcService,
-		JobMasterConfiguration jobMasterConfiguration,
-		ResourceID resourceId,
-		JobGraph jobGraph,
-		HighAvailabilityServices highAvailabilityService,
-		SlotPoolFactory slotPoolFactory,
-		SchedulerFactory schedulerFactory,
-		JobManagerSharedServices jobManagerSharedServices,
-		HeartbeatServices heartbeatServices,
-		JobManagerJobMetricGroupFactory jobMetricGroupFactory,
-		OnCompletionActions jobCompletionActions,
-		FatalErrorHandler fatalErrorHandler,
-		ClassLoader userCodeLoader,
-		SchedulerNGFactory schedulerNGFactory,
-		ShuffleMaster<?> shuffleMaster,
-		PartitionTrackerFactory partitionTrackerFactory,
-		StreamManagerAddress streamManagerAddress) throws Exception {
 
 		super(rpcService, AkkaRpcServiceUtils.createRandomName(JOB_MANAGER_NAME), null);
 
@@ -321,6 +286,12 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		this.taskManagerHeartbeatManager = NoOpHeartbeatManager.getInstance();
 		this.resourceManagerHeartbeatManager = NoOpHeartbeatManager.getInstance();
 
+		this.streamingJobLeaderService = new StreamingJobLeaderService(
+			RetryingRegistrationConfiguration.defaultConfiguration()
+		);
+	}
+
+	public void setStreamManagerAddress(@Nullable StreamManagerAddress streamManagerAddress) {
 		this.streamManagerAddress = streamManagerAddress;
 	}
 
@@ -1003,24 +974,19 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		resourceManagerConnection.start();
 	}
 
-	private void connectToStreamManager() {
+	private void connectToStreamManager() throws Exception {
 		assert (streamManagerAddress != null);
-		assert (streamManagerConnection == null);
-//		assert (establishedResourceManagerConnection == null);
 
-		log.info("Connecting to ResourceManager {}", resourceManagerAddress);
+		log.info("Connecting to StreamManager ...");
 
-		streamManagerConnection = new StreamManagerConnection(
-			log,
-			jobGraph.getJobID(),
-			resourceId,
+		this.streamingJobLeaderService.start(
 			getAddress(),
-			getFencingToken(),
-			streamManagerAddress.getRpcAddress(),
-			streamManagerAddress.getStreamManagerId(),
-			scheduledExecutorService);
+			getRpcService(),
+			highAvailabilityServices,
+			new StreamingJobLeaderListenerImpl(jobGraph.getJobID(), resourceId, getAddress(), getFencingToken())
+		);
 
-		streamManagerConnection.start();
+		this.streamingJobLeaderService.addJob(jobGraph.getJobID(), this.streamManagerAddress.getRpcAddress());
 	}
 
 	private void establishResourceManagerConnection(final JobMasterRegistrationSuccess<ResourceManagerId> success) {
@@ -1119,8 +1085,8 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 
 	//----------------------------------------------------------------------------------------------
 
-	private class StreamManagerConnection
-		extends RegisteredRpcConnection<StreamManagerId, StreamManagerGateway, JobMasterRegistrationSuccess<StreamManagerId>> {
+	private class StreamingJobLeaderListenerImpl implements StreamingJobLeaderListener {
+
 		private final JobID jobID;
 
 		private final ResourceID jobManagerResourceID;
@@ -1129,69 +1095,36 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 
 		private final JobMasterId jobMasterId;
 
-		StreamManagerConnection(
-			final Logger log,
+		StreamingJobLeaderListenerImpl(
 			final JobID jobID,
 			final ResourceID jobManagerResourceID,
 			final String jobManagerRpcAddress,
-			final JobMasterId jobMasterId,
-			final String streamManagerAddress,
-			final StreamManagerId streamManagerId,
-			final Executor executor) {
-			super(log, streamManagerAddress, streamManagerId, executor);
+			final JobMasterId jobMasterId) {
 			this.jobID = checkNotNull(jobID);
 			this.jobManagerResourceID = checkNotNull(jobManagerResourceID);
 			this.jobManagerRpcAddress = checkNotNull(jobManagerRpcAddress);
 			this.jobMasterId = checkNotNull(jobMasterId);
 		}
 
-		@Override
-		protected RetryingRegistration<StreamManagerId, StreamManagerGateway, JobMasterRegistrationSuccess<StreamManagerId>> generateRegistration() {
-			return new RetryingRegistration<StreamManagerId, StreamManagerGateway, JobMasterRegistrationSuccess<StreamManagerId>>(
-				log,
-				getRpcService(),
-				"StreamManager",
-				StreamManagerGateway.class,
-				getTargetAddress(),
-				getTargetLeaderId(),
-				jobMasterConfiguration.getRetryingRegistrationConfiguration()) {
-				@Override
-				protected CompletableFuture<RegistrationResponse> invokeRegistration(
-					StreamManagerGateway gateway,
-					StreamManagerId fencingToken,
-					long timeoutMillis) throws Exception {
-					Time timeout = Time.milliseconds(timeoutMillis);
 
-					return gateway.registerJobManager(
-						jobMasterId,
-						jobManagerResourceID,
-						jobManagerRpcAddress,
-						jobID,
-						timeout);
-				}
-			};
+		@Override
+		public void streamManagerGainedLeadership(JobID jobId, StreamManagerGateway streamManagerGateway, JMTMRegistrationSuccess registrationMessage) {
+			streamManagerGateway.registerJobManager(
+				jobMasterId,
+				jobManagerResourceID,
+				jobManagerRpcAddress,
+				jobID,
+				Time.milliseconds(50L)
+			);
 		}
 
 		@Override
-		protected void onRegistrationSuccess(JobMasterRegistrationSuccess<StreamManagerId> success) {
-			runAsync(() -> {
-				// filter out outdated connections
-				//noinspection ObjectEquality
-				if (this == streamManagerConnection) {
-					StreamManagerGateway streamManagerGateway = streamManagerConnection.getTargetGateway();
-					streamManagerGateway.registerJobManager(
-						jobMasterId,
-						jobManagerResourceID,
-						jobManagerRpcAddress,
-						jobID,
-						Time.milliseconds(50L)
-					);
-				}
-			});
+		public void streamManagerLostLeadership(JobID jobId, StreamManagerId streamManagerId) {
+
 		}
 
 		@Override
-		protected void onRegistrationFailure(Throwable failure) {
+		public void handleError(Throwable throwable) {
 
 		}
 	}

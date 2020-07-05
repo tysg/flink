@@ -16,13 +16,20 @@
  * limitations under the License.
  */
 
-package org.apache.flink.runtime.dispatcher;
+package org.apache.flink.streaming.controlplane.dispatcher;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Time;
+import org.apache.flink.runtime.dispatcher.Dispatcher;
+import org.apache.flink.runtime.dispatcher.DispatcherGateway;
+import org.apache.flink.runtime.dispatcher.DispatcherId;
+import org.apache.flink.runtime.dispatcher.DispatcherServices;
 import org.apache.flink.runtime.executiongraph.ArchivedExecutionGraph;
 import org.apache.flink.runtime.jobgraph.JobGraph;
+import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalService;
 import org.apache.flink.runtime.rpc.RpcService;
+import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
+import org.apache.flink.runtime.webmonitor.retriever.LeaderRetriever;
 
 import javax.annotation.Nonnull;
 import java.util.Collection;
@@ -32,27 +39,35 @@ import java.util.function.Function;
 /**
  * {@link Dispatcher} implementation used for testing purposes.
  */
-class TestingStreamDispatcher extends Dispatcher {
+class TestingStreamManagerDispatcher extends StreamManagerDispatcher {
 
 	private final CompletableFuture<Void> startFuture;
 
-	TestingStreamDispatcher(
-			RpcService rpcService,
-			String endpointId,
-			DispatcherId fencingToken,
-			Collection<JobGraph> recoveredJobs,
-			DispatcherServices dispatcherServices) throws Exception {
+	private final LeaderRetrievalService dispatcherRetrieverService;
+
+	private final LeaderGatewayRetriever<DispatcherGateway> startedDispatcherRetriever;
+
+	TestingStreamManagerDispatcher(
+		RpcService rpcService,
+		String endpointId,
+		StreamManagerDispatcherId fencingToken,
+		Collection<JobGraph> recoveredJobs,
+		StreamManagerDispatcherServices dispatcherServices,
+		LeaderGatewayRetriever<DispatcherGateway> unStartedRetriever) throws Exception {
 		super(
 			rpcService,
 			endpointId,
 			fencingToken,
 			recoveredJobs,
-			dispatcherServices);
+			dispatcherServices,
+			unStartedRetriever);
+
+		dispatcherRetrieverService = dispatcherServices.getHighAvailabilityServices().getDispatcherLeaderRetriever();
+		dispatcherRetrieverService.start(unStartedRetriever);
+		this.startedDispatcherRetriever = unStartedRetriever;
 
 		this.startFuture = new CompletableFuture<>();
 	}
-
-
 
 	@Override
 	public void onStart() throws Exception {
@@ -66,15 +81,21 @@ class TestingStreamDispatcher extends Dispatcher {
 		startFuture.complete(null);
 	}
 
-	void completeJobExecution(ArchivedExecutionGraph archivedExecutionGraph) {
-		runAsync(
-			() -> jobReachedGloballyTerminalState(archivedExecutionGraph));
+	@Override
+	public CompletableFuture<Void> onStop() {
+		return super.onStop().thenAccept(
+			ignore -> {
+				try {
+					dispatcherRetrieverService.stop();
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+			}
+		);
 	}
 
-	CompletableFuture<Void> getJobTerminationFuture(@Nonnull JobID jobId, @Nonnull Time timeout) {
-		return callAsyncWithoutFencing(
-			() -> getJobTerminationFuture(jobId),
-			timeout).thenCompose(Function.identity());
+	public LeaderGatewayRetriever<DispatcherGateway> getStartedDispatcherRetriever() {
+		return startedDispatcherRetriever;
 	}
 
 	CompletableFuture<Integer> getNumberJobs(Time timeout) {

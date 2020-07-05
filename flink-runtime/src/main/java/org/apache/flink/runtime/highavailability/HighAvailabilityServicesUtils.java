@@ -112,22 +112,22 @@ public class HighAvailabilityServicesUtils {
 					configuration,
 					addressResolution);
 
-//				final String smDispatcherRpcUrl = AkkaRpcServiceUtils.getRpcUrl(
-//					hostnamePort.f0,
-//					hostnamePort.f1,
-//					StreamManagerDispatcher.DISPATCHER_NAME,
-//					addressResolution,
-//					configuration);
-
-				final Tuple2<String, Integer> smHostnamePort = getStreamManagerAddress(configuration);
-
 				final String smDispatcherRpcUrl = AkkaRpcServiceUtils.getRpcUrl(
-					smHostnamePort.f0,
-					smHostnamePort.f1,
-					// TODO: we need to migrate this util to logical layer.
+					hostnamePort.f0,
+					hostnamePort.f1,
+//					StreamManagerDispatcher.DISPATCHER_NAME,
 					"smDispatcher",
 					addressResolution,
 					configuration);
+
+//				final Tuple2<String, Integer> smHostnamePort = getStreamManagerAddress(configuration);
+//
+//				final String smDispatcherRpcUrl = AkkaRpcServiceUtils.getRpcUrl(
+//					smHostnamePort.f0,
+//					smHostnamePort.f1,
+//					"smDispatcher",
+//					addressResolution,
+//					configuration);
 
 				return new StandaloneHaServices(
 					resourceManagerRpcUrl,

@@ -153,6 +153,14 @@ public class StandaloneHaServices extends AbstractNonHaServices {
 		}
 	}
 
+	public LeaderRetrievalService getStreamManagerLeaderRetriever(JobID jobID, String defaultStreamManagerAddress) {
+		synchronized (lock) {
+			checkNotShutdown();
+
+			return new StandaloneLeaderRetrievalService(defaultStreamManagerAddress, DEFAULT_LEADER_ID);
+		}
+	}
+
 	@Override
 	public LeaderElectionService getJobManagerLeaderElectionService(JobID jobID) {
 		synchronized (lock) {

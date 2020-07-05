@@ -187,7 +187,7 @@ public class StreamExecutionEnvironment {
 	 */
 	@PublicEvolving
 	public StreamExecutionEnvironment(final Configuration configuration) {
-		this(DefaultExecutorServiceLoader.INSTANCE, configuration, null);
+		this(new DefaultExecutorServiceLoader(), configuration, null);
 	}
 
 	/**
@@ -199,9 +199,9 @@ public class StreamExecutionEnvironment {
 	 */
 	@PublicEvolving
 	public StreamExecutionEnvironment(
-			final PipelineExecutorServiceLoader executorServiceLoader,
-			final Configuration configuration,
-			final ClassLoader userClassloader) {
+		final PipelineExecutorServiceLoader executorServiceLoader,
+		final Configuration configuration,
+		final ClassLoader userClassloader) {
 		this.executorServiceLoader = checkNotNull(executorServiceLoader);
 		this.configuration = checkNotNull(configuration);
 		this.userClassloader = userClassloader == null ? getClass().getClassLoader() : userClassloader;
@@ -230,8 +230,8 @@ public class StreamExecutionEnvironment {
 	}
 
 	/**
-	* Get the list of cached files that were registered for distribution among the task managers.
-	*/
+	 * Get the list of cached files that were registered for distribution among the task managers.
+	 */
 	public List<Tuple2<String, DistributedCache.DistributedCacheEntry>> getCachedFiles() {
 		return cacheFile;
 	}
@@ -272,9 +272,9 @@ public class StreamExecutionEnvironment {
 	 */
 	public StreamExecutionEnvironment setMaxParallelism(int maxParallelism) {
 		Preconditions.checkArgument(maxParallelism > 0 &&
-						maxParallelism <= KeyGroupRangeAssignment.UPPER_BOUND_MAX_PARALLELISM,
-				"maxParallelism is out of bounds 0 < maxParallelism <= " +
-						KeyGroupRangeAssignment.UPPER_BOUND_MAX_PARALLELISM + ". Found: " + maxParallelism);
+				maxParallelism <= KeyGroupRangeAssignment.UPPER_BOUND_MAX_PARALLELISM,
+			"maxParallelism is out of bounds 0 < maxParallelism <= " +
+				KeyGroupRangeAssignment.UPPER_BOUND_MAX_PARALLELISM + ". Found: " + maxParallelism);
 
 		config.setMaxParallelism(maxParallelism);
 		return this;
@@ -832,8 +832,8 @@ public class StreamExecutionEnvironment {
 		}
 		catch (Exception e) {
 			throw new RuntimeException("Could not create TypeInformation for type " + data[0].getClass().getName()
-					+ "; please specify the TypeInformation manually via "
-					+ "StreamExecutionEnvironment#fromElements(Collection, TypeInformation)", e);
+				+ "; please specify the TypeInformation manually via "
+				+ "StreamExecutionEnvironment#fromElements(Collection, TypeInformation)", e);
 		}
 		return fromCollection(Arrays.asList(data), typeInfo);
 	}
@@ -865,8 +865,8 @@ public class StreamExecutionEnvironment {
 		}
 		catch (Exception e) {
 			throw new RuntimeException("Could not create TypeInformation for type " + type.getName()
-					+ "; please specify the TypeInformation manually via "
-					+ "StreamExecutionEnvironment#fromElements(Collection, TypeInformation)", e);
+				+ "; please specify the TypeInformation manually via "
+				+ "StreamExecutionEnvironment#fromElements(Collection, TypeInformation)", e);
 		}
 		return fromCollection(Arrays.asList(data), typeInfo);
 	}
@@ -906,8 +906,8 @@ public class StreamExecutionEnvironment {
 		}
 		catch (Exception e) {
 			throw new RuntimeException("Could not create TypeInformation for type " + first.getClass()
-					+ "; please specify the TypeInformation manually via "
-					+ "StreamExecutionEnvironment#fromElements(Collection, TypeInformation)", e);
+				+ "; please specify the TypeInformation manually via "
+				+ "StreamExecutionEnvironment#fromElements(Collection, TypeInformation)", e);
 		}
 		return fromCollection(data, typeInfo);
 	}
@@ -1034,13 +1034,13 @@ public class StreamExecutionEnvironment {
 	 * @return A data stream representing the elements in the iterator
 	 */
 	public <OUT> DataStreamSource<OUT> fromParallelCollection(SplittableIterator<OUT> iterator, TypeInformation<OUT>
-			typeInfo) {
+		typeInfo) {
 		return fromParallelCollection(iterator, typeInfo, "Parallel Collection Source");
 	}
 
 	// private helper for passing different names
 	private <OUT> DataStreamSource<OUT> fromParallelCollection(SplittableIterator<OUT> iterator, TypeInformation<OUT>
-			typeInfo, String operatorName) {
+		typeInfo, String operatorName) {
 		return addSource(new FromSplittableIteratorFunction<>(iterator), operatorName, typeInfo);
 	}
 
@@ -1158,8 +1158,8 @@ public class StreamExecutionEnvironment {
 			typeInformation = TypeExtractor.getInputFormatTypes(inputFormat);
 		} catch (Exception e) {
 			throw new InvalidProgramException("The type returned by the input format could not be " +
-					"automatically determined. Please specify the TypeInformation of the produced type " +
-					"explicitly by using the 'createInput(InputFormat, TypeInformation)' method instead.");
+				"automatically determined. Please specify the TypeInformation of the produced type " +
+				"explicitly by using the 'createInput(InputFormat, TypeInformation)' method instead.");
 		}
 		return readFile(inputFormat, filePath, watchType, interval, typeInformation);
 	}
@@ -1208,8 +1208,8 @@ public class StreamExecutionEnvironment {
 			typeInformation = TypeExtractor.getInputFormatTypes(inputFormat);
 		} catch (Exception e) {
 			throw new InvalidProgramException("The type returned by the input format could not be " +
-					"automatically determined. Please specify the TypeInformation of the produced type " +
-					"explicitly by using the 'createInput(InputFormat, TypeInformation)' method instead.");
+				"automatically determined. Please specify the TypeInformation of the produced type " +
+				"explicitly by using the 'createInput(InputFormat, TypeInformation)' method instead.");
 		}
 		return readFile(inputFormat, filePath, watchType, interval, typeInformation);
 	}
@@ -1237,7 +1237,7 @@ public class StreamExecutionEnvironment {
 	@SuppressWarnings("deprecation")
 	public DataStream<String> readFileStream(String filePath, long intervalMillis, FileMonitoringFunction.WatchType watchType) {
 		DataStream<Tuple3<String, Long, Long>> source = addSource(new FileMonitoringFunction(
-				filePath, intervalMillis, watchType), "Read File Stream source");
+			filePath, intervalMillis, watchType), "Read File Stream source");
 
 		return source.flatMap(new FileReadFunction());
 	}
@@ -1338,7 +1338,7 @@ public class StreamExecutionEnvironment {
 	@PublicEvolving
 	public DataStreamSource<String> socketTextStream(String hostname, int port, String delimiter, long maxRetry) {
 		return addSource(new SocketTextStreamFunction(hostname, port, delimiter, maxRetry),
-				"Socket Stream");
+			"Socket Stream");
 	}
 
 	/**
@@ -1456,7 +1456,7 @@ public class StreamExecutionEnvironment {
 			FileInputFormat<OUT> format = (FileInputFormat<OUT>) inputFormat;
 
 			source = createFileInput(format, typeInfo, "Custom File source",
-					FileProcessingMode.PROCESS_ONCE, -1);
+				FileProcessingMode.PROCESS_ONCE, -1);
 		} else {
 			source = createInput(inputFormat, typeInfo, "Custom Source");
 		}
@@ -1485,7 +1485,7 @@ public class StreamExecutionEnvironment {
 		Preconditions.checkArgument(monitoringMode.equals(FileProcessingMode.PROCESS_ONCE) ||
 				interval >= ContinuousFileMonitoringFunction.MIN_MONITORING_INTERVAL,
 			"The path monitoring interval cannot be less than " +
-					ContinuousFileMonitoringFunction.MIN_MONITORING_INTERVAL + " ms.");
+				ContinuousFileMonitoringFunction.MIN_MONITORING_INTERVAL + " ms.");
 
 		ContinuousFileMonitoringFunction<OUT> monitoringFunction =
 			new ContinuousFileMonitoringFunction<>(inputFormat, monitoringMode, getParallelism(), interval);
@@ -1494,7 +1494,7 @@ public class StreamExecutionEnvironment {
 			new ContinuousFileReaderOperator<>(inputFormat);
 
 		SingleOutputStreamOperator<OUT> source = addSource(monitoringFunction, sourceName)
-				.transform("Split Reader: " + sourceName, typeInfo, reader);
+			.transform("Split Reader: " + sourceName, typeInfo, reader);
 
 		return new DataStreamSource<>(source);
 	}
@@ -1579,8 +1579,8 @@ public class StreamExecutionEnvironment {
 		if (typeInfo == null) {
 			try {
 				typeInfo = TypeExtractor.createTypeInfo(
-						SourceFunction.class,
-						function.getClass(), 0, null, null);
+					SourceFunction.class,
+					function.getClass(), 0, null, null);
 			} catch (final InvalidTypesException e) {
 				typeInfo = (TypeInformation<OUT>) new MissingTypeInfo(sourceName, e);
 			}
@@ -1973,7 +1973,7 @@ public class StreamExecutionEnvironment {
 	 * @return A remote environment that executes the program on a cluster.
 	 */
 	public static StreamExecutionEnvironment createRemoteEnvironment(
-			String host, int port, String... jarFiles) {
+		String host, int port, String... jarFiles) {
 		return new RemoteStreamEnvironment(host, port, jarFiles);
 	}
 
@@ -1999,7 +1999,7 @@ public class StreamExecutionEnvironment {
 	 * @return A remote environment that executes the program on a cluster.
 	 */
 	public static StreamExecutionEnvironment createRemoteEnvironment(
-			String host, int port, int parallelism, String... jarFiles) {
+		String host, int port, int parallelism, String... jarFiles) {
 		RemoteStreamEnvironment env = new RemoteStreamEnvironment(host, port, jarFiles);
 		env.setParallelism(parallelism);
 		return env;
@@ -2027,7 +2027,7 @@ public class StreamExecutionEnvironment {
 	 * @return A remote environment that executes the program on a cluster.
 	 */
 	public static StreamExecutionEnvironment createRemoteEnvironment(
-			String host, int port, Configuration clientConfig, String... jarFiles) {
+		String host, int port, Configuration clientConfig, String... jarFiles) {
 		return new RemoteStreamEnvironment(host, port, clientConfig, jarFiles);
 	}
 

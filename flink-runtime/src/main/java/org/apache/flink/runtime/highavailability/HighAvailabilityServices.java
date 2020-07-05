@@ -97,12 +97,27 @@ public interface HighAvailabilityServices extends ClientHighAvailabilityServices
 	/**
 	 * Gets the leader retriever for the job JobMaster which is responsible for the given job.
 	 *
-	 * @param jobID The identifier of the job.
+	 * @param jobID                    The identifier of the job.
 	 * @param defaultJobManagerAddress JobManager address which will be returned by
-	 *                              a static leader retrieval service.
+	 *                                 a static leader retrieval service.
 	 * @return Leader retrieval service to retrieve the job manager for the given job
 	 */
 	LeaderRetrievalService getJobManagerLeaderRetriever(JobID jobID, String defaultJobManagerAddress);
+
+	/**
+	 * Gets the leader retriever for the job Stream Manager which is responsible for the given job.
+	 * <p>
+	 * Currently it only support Standalone mode.
+	 * It is set default to solve the compile problem in other HA implementation.
+	 *
+	 * @param jobID                       The identifier of the job.
+	 * @param defaultStreamManagerAddress Stream Manager address which will be returned by
+	 *                                    a static leader retrieval service.
+	 * @return Leader retrieval service to retrieve the stream manager for the given job
+	 */
+	default LeaderRetrievalService getStreamManagerLeaderRetriever(JobID jobID, String defaultStreamManagerAddress) {
+		return null;
+	}
 
 	/**
 	 * This retriever should no longer be used on the cluster side. The web monitor retriever
