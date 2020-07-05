@@ -20,6 +20,7 @@ package org.apache.flink.runtime.dispatcher;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Time;
+import org.apache.flink.runtime.controlplane.streammanager.StreamManagerAddress;
 import org.apache.flink.runtime.executiongraph.ArchivedExecutionGraph;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.messages.Acknowledge;
@@ -46,6 +47,21 @@ public interface DispatcherGateway extends FencedRpcGateway<DispatcherId>, Restf
 	CompletableFuture<Acknowledge> submitJob(
 		JobGraph jobGraph,
 		@RpcTimeout Time timeout);
+
+	/**
+	 * Submit a job to the dispatcher with address of stream manager.
+	 *
+	 * @param jobGraph JobGraph to submit
+	 * @param streamManagerAddress the rpc address of stream manager
+	 * @param timeout RPC timeout
+	 * @return A future acknowledge if the submission succeeded
+	 */
+	default CompletableFuture<Acknowledge> submitJob(
+		JobGraph jobGraph,
+		StreamManagerAddress streamManagerAddress,
+		@RpcTimeout Time timeout){
+		return null;
+	}
 
 	/**
 	 * List the current set of submitted jobs.

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.streaming.controlplane.streammanager;
+package org.apache.flink.runtime.controlplane.streammanager;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.util.AutoCloseableAsync;
@@ -24,19 +24,19 @@ import org.apache.flink.util.AutoCloseableAsync;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Interface for a runner which executes a {@link StreamManager}.
+ * Interface for a runner which executes a {@link }.
  */
 public interface StreamManagerRunner extends AutoCloseableAsync {
 
 	/**
-	 * Start the execution of the {@link StreamManager}.
+	 * Start the execution of the {@link }.
 	 *
 	 * @throws Exception if the JobMaster cannot be started
 	 */
 	void start() throws Exception;
 
 	/**
-	 * Get the {@link StreamManagerGateway} of the {@link StreamManager}. The future is
+	 * Get the {@link StreamManagerGateway} of the {@link }. The future is
 	 * only completed if the JobMaster becomes leader.
 	 *
 	 * @return Future with the JobMasterGateway once the underlying JobMaster becomes leader

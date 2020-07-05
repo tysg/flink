@@ -23,6 +23,8 @@ import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.runtime.blob.FailingPermanentBlobService;
 import org.apache.flink.runtime.blob.VoidPermanentBlobService;
 import org.apache.flink.runtime.checkpoint.StandaloneCheckpointRecoveryFactory;
+import org.apache.flink.runtime.controlplane.streammanager.StreamManagerAddress;
+import org.apache.flink.runtime.controlplane.streammanager.StreamManagerId;
 import org.apache.flink.runtime.execution.librarycache.BlobLibraryCacheManager;
 import org.apache.flink.runtime.execution.librarycache.FlinkUserCodeClassLoaders;
 import org.apache.flink.runtime.execution.librarycache.LibraryCacheManager;
@@ -31,6 +33,7 @@ import org.apache.flink.runtime.highavailability.TestingHighAvailabilityServices
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobmaster.factories.JobMasterServiceFactory;
+import org.apache.flink.runtime.jobmaster.factories.StreamingJobMasterServiceFactory;
 import org.apache.flink.runtime.jobmaster.factories.TestingJobMasterServiceFactory;
 import org.apache.flink.runtime.leaderelection.TestingLeaderElectionService;
 import org.apache.flink.runtime.leaderretrieval.SettableLeaderRetrievalService;
@@ -309,7 +312,7 @@ public class JobManagerRunnerImplTest extends TestLogger {
 	}
 
 	@Nonnull
-	private JobManagerRunnerImpl createJobManagerRunner(JobMasterServiceFactory jobMasterServiceFactory, LibraryCacheManager libraryCacheManager) throws Exception{
+	private JobManagerRunnerImpl createJobManagerRunner(JobMasterServiceFactory jobMasterServiceFactory, LibraryCacheManager libraryCacheManager) throws Exception {
 		return new JobManagerRunnerImpl(
 			jobGraph,
 			jobMasterServiceFactory,
@@ -318,4 +321,39 @@ public class JobManagerRunnerImplTest extends TestLogger {
 			TestingUtils.defaultExecutor(),
 			fatalErrorHandler);
 	}
+
+
+	@Nonnull
+	private JobManagerRunnerImpl createStreamingJobManagerRunner() throws Exception {
+		return new JobManagerRunnerImpl(
+			jobGraph,
+			new StreamingJobMasterServiceFactory(
+				defaultJobMasterServiceFactory,
+				new StreamManagerAddress("local", StreamManagerId.generate())),
+			haServices,
+			libraryCacheManager,
+			TestingUtils.defaultExecutor(),
+			fatalErrorHandler);
+	}
+
+	@Test
+	public void testStreamingJobCompletion() throws Exception {
+		final JobManagerRunnerImpl jobManagerRunner = createStreamingJobManagerRunner();
+
+		try {
+			jobManagerRunner.start();
+
+			final CompletableFuture<ArchivedExecutionGraph> resultFuture = jobManagerRunner.getResultFuture();
+
+			assertThat(resultFuture.isDone(), is(false));
+
+			jobManagerRunner.jobReachedGloballyTerminalState(archivedExecutionGraph);
+
+			assertThat(resultFuture.get(), is(archivedExecutionGraph));
+		} finally {
+			jobManagerRunner.close();
+		}
+	}
+
+
 }

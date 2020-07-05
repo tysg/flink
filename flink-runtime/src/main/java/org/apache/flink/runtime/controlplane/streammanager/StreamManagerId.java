@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.streaming.controlplane.streammanager;
+package org.apache.flink.runtime.controlplane.streammanager;
 
 import org.apache.flink.util.AbstractID;
 
@@ -24,7 +24,7 @@ import javax.annotation.Nullable;
 import java.util.UUID;
 
 /**
- * The {@link StreamManager} fencing token.
+ * The {@link StreamManagerGateway} fencing token.
  */
 public class StreamManagerId extends AbstractID {
 
