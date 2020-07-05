@@ -42,7 +42,10 @@ import java.util.function.Function;
 class TestingStreamManagerDispatcher extends StreamManagerDispatcher {
 
 	private final CompletableFuture<Void> startFuture;
+
 	private final LeaderRetrievalService dispatcherRetrieverService;
+
+	private final LeaderGatewayRetriever<DispatcherGateway> startedDispatcherRetriever;
 
 	TestingStreamManagerDispatcher(
 		RpcService rpcService,
@@ -61,6 +64,8 @@ class TestingStreamManagerDispatcher extends StreamManagerDispatcher {
 
 		dispatcherRetrieverService = dispatcherServices.getHighAvailabilityServices().getDispatcherLeaderRetriever();
 		dispatcherRetrieverService.start(unStartedRetriever);
+		this.startedDispatcherRetriever = unStartedRetriever;
+
 		this.startFuture = new CompletableFuture<>();
 	}
 
@@ -89,16 +94,9 @@ class TestingStreamManagerDispatcher extends StreamManagerDispatcher {
 		);
 	}
 
-//	void completeJobExecution(ArchivedExecutionGraph archivedExecutionGraph) {
-//		runAsync(
-//			() -> jobReachedGloballyTerminalState(archivedExecutionGraph));
-//	}
-//
-//	CompletableFuture<Void> getJobTerminationFuture(@Nonnull JobID jobId, @Nonnull Time timeout) {
-//		return callAsyncWithoutFencing(
-//			() -> getJobTerminationFuture(jobId),
-//			timeout).thenCompose(Function.identity());
-//	}
+	public LeaderGatewayRetriever<DispatcherGateway> getStartedDispatcherRetriever() {
+		return startedDispatcherRetriever;
+	}
 
 	CompletableFuture<Integer> getNumberJobs(Time timeout) {
 		return callAsyncWithoutFencing(
