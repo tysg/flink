@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,16 +16,30 @@
  * limitations under the License.
  */
 
-package org.apache.flink.streaming.controlplane.streammanager.factories;
+package org.apache.flink.streaming.controlplane.dispatcher;
 
-import org.apache.flink.runtime.controlplane.streammanager.StreamManagerService;
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.runtime.jobgraph.JobGraph;
+import org.apache.flink.runtime.jobmanager.JobGraphWriter;
 
 /**
- * Factory for a {@link StreamManagerService}.
+ * Testing implementation of {@link JobGraphWriter} which does nothing.
  */
-public interface StreamManagerServiceFactory {
+public enum NoOpJobGraphWriter implements JobGraphWriter {
+	INSTANCE;
 
-	StreamManagerService createStreamManagerService(
-		JobGraph jobGraph) throws Exception;
+	@Override
+	public void putJobGraph(JobGraph jobGraph) throws Exception {
+
+	}
+
+	@Override
+	public void removeJobGraph(JobID jobId) throws Exception {
+
+	}
+
+	@Override
+	public void releaseJobGraph(JobID jobId) throws Exception {
+
+	}
 }
