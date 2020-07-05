@@ -202,7 +202,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 	private ResourceManagerConnection resourceManagerConnection;
 
 	@Nullable
-	private StreamManagerAddress streamManagerAddress = null;
+	private StreamManagerAddress streamManagerAddress;
 
 	@Nullable
 	private EstablishedResourceManagerConnection establishedResourceManagerConnection;
@@ -1000,7 +1000,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 
 			final ResourceManagerGateway resourceManagerGateway = resourceManagerConnection.getTargetGateway();
 
-			final ResourceID resourceManagerResourceId = success.getResourceManagerResourceId();
+			final ResourceID resourceManagerResourceId = success.getTargetResourceId();
 
 			establishedResourceManagerConnection = new EstablishedResourceManagerConnection(
 				resourceManagerGateway,
