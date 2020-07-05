@@ -67,10 +67,7 @@ import org.apache.flink.runtime.webmonitor.retriever.GatewayRetriever;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkException;
 import org.apache.flink.util.Preconditions;
-import org.apache.flink.util.function.BiConsumerWithException;
-import org.apache.flink.util.function.CheckedSupplier;
-import org.apache.flink.util.function.FunctionUtils;
-import org.apache.flink.util.function.FunctionWithException;
+import org.apache.flink.util.function.*;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -301,7 +298,7 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
 					new JobSubmissionException(jobGraph.getJobID(), "Currently jobs is not supported if parts of the vertices have " +
 						"resources configured. The limitation will be removed in future versions."));
 			} else {
-				return internalSubmitJob(jobGraph);
+				return internalSubmitJob(jobGraph, streamManagerAddress);
 			}
 		} catch (FlinkException e) {
 			return FutureUtils.completedExceptionally(e);
@@ -366,10 +363,44 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
 		}, getRpcService().getExecutor());
 	}
 
+
+	private CompletableFuture<Acknowledge> internalSubmitJob(JobGraph jobGraph, StreamManagerAddress streamManagerAddress) {
+		log.info("Submitting job {} ({}).", jobGraph.getJobID(), jobGraph.getName());
+
+		final CompletableFuture<Acknowledge> persistAndRunFuture = waitForTerminatingJobManager(
+			jobGraph.getJobID(), jobGraph, streamManagerAddress, this::persistAndRunJob)
+			.thenApply(ignored -> Acknowledge.get());
+
+		return persistAndRunFuture.handleAsync((acknowledge, throwable) -> {
+			if (throwable != null) {
+				cleanUpJobData(jobGraph.getJobID(), true);
+
+				final Throwable strippedThrowable = ExceptionUtils.stripCompletionException(throwable);
+				log.error("Failed to submit job {}.", jobGraph.getJobID(), strippedThrowable);
+				throw new CompletionException(
+					new JobSubmissionException(jobGraph.getJobID(), "Failed to submit job.", strippedThrowable));
+			} else {
+				return acknowledge;
+			}
+		}, getRpcService().getExecutor());
+	}
+
 	private CompletableFuture<Void> persistAndRunJob(JobGraph jobGraph) throws Exception {
 		jobGraphWriter.putJobGraph(jobGraph);
 
 		final CompletableFuture<Void> runJobFuture = runJob(jobGraph);
+
+		return runJobFuture.whenComplete(BiConsumerWithException.unchecked((Object ignored, Throwable throwable) -> {
+			if (throwable != null) {
+				jobGraphWriter.removeJobGraph(jobGraph.getJobID());
+			}
+		}));
+	}
+
+	private CompletableFuture<Void> persistAndRunJob(JobGraph jobGraph, StreamManagerAddress streamManagerAddress) throws Exception {
+		jobGraphWriter.putJobGraph(jobGraph);
+
+		final CompletableFuture<Void> runJobFuture = runJob(jobGraph, streamManagerAddress);
 
 		return runJobFuture.whenComplete(BiConsumerWithException.unchecked((Object ignored, Throwable throwable) -> {
 			if (throwable != null) {
@@ -397,12 +428,48 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
 				getMainThreadExecutor());
 	}
 
+	private CompletableFuture<Void> runJob(JobGraph jobGraph, StreamManagerAddress streamManagerAddress) {
+		Preconditions.checkState(!jobManagerRunnerFutures.containsKey(jobGraph.getJobID()));
+
+		final CompletableFuture<JobManagerRunner> jobManagerRunnerFuture = createJobManagerRunner(jobGraph, streamManagerAddress);
+
+		jobManagerRunnerFutures.put(jobGraph.getJobID(), jobManagerRunnerFuture);
+
+		return jobManagerRunnerFuture
+			.thenApply(FunctionUtils.uncheckedFunction(this::startJobManagerRunner))
+			.thenApply(FunctionUtils.nullFn())
+			.whenCompleteAsync(
+				(ignored, throwable) -> {
+					if (throwable != null) {
+						jobManagerRunnerFutures.remove(jobGraph.getJobID());
+					}
+				},
+				getMainThreadExecutor());
+	}
+
 	private CompletableFuture<JobManagerRunner> createJobManagerRunner(JobGraph jobGraph) {
 		final RpcService rpcService = getRpcService();
 
 		return CompletableFuture.supplyAsync(
 			CheckedSupplier.unchecked(() ->
 				jobManagerRunnerFactory.createJobManagerRunner(
+					jobGraph,
+					configuration,
+					rpcService,
+					highAvailabilityServices,
+					heartbeatServices,
+					jobManagerSharedServices,
+					new DefaultJobManagerJobMetricGroupFactory(jobManagerMetricGroup),
+					fatalErrorHandler)),
+			rpcService.getExecutor());
+	}
+
+	private CompletableFuture<JobManagerRunner> createJobManagerRunner(JobGraph jobGraph, StreamManagerAddress streamManagerAddress) {
+		final RpcService rpcService = getRpcService();
+
+		return CompletableFuture.supplyAsync(
+			CheckedSupplier.unchecked(() ->
+				new StreamManagerJobManagerRunnerFactory(streamManagerAddress).createJobManagerRunner(
 					jobGraph,
 					configuration,
 					rpcService,
@@ -859,6 +926,25 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
 			FunctionUtils.uncheckedFunction((ignored) -> {
 				jobManagerTerminationFutures.remove(jobId);
 				return action.apply(jobGraph);
+			}),
+			getMainThreadExecutor());
+	}
+
+	private CompletableFuture<Void> waitForTerminatingJobManager(
+		JobID jobId, JobGraph jobGraph, StreamManagerAddress streamManagerAddress,
+		BiFunctionWithException<JobGraph, StreamManagerAddress, CompletableFuture<Void>, ?> action) {
+		final CompletableFuture<Void> jobManagerTerminationFuture = getJobTerminationFuture(jobId)
+			.exceptionally((Throwable throwable) -> {
+				throw new CompletionException(
+					new DispatcherException(
+						String.format("Termination of previous JobManager for job %s failed. Cannot submit job under the same job id.", jobId),
+						throwable));
+			});
+
+		return jobManagerTerminationFuture.thenComposeAsync(
+			FunctionUtils.uncheckedFunction((ignored) -> {
+				jobManagerTerminationFutures.remove(jobId);
+				return action.apply(jobGraph, streamManagerAddress);
 			}),
 			getMainThreadExecutor());
 	}

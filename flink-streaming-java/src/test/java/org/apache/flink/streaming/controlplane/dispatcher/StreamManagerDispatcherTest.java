@@ -19,18 +19,15 @@
 package org.apache.flink.streaming.controlplane.dispatcher;
 
 import org.apache.flink.api.common.JobID;
-import org.apache.flink.api.common.JobStatus;
-import org.apache.flink.api.common.operators.ResourceSpec;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.configuration.BlobServerOptions;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.blob.BlobServer;
 import org.apache.flink.runtime.blob.VoidBlobStore;
-import org.apache.flink.runtime.checkpoint.Checkpoints;
 import org.apache.flink.runtime.checkpoint.StandaloneCheckpointRecoveryFactory;
-import org.apache.flink.runtime.checkpoint.savepoint.SavepointV2;
-import org.apache.flink.runtime.client.JobSubmissionException;
+import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerRunner;
+import org.apache.flink.runtime.controlplane.streammanager.StreamManagerService;
 import org.apache.flink.runtime.dispatcher.*;
 import org.apache.flink.runtime.heartbeat.HeartbeatServices;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
@@ -43,46 +40,36 @@ import org.apache.flink.runtime.jobmaster.*;
 import org.apache.flink.runtime.jobmaster.factories.JobManagerJobMetricGroupFactory;
 import org.apache.flink.runtime.leaderelection.LeaderElectionService;
 import org.apache.flink.runtime.leaderelection.StandaloneLeaderElectionService;
-import org.apache.flink.runtime.leaderelection.TestingLeaderElectionService;
 import org.apache.flink.runtime.leaderretrieval.SettableLeaderRetrievalService;
 import org.apache.flink.runtime.leaderretrieval.StandaloneLeaderRetrievalService;
 import org.apache.flink.runtime.messages.Acknowledge;
-import org.apache.flink.runtime.messages.FlinkJobNotFoundException;
 import org.apache.flink.runtime.metrics.groups.UnregisteredMetricGroups;
 import org.apache.flink.runtime.resourcemanager.utils.TestingResourceManagerGateway;
 import org.apache.flink.runtime.rpc.FatalErrorHandler;
 import org.apache.flink.runtime.rpc.RpcService;
 import org.apache.flink.runtime.rpc.RpcUtils;
 import org.apache.flink.runtime.rpc.TestingRpcService;
-import org.apache.flink.runtime.state.*;
 import org.apache.flink.runtime.testtasks.NoOpInvokable;
 import org.apache.flink.runtime.testutils.TestingJobGraphStore;
+import org.apache.flink.runtime.util.ExecutorThreadFactory;
+import org.apache.flink.runtime.util.Hardware;
 import org.apache.flink.runtime.util.TestingFatalErrorHandler;
 import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
 import org.apache.flink.runtime.webmonitor.retriever.impl.RpcGatewayRetriever;
-import org.apache.flink.util.ExceptionUtils;
-import org.apache.flink.util.FlinkException;
+import org.apache.flink.streaming.controlplane.streammanager.*;
+import org.apache.flink.streaming.controlplane.streammanager.factories.DefaultStreamManagerServiceFactory;
+import org.apache.flink.streaming.controlplane.streammanager.factories.StreamManagerServiceFactory;
 import org.apache.flink.util.TestLogger;
 import org.apache.flink.util.function.ThrowingRunnable;
-import org.hamcrest.Matchers;
 import org.junit.*;
 import org.junit.rules.TemporaryFolder;
 import org.junit.rules.TestName;
 
 import javax.annotation.Nonnull;
-import java.io.File;
-import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.UUID;
 import java.util.concurrent.*;
 
-import static org.hamcrest.Matchers.*;
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.*;
 
@@ -322,13 +309,17 @@ public class StreamManagerDispatcherTest extends TestLogger {
 	 */
 	@Test
 	public void testJobSubmission() throws Exception {
-		dispatcher = createAndStartDispatcher(heartbeatServices, haServices, new ExpectedJobIdStreamManagerRunnerFactory(TEST_JOB_ID, createdJobManagerRunnerLatch));
+		CompletableFuture<Acknowledge> isRegisterJobManagerFuture = new CompletableFuture<>();
+
+		dispatcher = createAndStartDispatcher(heartbeatServices, haServices,
+			new ExpectedCompletableFutureStreamManagerRunnerFactory(isRegisterJobManagerFuture));
 
 		StreamManagerDispatcherGateway dispatcherGateway = dispatcher.getSelfGateway(StreamManagerDispatcherGateway.class);
 
 		CompletableFuture<Acknowledge> acknowledgeFuture = dispatcherGateway.submitJob(jobGraph, RpcUtils.INF_TIMEOUT);
 
 		assertEquals(Acknowledge.get(), acknowledgeFuture.get());
+		assertEquals(Acknowledge.get(), isRegisterJobManagerFuture.get(3, TimeUnit.MINUTES));
 	}
 
 	@Test
@@ -394,6 +385,57 @@ public class StreamManagerDispatcherTest extends TestLogger {
 			throw failure;
 		}
 	}
+
+	private static final class ExpectedCompletableFutureStreamManagerRunnerFactory implements StreamManagerRunnerFactory {
+
+		private final CompletableFuture<Acknowledge> acknowledgeCompletableFuture;
+
+		private ExpectedCompletableFutureStreamManagerRunnerFactory(CompletableFuture<Acknowledge> acknowledgeCompletableFuture) {
+			this.acknowledgeCompletableFuture = acknowledgeCompletableFuture;
+		}
+
+		@Override
+		public StreamManagerRunner createStreamManagerRunner(
+			JobGraph jobGraph,
+			Configuration configuration,
+			RpcService rpcService,
+			HighAvailabilityServices highAvailabilityServices,
+			LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever,
+			FatalErrorHandler fatalErrorHandler) throws Exception {
+
+			final StreamManagerConfiguration streamManagerConfiguration = StreamManagerConfiguration.fromConfiguration(configuration);
+
+			final StreamManagerServiceFactory streamManagerServiceFactory = jobGraph1 -> {
+				final StreamManagerRuntimeServices streamManagerRuntimeServices = StreamManagerRuntimeServices.fromConfiguration(
+					streamManagerConfiguration,
+					highAvailabilityServices,
+					rpcService.getScheduledExecutor());
+
+				return new TestingStreamManager(
+					rpcService,
+					streamManagerConfiguration,
+					ResourceID.generate(),
+					jobGraph1,
+					highAvailabilityServices,
+					streamManagerRuntimeServices.getJobLeaderIdService(),
+					dispatcherGatewayRetriever,
+					fatalErrorHandler,
+					acknowledgeCompletableFuture);
+			};
+
+			final ScheduledExecutorService futureExecutor = Executors.newScheduledThreadPool(
+				Hardware.getNumberCPUCores(),
+				new ExecutorThreadFactory("streammanager-future"));
+
+			return new StreamManagerRunnerImpl(
+				jobGraph,
+				streamManagerServiceFactory,
+				highAvailabilityServices,
+				futureExecutor,
+				fatalErrorHandler);
+		}
+	}
+
 
 	private static final class ExpectedJobIdStreamManagerRunnerFactory implements StreamManagerRunnerFactory {
 

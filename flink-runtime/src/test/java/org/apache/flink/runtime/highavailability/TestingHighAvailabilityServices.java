@@ -26,6 +26,7 @@ import org.apache.flink.runtime.highavailability.nonha.standalone.StandaloneRunn
 import org.apache.flink.runtime.jobmanager.JobGraphStore;
 import org.apache.flink.runtime.leaderelection.LeaderElectionService;
 import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalService;
+import org.apache.flink.runtime.leaderretrieval.StandaloneLeaderRetrievalService;
 
 import java.io.IOException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -161,6 +162,10 @@ public class TestingHighAvailabilityServices implements HighAvailabilityServices
 	@Override
 	public LeaderRetrievalService getJobManagerLeaderRetriever(JobID jobID, String defaultJobManagerAddress) {
 		return getJobManagerLeaderRetriever(jobID);
+	}
+
+	public LeaderRetrievalService getStreamManagerLeaderRetriever(JobID jobID, String defaultStreamManagerAddress) {
+		return new StandaloneLeaderRetrievalService(defaultStreamManagerAddress, DEFAULT_LEADER_ID);
 	}
 
 	@Override
