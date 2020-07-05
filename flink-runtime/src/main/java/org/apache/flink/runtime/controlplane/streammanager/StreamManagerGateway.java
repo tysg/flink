@@ -51,14 +51,13 @@ public interface StreamManagerGateway extends FencedRpcGateway<StreamManagerId> 
             JobID jobId,
             @RpcTimeout Time timeout);
 
-    /*
+    /**
      * Disconnects the job manager from the stream manager because of the given cause.
-     *
-     * @param jobMasterId identifying the job manager leader id
-     * @param cause of the disconnect
+     * @param jobId The Job ID of the job manager
+     * @param cause the disconnection between the job manager and the stream manager
      */
-    void disconnectJobMaster(
-		final JobMasterId jobMasterId,
+    void disconnectJobManager(
+		final JobID jobId,
 		final Exception cause);
 
 }

@@ -41,6 +41,8 @@ import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobmanager.JobGraphWriter;
 import org.apache.flink.runtime.jobmaster.*;
 import org.apache.flink.runtime.jobmaster.factories.JobManagerJobMetricGroupFactory;
+import org.apache.flink.runtime.leaderelection.LeaderElectionService;
+import org.apache.flink.runtime.leaderelection.StandaloneLeaderElectionService;
 import org.apache.flink.runtime.leaderelection.TestingLeaderElectionService;
 import org.apache.flink.runtime.leaderretrieval.SettableLeaderRetrievalService;
 import org.apache.flink.runtime.leaderretrieval.StandaloneLeaderRetrievalService;
@@ -105,7 +107,7 @@ public class StreamManagerDispatcherTest extends TestLogger {
 
 	private TestingFatalErrorHandler fatalErrorHandler;
 
-	private TestingLeaderElectionService jobMasterLeaderElectionService;
+	private LeaderElectionService jobMasterLeaderElectionService;
 
 	private CountDownLatch createdJobManagerRunnerLatch;
 
@@ -145,7 +147,7 @@ public class StreamManagerDispatcherTest extends TestLogger {
 		fatalErrorHandler = new TestingFatalErrorHandler();
 		heartbeatServices = new HeartbeatServices(1000L, 10000L);
 
-		jobMasterLeaderElectionService = new TestingLeaderElectionService();
+		jobMasterLeaderElectionService = new StandaloneLeaderElectionService();
 
 		haServices = new TestingHighAvailabilityServicesBuilder().build();
 		haServices.setJobMasterLeaderElectionService(TEST_JOB_ID, jobMasterLeaderElectionService);
@@ -324,13 +326,9 @@ public class StreamManagerDispatcherTest extends TestLogger {
 
 		StreamManagerDispatcherGateway dispatcherGateway = dispatcher.getSelfGateway(StreamManagerDispatcherGateway.class);
 
-		CompletableFuture<Acknowledge> acknowledgeFuture = dispatcherGateway.submitJob(jobGraph, TIMEOUT);
+		CompletableFuture<Acknowledge> acknowledgeFuture = dispatcherGateway.submitJob(jobGraph, RpcUtils.INF_TIMEOUT);
 
-		acknowledgeFuture.get();
-
-		assertTrue(
-			"jobManagerRunner was not started",
-			jobMasterLeaderElectionService.getStartFuture().isDone());
+		assertEquals(Acknowledge.get(), acknowledgeFuture.get());
 	}
 
 	@Test

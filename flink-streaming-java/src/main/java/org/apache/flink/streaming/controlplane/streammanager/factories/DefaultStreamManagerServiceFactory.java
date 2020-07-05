@@ -28,6 +28,7 @@ import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.rpc.FatalErrorHandler;
 import org.apache.flink.runtime.rpc.RpcService;
+import org.apache.flink.streaming.controlplane.streammanager.StreamManagerRuntimeServices;
 
 /**
  * Default implementation of the {@link StreamManagerServiceFactory}.
@@ -66,6 +67,10 @@ public class DefaultStreamManagerServiceFactory implements StreamManagerServiceF
 	@Override
 	public StreamManager createStreamManagerService(
 			JobGraph jobGraph) throws Exception {
+		final StreamManagerRuntimeServices streamManagerRuntimeServices = StreamManagerRuntimeServices.fromConfiguration(
+				streamManagerConfiguration,
+				haServices,
+				rpcService.getScheduledExecutor());
 
 		return new StreamManager(
 			rpcService,
@@ -73,6 +78,7 @@ public class DefaultStreamManagerServiceFactory implements StreamManagerServiceF
 			ResourceID.generate(),
 			jobGraph,
 			haServices,
+			streamManagerRuntimeServices.getJobLeaderIdService(),
 			dispatcherGatewayRetriever,
 			fatalErrorHandler);
 	}

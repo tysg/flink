@@ -20,7 +20,6 @@ package org.apache.flink.runtime.jobmaster;
 
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.registration.RegistrationResponse;
-import org.apache.flink.runtime.resourcemanager.ResourceManagerId;
 import org.apache.flink.util.AbstractID;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -38,28 +37,28 @@ public class JobMasterRegistrationSuccess<ID extends AbstractID> extends Registr
 
 	private final ID registrationTargetId;
 
-	private final ResourceID resourceManagerResourceId;
+	private final ResourceID targetResourceId;
 
 	public JobMasterRegistrationSuccess(
 		final ID registrationTargetId,
 		final ResourceID resourceManagerResourceId) {
 		this.registrationTargetId = checkNotNull(registrationTargetId);
-		this.resourceManagerResourceId = checkNotNull(resourceManagerResourceId);
+		this.targetResourceId = checkNotNull(resourceManagerResourceId);
 	}
 
 	public ID getRegistrationTargetId() {
 		return registrationTargetId;
 	}
 
-	public ResourceID getResourceManagerResourceId() {
-		return resourceManagerResourceId;
+	public ResourceID getTargetResourceId() {
+		return targetResourceId;
 	}
 
 	@Override
 	public String toString() {
 		return "JobMasterRegistrationSuccess{" +
 			"resourceManagerId=" + registrationTargetId +
-			", resourceManagerResourceId=" + resourceManagerResourceId +
+			", resourceManagerResourceId=" + targetResourceId +
 			'}';
 	}
 }
