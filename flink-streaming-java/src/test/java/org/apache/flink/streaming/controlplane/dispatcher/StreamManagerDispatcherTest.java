@@ -317,8 +317,8 @@ public class StreamManagerDispatcherTest extends TestLogger {
 
 
 	/**
-	 * Tests that we can submit a job to the Dispatcher which then spawns a
-	 * new JobManagerRunner.
+	 * Tests that we can submit a job to the StreamManagerDispatcher which then spawns a
+	 * new StreamManagerRunner.
 	 */
 	@Test
 	public void testJobSubmission() throws Exception {
