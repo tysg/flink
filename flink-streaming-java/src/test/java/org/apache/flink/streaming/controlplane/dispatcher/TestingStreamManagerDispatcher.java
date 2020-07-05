@@ -30,6 +30,7 @@ import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalService;
 import org.apache.flink.runtime.rpc.RpcService;
 import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
 import org.apache.flink.runtime.webmonitor.retriever.LeaderRetriever;
+import org.apache.flink.runtime.webmonitor.retriever.impl.RpcGatewayRetriever;
 
 import javax.annotation.Nonnull;
 import java.util.Collection;
@@ -52,19 +53,23 @@ class TestingStreamManagerDispatcher extends StreamManagerDispatcher {
 		String endpointId,
 		StreamManagerDispatcherId fencingToken,
 		Collection<JobGraph> recoveredJobs,
-		StreamManagerDispatcherServices dispatcherServices,
-		LeaderGatewayRetriever<DispatcherGateway> unStartedRetriever) throws Exception {
+		StreamManagerDispatcherServices dispatcherServices) throws Exception {
 		super(
 			rpcService,
 			endpointId,
 			fencingToken,
 			recoveredJobs,
-			dispatcherServices,
-			unStartedRetriever);
+			dispatcherServices
+		);
 
 		dispatcherRetrieverService = dispatcherServices.getHighAvailabilityServices().getDispatcherLeaderRetriever();
-		dispatcherRetrieverService.start(unStartedRetriever);
-		this.startedDispatcherRetriever = unStartedRetriever;
+		startedDispatcherRetriever = new RpcGatewayRetriever<>(
+			rpcService,
+			DispatcherGateway.class,
+			DispatcherId::fromUuid,
+			10,
+			Time.milliseconds(50L));
+		dispatcherRetrieverService.start(startedDispatcherRetriever);
 
 		this.startFuture = new CompletableFuture<>();
 	}
