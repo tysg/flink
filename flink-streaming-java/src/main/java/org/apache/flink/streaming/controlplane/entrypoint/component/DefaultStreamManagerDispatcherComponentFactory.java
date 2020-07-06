@@ -90,12 +90,9 @@ public class DefaultStreamManagerDispatcherComponentFactory implements StreamMan
 		LeaderRetrievalService smDispatcherLeaderRetrievalService = null;
 		StreamManagerWebMonitorEndpoint<?> smWebMonitorEndpoint = null;
 		StreamManagerDispatcherRunner smDispatcherRunner = null;
-		LeaderRetrievalService dispatcherLeaderRetrievalService = null;
 
 		try {
 			smDispatcherLeaderRetrievalService = highAvailabilityServices.getStreamManagerDispatcherLeaderRetriever();
-
-			dispatcherLeaderRetrievalService = highAvailabilityServices.getDispatcherLeaderRetriever();
 
 			final LeaderGatewayRetriever<StreamManagerDispatcherGateway> smDispatcherGatewayRetriever = new RpcGatewayRetriever<>(
 				rpcService,
@@ -103,14 +100,6 @@ public class DefaultStreamManagerDispatcherComponentFactory implements StreamMan
 				StreamManagerDispatcherId::fromUuid,
 				10,
 				Time.milliseconds(50L));
-
-			final LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever = new RpcGatewayRetriever<>(
-				rpcService,
-				DispatcherGateway.class,
-				DispatcherId::fromUuid,
-				10,
-				Time.milliseconds(50L));
-
 
 			final ScheduledExecutorService executor = StreamManagerWebMonitorEndpoint.createExecutorService(
 				configuration.getInteger(RestOptions.SERVER_NUM_THREADS),
@@ -142,18 +131,17 @@ public class DefaultStreamManagerDispatcherComponentFactory implements StreamMan
 				new HaServicesJobGraphStoreFactory(highAvailabilityServices),
 				ioExecutor,
 				rpcService,
-				partialSmDispatcherServices,
-				dispatcherGatewayRetriever);
+				partialSmDispatcherServices
+			);
 
 
 			smDispatcherLeaderRetrievalService.start(smDispatcherGatewayRetriever);
-			dispatcherLeaderRetrievalService.start(dispatcherGatewayRetriever);
 
 			return new StreamManagerDispatcherComponent(
 				smDispatcherRunner,
 				smDispatcherLeaderRetrievalService,
-				smWebMonitorEndpoint,
-				dispatcherLeaderRetrievalService);
+				smWebMonitorEndpoint
+				);
 
 		} catch (Exception exception) {
 			// clean up all started components

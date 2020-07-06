@@ -39,6 +39,5 @@ public interface StreamManagerDispatcherRunnerFactory {
 		JobGraphStoreFactory jobGraphStoreFactory,
 		Executor ioExecutor,
 		RpcService rpcService,
-		PartialStreamManagerDispatcherServices partialDispatcherServices,
-		LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever) throws Exception;
+		PartialStreamManagerDispatcherServices partialDispatcherServices) throws Exception;
 }

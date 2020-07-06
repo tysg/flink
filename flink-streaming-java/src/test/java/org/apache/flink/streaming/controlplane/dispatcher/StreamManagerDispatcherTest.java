@@ -232,13 +232,7 @@ public class StreamManagerDispatcherTest extends TestLogger {
 					heartbeatServices,
 					fatalErrorHandler,
 					jobGraphWriter,
-					streamManagerRunnerFactory),
-				new RpcGatewayRetriever<>(
-					rpcService,
-					DispatcherGateway.class,
-					DispatcherId::fromUuid,
-					10,
-					Time.milliseconds(50L))
+					streamManagerRunnerFactory)
 			);
 		}
 

@@ -38,6 +38,5 @@ public interface StreamManagerDispatcherLeaderProcessFactoryFactory {
 		Executor ioExecutor,
 		RpcService rpcService,
 		PartialStreamManagerDispatcherServices partialDispatcherServices,
-		FatalErrorHandler fatalErrorHandler,
-		LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever);
+		FatalErrorHandler fatalErrorHandler);
 }

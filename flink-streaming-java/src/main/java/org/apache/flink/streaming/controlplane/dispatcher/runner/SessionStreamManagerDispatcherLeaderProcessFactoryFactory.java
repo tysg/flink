@@ -45,13 +45,12 @@ public class SessionStreamManagerDispatcherLeaderProcessFactoryFactory implement
 		Executor ioExecutor,
 		RpcService rpcService,
 		PartialStreamManagerDispatcherServices partialDispatcherServices,
-		FatalErrorHandler fatalErrorHandler,
-		LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever) {
+		FatalErrorHandler fatalErrorHandler) {
 		final AbstractStreamManagerDispatcherLeaderProcess.StreamManagerDispatcherGatewayServiceFactory dispatcherGatewayServiceFactory = new DefaultStreamManagerDispatcherGatewayServiceFactory(
 			dispatcherFactory,
 			rpcService,
-			partialDispatcherServices,
-			dispatcherGatewayRetriever);
+			partialDispatcherServices
+		);
 
 		return new SessionStreamManagerDispatcherLeaderProcessFactory(
 			dispatcherGatewayServiceFactory,

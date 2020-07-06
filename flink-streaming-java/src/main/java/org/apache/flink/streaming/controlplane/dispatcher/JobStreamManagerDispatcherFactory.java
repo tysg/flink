@@ -42,8 +42,7 @@ public enum JobStreamManagerDispatcherFactory implements StreamManagerDispatcher
 		RpcService rpcService,
 		StreamManagerDispatcherId fencingToken,
 		Collection<JobGraph> recoveredJobs,
-		PartialStreamManagerDispatcherServicesWithJobGraphStore partialDispatcherServicesWithJobGraphStore,
-		LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever) throws Exception {
+		PartialStreamManagerDispatcherServicesWithJobGraphStore partialDispatcherServicesWithJobGraphStore) throws Exception {
 		final JobGraph jobGraph = Iterables.getOnlyElement(recoveredJobs);
 
 		final Configuration configuration = partialDispatcherServicesWithJobGraphStore.getConfiguration();
