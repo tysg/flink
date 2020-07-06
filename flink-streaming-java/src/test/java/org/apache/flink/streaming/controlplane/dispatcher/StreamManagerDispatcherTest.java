@@ -107,6 +107,8 @@ public class StreamManagerDispatcherTest extends TestLogger {
 	 */
 	private TestingStreamManagerDispatcher dispatcher;
 
+	private TestingDispatcher runtimeDispatcher;
+
 	private TestingHighAvailabilityServices haServices;
 
 	private HeartbeatServices heartbeatServices;
@@ -160,7 +162,8 @@ public class StreamManagerDispatcherTest extends TestLogger {
 			.setHaServices(haServices)
 			.setHeartbeatServices(heartbeatServices)
 			.setStreamManagerRunnerFactory(streamManagerRunnerFactory);
-		final TestingDispatcher runtimeDispatcher = dispatcherBuilder.buildRuntimeDispatcher();
+
+		runtimeDispatcher = dispatcherBuilder.buildRuntimeDispatcher();
 
 		runtimeDispatcher.start();
 		haServices.setDispatcherLeaderRetriever(
@@ -318,8 +321,8 @@ public class StreamManagerDispatcherTest extends TestLogger {
 
 		CompletableFuture<Acknowledge> acknowledgeFuture = dispatcherGateway.submitJob(jobGraph, RpcUtils.INF_TIMEOUT);
 
-		assertEquals(Acknowledge.get(), acknowledgeFuture.get());
-		assertEquals(Acknowledge.get(), isRegisterJobManagerFuture.get(3, TimeUnit.MINUTES));
+		assertEquals("stream manager runner do not start", Acknowledge.get(), acknowledgeFuture.get());
+		assertEquals("job master can not connect to stream manager", Acknowledge.get(), isRegisterJobManagerFuture.get(3, TimeUnit.SECONDS));
 	}
 
 	@Test
