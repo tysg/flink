@@ -22,10 +22,12 @@ import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerId;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
 import org.apache.flink.runtime.jobmaster.JMTMRegistrationSuccess;
+import org.apache.flink.runtime.jobmaster.JobMasterId;
 import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalListener;
 import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalService;
 import org.apache.flink.runtime.registration.RegisteredRpcConnection;
@@ -33,7 +35,6 @@ import org.apache.flink.runtime.registration.RegistrationResponse;
 import org.apache.flink.runtime.registration.RetryingRegistration;
 import org.apache.flink.runtime.registration.RetryingRegistrationConfiguration;
 import org.apache.flink.runtime.rpc.RpcService;
-import org.apache.flink.runtime.taskmanager.TaskManagerLocation;
 import org.apache.flink.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,9 +58,9 @@ import java.util.concurrent.Executor;
  * leader and its connection. In case that a job leader loses leadership, the job leader listener
  * is notified as well.
  */
-public class StreamingJobLeaderService {
+public class StreamingLeaderService {
 
-	private static final Logger LOG = LoggerFactory.getLogger(StreamingJobLeaderService.class);
+	private static final Logger LOG = LoggerFactory.getLogger(StreamingLeaderService.class);
 
 	/**
 	 * The leader retrieval service and listener for each registered job.
@@ -71,12 +72,12 @@ public class StreamingJobLeaderService {
 	/**
 	 * Internal state of the service.
 	 */
-	private volatile StreamingJobLeaderService.State state;
+	private volatile StreamingLeaderService.State state;
 
 	/**
 	 * Address of the owner of this service. This address is used for the job manager connection.
 	 */
-	private String ownerAddress;
+	private JobMasterLocation jobMasterLocation;
 
 	/**
 	 * Rpc service to use for establishing connections.
@@ -91,9 +92,9 @@ public class StreamingJobLeaderService {
 	/**
 	 * Job leader listener listening for job leader changes.
 	 */
-	private StreamingJobLeaderListener streamManagerLeaderListener;
+	private StreamingLeaderListener streamManagerLeaderListener;
 
-	public StreamingJobLeaderService(
+	public StreamingLeaderService(
 		RetryingRegistrationConfiguration retryingRegistrationConfiguration) {
 		this.retryingRegistrationConfiguration = Preconditions.checkNotNull(retryingRegistrationConfiguration);
 
@@ -101,9 +102,9 @@ public class StreamingJobLeaderService {
 		// concurrently via containsJob
 		streamManagerLeaderServices = new ConcurrentHashMap<>(4);
 
-		state = StreamingJobLeaderService.State.CREATED;
+		state = StreamingLeaderService.State.CREATED;
 
-		ownerAddress = null;
+		jobMasterLocation = null;
 		rpcService = null;
 		highAvailabilityServices = null;
 		streamManagerLeaderListener = null;
@@ -114,30 +115,30 @@ public class StreamingJobLeaderService {
 	// -------------------------------------------------------------------------------
 
 	/**
-	 * todo this method only connect the corresponding job manager
-	 * Start the job leader service with the given services.
+	 * todo this method only connect the corresponding stream manager
+	 * Start the stream manager leader service with the given services.
 	 *
-	 * @param initialOwnerAddress             to be used for establishing connections (source address)
+	 * @param initialJobMasterLocation             to be used for establishing connections (source address)
 	 * @param initialRpcService               to be used to create rpc connections
 	 * @param initialHighAvailabilityServices to create leader retrieval services for the different jobs
-	 * @param initialStreamingJobLeaderListener        listening for stream leader changes
+	 * @param initialStreamingLeaderListener  listening for stream leader changes
 	 */
 	public void start(
-		final String initialOwnerAddress,
+		final JobMasterLocation initialJobMasterLocation,
 		final RpcService initialRpcService,
 		final HighAvailabilityServices initialHighAvailabilityServices,
-		final StreamingJobLeaderListener initialStreamingJobLeaderListener) throws Exception {
+		final StreamingLeaderListener initialStreamingLeaderListener) throws Exception {
 
-		if (StreamingJobLeaderService.State.CREATED != state) {
+		if (StreamingLeaderService.State.CREATED != state) {
 			throw new IllegalStateException("The service has already been started.");
 		} else {
 			LOG.info("Start job leader service.");
 
-			this.ownerAddress = Preconditions.checkNotNull(initialOwnerAddress);
+			this.jobMasterLocation = Preconditions.checkNotNull(initialJobMasterLocation);
 			this.rpcService = Preconditions.checkNotNull(initialRpcService);
 			this.highAvailabilityServices = Preconditions.checkNotNull(initialHighAvailabilityServices);
-			this.streamManagerLeaderListener = Preconditions.checkNotNull(initialStreamingJobLeaderListener);
-			state = StreamingJobLeaderService.State.STARTED;
+			this.streamManagerLeaderListener = Preconditions.checkNotNull(initialStreamingLeaderListener);
+			state = StreamingLeaderService.State.STARTED;
 		}
 	}
 
@@ -151,7 +152,7 @@ public class StreamingJobLeaderService {
 	public void stop() throws Exception {
 		LOG.info("Stop job leader service.");
 
-		if (StreamingJobLeaderService.State.STARTED == state) {
+		if (StreamingLeaderService.State.STARTED == state) {
 
 			for (Tuple2<LeaderRetrievalService, StreamManagerLeaderListener> leaderRetrievalServiceEntry : streamManagerLeaderServices.values()) {
 				LeaderRetrievalService leaderRetrievalService = leaderRetrievalServiceEntry.f0;
@@ -164,7 +165,7 @@ public class StreamingJobLeaderService {
 			streamManagerLeaderServices.clear();
 		}
 
-		state = StreamingJobLeaderService.State.STOPPED;
+		state = StreamingLeaderService.State.STOPPED;
 	}
 
 	/**
@@ -174,7 +175,7 @@ public class StreamingJobLeaderService {
 	 * @throws Exception if an error occurred while stopping the leader retrieval service and listener
 	 */
 	public void removeJob(JobID jobId) throws Exception {
-		Preconditions.checkState(StreamingJobLeaderService.State.STARTED == state, "The service is currently not running.");
+		Preconditions.checkState(StreamingLeaderService.State.STARTED == state, "The service is currently not running.");
 
 		Tuple2<LeaderRetrievalService, StreamManagerLeaderListener> entry = streamManagerLeaderServices.remove(jobId);
 
@@ -198,7 +199,7 @@ public class StreamingJobLeaderService {
 	 * @throws Exception if an error occurs while starting the leader retrieval service
 	 */
 	public void addJob(final JobID jobId, final String defaultTargetAddress) throws Exception {
-		Preconditions.checkState(StreamingJobLeaderService.State.STARTED == state, "The service is currently not running.");
+		Preconditions.checkState(StreamingLeaderService.State.STARTED == state, "The service is currently not running.");
 
 		LOG.info("Add job {} for job leader monitoring.", jobId);
 
@@ -314,7 +315,7 @@ public class StreamingJobLeaderService {
 			synchronized (lock) {
 				if (stopped) {
 					LOG.debug("{}'s leader retrieval listener reported a new leader for job {}. " +
-						"However, the service is no longer running.", StreamingJobLeaderService.class.getSimpleName(), jobId);
+						"However, the service is no longer running.", StreamingLeaderService.class.getSimpleName(), jobId);
 				} else {
 					final StreamManagerId streamManagerId = StreamManagerId.fromUuidOrNull(leaderId);
 
@@ -354,6 +355,7 @@ public class StreamingJobLeaderService {
 				LOG,
 				leaderAddress,
 				streamManagerId,
+				jobMasterLocation,
 				rpcService.getExecutor());
 
 			LOG.info("Try to register at job manager {} with leader id {}.", leaderAddress, streamManagerId.toUUID());
@@ -373,7 +375,7 @@ public class StreamingJobLeaderService {
 		public void handleError(Exception exception) {
 			if (stopped) {
 				LOG.debug("{}'s leader retrieval listener reported an exception for job {}. " +
-						"However, the service is no longer running.", StreamingJobLeaderService.class.getSimpleName(),
+						"However, the service is no longer running.", StreamingLeaderService.class.getSimpleName(),
 					jobId, exception);
 			} else {
 				streamManagerLeaderListener.handleError(exception);
@@ -384,13 +386,16 @@ public class StreamingJobLeaderService {
 		 * Rpc connection for the job manager <--> task manager connection.
 		 */
 		private final class StreamManagerRegisteredRpcConnection extends RegisteredRpcConnection<StreamManagerId, StreamManagerGateway, JMTMRegistrationSuccess> {
+			private final JobMasterLocation jobMasterLocation;
 
 			StreamManagerRegisteredRpcConnection(
 				Logger log,
 				String targetAddress,
 				StreamManagerId streamManagerId,
+				JobMasterLocation jobMasterLocation,
 				Executor executor) {
 				super(log, targetAddress, streamManagerId, executor);
+				this.jobMasterLocation = jobMasterLocation;
 			}
 
 			@Override
@@ -403,7 +408,7 @@ public class StreamingJobLeaderService {
 					getTargetAddress(),
 					getTargetLeaderId(),
 					retryingRegistrationConfiguration,
-					ownerAddress);
+					jobMasterLocation);
 			}
 
 			@Override
@@ -437,7 +442,7 @@ public class StreamingJobLeaderService {
 	private static final class StreamManagerRetryingRegistration
 		extends RetryingRegistration<StreamManagerId, StreamManagerGateway, JMTMRegistrationSuccess> {
 
-		private final String jobMasterRpcAddress;
+		private final JobMasterLocation jobMasterLocation;
 
 		StreamManagerRetryingRegistration(
 			Logger log,
@@ -447,7 +452,7 @@ public class StreamingJobLeaderService {
 			String targetAddress,
 			StreamManagerId streamManagerId,
 			RetryingRegistrationConfiguration retryingRegistrationConfiguration,
-			String jobMasterRpcAddress) {
+			JobMasterLocation jobMasterLocation) {
 			super(
 				log,
 				rpcService,
@@ -457,21 +462,35 @@ public class StreamingJobLeaderService {
 				streamManagerId,
 				retryingRegistrationConfiguration);
 
-			this.jobMasterRpcAddress = jobMasterRpcAddress;
+			this.jobMasterLocation = jobMasterLocation;
 		}
 
 		@Override
 		protected CompletableFuture<RegistrationResponse> invokeRegistration(
 			StreamManagerGateway gateway,
 			StreamManagerId streamManagerId,
-			long timeoutMillis) throws Exception {
+			long timeoutMillis) {
 			return gateway.registerJobManager(
-				null,
-				null,
-				jobMasterRpcAddress,
-				null,
+				jobMasterLocation.jobMasterId,
+				jobMasterLocation.jobManagerResourceID,
+				jobMasterLocation.jobMasterRpcAddress,
+				jobMasterLocation.jobID,
 				Time.milliseconds(timeoutMillis)
 			);
+		}
+	}
+
+	public static class JobMasterLocation {
+		final JobMasterId jobMasterId;
+		final ResourceID jobManagerResourceID;
+		final String jobMasterRpcAddress;
+		final JobID jobID;
+
+		public JobMasterLocation(JobMasterId jobMasterId, ResourceID jobManagerResourceID, String jobMasterRpcAddress, JobID jobID) {
+			this.jobMasterId = jobMasterId;
+			this.jobManagerResourceID = jobManagerResourceID;
+			this.jobMasterRpcAddress = jobMasterRpcAddress;
+			this.jobID = jobID;
 		}
 	}
 
@@ -494,7 +513,7 @@ public class StreamingJobLeaderService {
 	 */
 	@VisibleForTesting
 	public boolean containsJob(JobID jobId) {
-		Preconditions.checkState(StreamingJobLeaderService.State.STARTED == state, "The service is currently not running.");
+		Preconditions.checkState(StreamingLeaderService.State.STARTED == state, "The service is currently not running.");
 
 		return streamManagerLeaderServices.containsKey(jobId);
 	}

@@ -327,6 +327,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 		checkNotNull(newStreamManagerId, "The new StreamManagerId must not be null");
 
+		setFencingToken(newStreamManagerId);
+
 		return Acknowledge.get();
 	}
 
