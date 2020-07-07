@@ -139,6 +139,10 @@ public abstract class StreamManagerDispatcher extends PermanentlyFencedRpcEndpoi
 
 	}
 
+	public LeaderGatewayRetriever<DispatcherGateway> getStartedDispatcherRetriever() {
+		return this.dispatcherGatewayRetriever;
+	}
+
 	//------------------------------------------------------
 	// Getters
 	//------------------------------------------------------

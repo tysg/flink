@@ -44,10 +44,6 @@ class TestingStreamManagerDispatcher extends StreamManagerDispatcher {
 
 	private final CompletableFuture<Void> startFuture;
 
-	private final LeaderRetrievalService dispatcherRetrieverService;
-
-	private final LeaderGatewayRetriever<DispatcherGateway> startedDispatcherRetriever;
-
 	TestingStreamManagerDispatcher(
 		RpcService rpcService,
 		String endpointId,
@@ -62,15 +58,6 @@ class TestingStreamManagerDispatcher extends StreamManagerDispatcher {
 			dispatcherServices
 		);
 
-		dispatcherRetrieverService = dispatcherServices.getHighAvailabilityServices().getDispatcherLeaderRetriever();
-		startedDispatcherRetriever = new RpcGatewayRetriever<>(
-			rpcService,
-			DispatcherGateway.class,
-			DispatcherId::fromUuid,
-			10,
-			Time.milliseconds(50L));
-		dispatcherRetrieverService.start(startedDispatcherRetriever);
-
 		this.startFuture = new CompletableFuture<>();
 	}
 
@@ -84,23 +71,6 @@ class TestingStreamManagerDispatcher extends StreamManagerDispatcher {
 		}
 
 		startFuture.complete(null);
-	}
-
-	@Override
-	public CompletableFuture<Void> onStop() {
-		return super.onStop().thenAccept(
-			ignore -> {
-				try {
-					dispatcherRetrieverService.stop();
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
-			}
-		);
-	}
-
-	public LeaderGatewayRetriever<DispatcherGateway> getStartedDispatcherRetriever() {
-		return startedDispatcherRetriever;
 	}
 
 	CompletableFuture<Integer> getNumberJobs(Time timeout) {

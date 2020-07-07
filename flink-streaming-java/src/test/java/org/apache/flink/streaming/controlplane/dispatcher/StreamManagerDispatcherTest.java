@@ -316,7 +316,7 @@ public class StreamManagerDispatcherTest extends TestLogger {
 
 		CompletableFuture<Acknowledge> acknowledgeFuture = dispatcherGateway.submitJob(jobGraph, RpcUtils.INF_TIMEOUT);
 
-		assertEquals("stream manager runner do not start", Acknowledge.get(), acknowledgeFuture.get());
+		assertEquals("stream manager runner do not start", Acknowledge.get(), acknowledgeFuture.get(3, TimeUnit.SECONDS));
 		assertEquals("job master can not connect to stream manager", Acknowledge.get(), isRegisterJobManagerFuture.get(3, TimeUnit.SECONDS));
 	}
 
