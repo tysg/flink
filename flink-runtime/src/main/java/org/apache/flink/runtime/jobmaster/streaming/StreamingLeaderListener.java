@@ -22,8 +22,6 @@ import org.apache.flink.api.common.JobID;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerId;
 import org.apache.flink.runtime.jobmaster.JMTMRegistrationSuccess;
-import org.apache.flink.runtime.jobmaster.JobMasterGateway;
-import org.apache.flink.runtime.jobmaster.JobMasterId;
 import org.apache.flink.runtime.taskexecutor.JobLeaderService;
 
 /**

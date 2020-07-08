@@ -34,29 +34,30 @@ import java.util.concurrent.CompletableFuture;
  */
 public interface StreamManagerGateway extends FencedRpcGateway<StreamManagerId> {
 
-    /**
-     * Register a {@link JobMaster} at the resource manager.
-     *
-     * @param jobMasterId The fencing token for the JobMaster leader
-     * @param jobMasterResourceId The resource ID of the JobMaster that registers
-     * @param jobMasterAddress The address of the JobMaster that registers
-     * @param jobId The Job ID of the JobMaster that registers
-     * @param timeout Timeout for the future to complete
-     * @return Future registration response
-     */
-    CompletableFuture<RegistrationResponse> registerJobManager(
-            JobMasterId jobMasterId,
-            ResourceID jobMasterResourceId,
-            String jobMasterAddress,
-            JobID jobId,
-            @RpcTimeout Time timeout);
+	/**
+	 * Register a {@link JobMaster} at the resource manager.
+	 *
+	 * @param jobMasterId         The fencing token for the JobMaster leader
+	 * @param jobMasterResourceId The resource ID of the JobMaster that registers
+	 * @param jobMasterAddress    The address of the JobMaster that registers
+	 * @param jobId               The Job ID of the JobMaster that registers
+	 * @param timeout             Timeout for the future to complete
+	 * @return Future registration response
+	 */
+	CompletableFuture<RegistrationResponse> registerJobManager(
+		JobMasterId jobMasterId,
+		ResourceID jobMasterResourceId,
+		String jobMasterAddress,
+		JobID jobId,
+		@RpcTimeout Time timeout);
 
-    /**
-     * Disconnects the job manager from the stream manager because of the given cause.
-     * @param jobId The Job ID of the job manager
-     * @param cause the disconnection between the job manager and the stream manager
-     */
-    void disconnectJobManager(
+	/**
+	 * Disconnects the job manager from the stream manager because of the given cause.
+	 *
+	 * @param jobId The Job ID of the job manager
+	 * @param cause the disconnection between the job manager and the stream manager
+	 */
+	void disconnectJobManager(
 		final JobID jobId,
 		final Exception cause);
 

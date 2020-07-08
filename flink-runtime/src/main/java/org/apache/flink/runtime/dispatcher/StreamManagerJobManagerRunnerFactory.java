@@ -20,14 +20,11 @@ package org.apache.flink.runtime.dispatcher;
 
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
-import org.apache.flink.runtime.controlplane.streammanager.StreamManagerAddress;
 import org.apache.flink.runtime.heartbeat.HeartbeatServices;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
 import org.apache.flink.runtime.io.network.partition.JobMasterPartitionTrackerImpl;
 import org.apache.flink.runtime.jobgraph.JobGraph;
-import org.apache.flink.runtime.jobmanager.OnCompletionActions;
 import org.apache.flink.runtime.jobmaster.*;
-import org.apache.flink.runtime.jobmaster.factories.DefaultJobMasterServiceFactory;
 import org.apache.flink.runtime.jobmaster.factories.JobManagerJobMetricGroupFactory;
 import org.apache.flink.runtime.jobmaster.factories.JobMasterServiceFactory;
 import org.apache.flink.runtime.jobmaster.slotpool.DefaultSchedulerFactory;
@@ -45,9 +42,9 @@ import org.apache.flink.runtime.shuffle.ShuffleServiceLoader;
  */
 public class StreamManagerJobManagerRunnerFactory implements JobManagerRunnerFactory {
 
-	private final StreamManagerAddress streamManagerAddress;
+	private final String streamManagerAddress;
 
-	StreamManagerJobManagerRunnerFactory(StreamManagerAddress streamManagerAddress) {
+	StreamManagerJobManagerRunnerFactory(String streamManagerAddress) {
 		this.streamManagerAddress = streamManagerAddress;
 	}
 

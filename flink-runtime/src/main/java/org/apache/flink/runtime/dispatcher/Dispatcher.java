@@ -32,7 +32,6 @@ import org.apache.flink.runtime.client.JobSubmissionException;
 import org.apache.flink.runtime.clusterframework.ApplicationStatus;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
-import org.apache.flink.runtime.controlplane.streammanager.StreamManagerAddress;
 import org.apache.flink.runtime.executiongraph.ArchivedExecutionGraph;
 import org.apache.flink.runtime.heartbeat.HeartbeatServices;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
@@ -62,7 +61,6 @@ import org.apache.flink.runtime.rest.handler.legacy.backpressure.OperatorBackPre
 import org.apache.flink.runtime.rpc.FatalErrorHandler;
 import org.apache.flink.runtime.rpc.PermanentlyFencedRpcEndpoint;
 import org.apache.flink.runtime.rpc.RpcService;
-import org.apache.flink.runtime.rpc.RpcTimeout;
 import org.apache.flink.runtime.webmonitor.retriever.GatewayRetriever;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkException;
@@ -285,7 +283,7 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
 
 	public CompletableFuture<Acknowledge> submitJob(
 		JobGraph jobGraph,
-		StreamManagerAddress streamManagerAddress,
+		String streamManagerAddress,
 		Time timeout) {
 		log.info("Received JobGraph submission {} ({}).", jobGraph.getJobID(), jobGraph.getName());
 
@@ -364,7 +362,7 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
 	}
 
 
-	private CompletableFuture<Acknowledge> internalSubmitJob(JobGraph jobGraph, StreamManagerAddress streamManagerAddress) {
+	private CompletableFuture<Acknowledge> internalSubmitJob(JobGraph jobGraph, String streamManagerAddress) {
 		log.info("Submitting job {} ({}).", jobGraph.getJobID(), jobGraph.getName());
 
 		final CompletableFuture<Acknowledge> persistAndRunFuture = waitForTerminatingJobManager(
@@ -397,7 +395,7 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
 		}));
 	}
 
-	private CompletableFuture<Void> persistAndRunJob(JobGraph jobGraph, StreamManagerAddress streamManagerAddress) throws Exception {
+	private CompletableFuture<Void> persistAndRunJob(JobGraph jobGraph, String streamManagerAddress) throws Exception {
 		jobGraphWriter.putJobGraph(jobGraph);
 
 		final CompletableFuture<Void> runJobFuture = runJob(jobGraph, streamManagerAddress);
@@ -428,7 +426,7 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
 				getMainThreadExecutor());
 	}
 
-	private CompletableFuture<Void> runJob(JobGraph jobGraph, StreamManagerAddress streamManagerAddress) {
+	private CompletableFuture<Void> runJob(JobGraph jobGraph, String streamManagerAddress) {
 		Preconditions.checkState(!jobManagerRunnerFutures.containsKey(jobGraph.getJobID()));
 
 		final CompletableFuture<JobManagerRunner> jobManagerRunnerFuture = createJobManagerRunner(jobGraph, streamManagerAddress);
@@ -464,7 +462,7 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
 			rpcService.getExecutor());
 	}
 
-	private CompletableFuture<JobManagerRunner> createJobManagerRunner(JobGraph jobGraph, StreamManagerAddress streamManagerAddress) {
+	private CompletableFuture<JobManagerRunner> createJobManagerRunner(JobGraph jobGraph, String streamManagerAddress) {
 		final RpcService rpcService = getRpcService();
 
 		return CompletableFuture.supplyAsync(
@@ -931,8 +929,8 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
 	}
 
 	private CompletableFuture<Void> waitForTerminatingJobManager(
-		JobID jobId, JobGraph jobGraph, StreamManagerAddress streamManagerAddress,
-		BiFunctionWithException<JobGraph, StreamManagerAddress, CompletableFuture<Void>, ?> action) {
+		JobID jobId, JobGraph jobGraph, String streamManagerAddress,
+		BiFunctionWithException<JobGraph, String, CompletableFuture<Void>, ?> action) {
 		final CompletableFuture<Void> jobManagerTerminationFuture = getJobTerminationFuture(jobId)
 			.exceptionally((Throwable throwable) -> {
 				throw new CompletionException(
