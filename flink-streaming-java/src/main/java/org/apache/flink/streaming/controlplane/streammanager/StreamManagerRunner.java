@@ -16,9 +16,10 @@
  * limitations under the License.
  */
 
-package org.apache.flink.runtime.controlplane.streammanager;
+package org.apache.flink.streaming.controlplane.streammanager;
 
 import org.apache.flink.api.common.JobID;
+import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
 import org.apache.flink.util.AutoCloseableAsync;
 
 import java.util.concurrent.CompletableFuture;

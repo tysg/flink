@@ -24,8 +24,6 @@ import org.apache.flink.runtime.client.JobExecutionException;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerId;
-import org.apache.flink.runtime.controlplane.streammanager.StreamManagerRunner;
-import org.apache.flink.runtime.controlplane.streammanager.StreamManagerService;
 import org.apache.flink.streaming.controlplane.streammanager.factories.StreamManagerServiceFactory;
 import org.apache.flink.runtime.executiongraph.ArchivedExecutionGraph;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;

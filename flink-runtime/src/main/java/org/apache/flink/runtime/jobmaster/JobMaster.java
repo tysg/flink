@@ -31,7 +31,6 @@ import org.apache.flink.runtime.checkpoint.TaskStateSnapshot;
 import org.apache.flink.runtime.clusterframework.types.AllocationID;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
-import org.apache.flink.runtime.controlplane.streammanager.StreamManagerAddress;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerId;
 import org.apache.flink.runtime.execution.ExecutionState;
@@ -202,7 +201,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 	private ResourceManagerConnection resourceManagerConnection;
 
 	@Nullable
-	private StreamManagerAddress streamManagerAddress;
+	private String streamManagerAddress;
 
 	@Nullable
 	private EstablishedResourceManagerConnection establishedResourceManagerConnection;
@@ -291,7 +290,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		);
 	}
 
-	public void setStreamManagerAddress(@Nullable StreamManagerAddress streamManagerAddress) {
+	public void setStreamManagerAddress(@Nullable String streamManagerAddress) {
 		this.streamManagerAddress = streamManagerAddress;
 	}
 
@@ -989,7 +988,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 			new StreamingLeaderListenerImpl(jobGraph.getJobID(), resourceId, getAddress(), getFencingToken())
 		);
 
-		this.streamingLeaderService.addJob(jobGraph.getJobID(), this.streamManagerAddress.getRpcAddress());
+		this.streamingLeaderService.addJob(jobGraph.getJobID(), this.streamManagerAddress);
 	}
 
 	private void establishResourceManagerConnection(final JobMasterRegistrationSuccess<ResourceManagerId> success) {

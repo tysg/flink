@@ -18,7 +18,7 @@
 
 package org.apache.flink.streaming.controlplane.streammanager.factories;
 
-import org.apache.flink.runtime.controlplane.streammanager.StreamManagerService;
+import org.apache.flink.streaming.controlplane.streammanager.StreamManagerService;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 
 /**
