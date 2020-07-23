@@ -611,6 +611,10 @@ public class ExecutionGraph implements AccessExecutionGraph {
 		return this.userClassLoader;
 	}
 
+	public Time getRpcTimeout() {
+		return this.rpcTimeout;
+	}
+
 	@Override
 	public JobStatus getState() {
 		return state;
@@ -840,6 +844,15 @@ public class ExecutionGraph implements AccessExecutionGraph {
 		failoverStrategy.notifyNewVertices(newExecJobVertices);
 
 		partitionReleaseStrategy = partitionReleaseStrategyFactory.createInstance(getSchedulingTopology());
+	}
+
+	public void updateNumOfTotalVertices() {
+		int totalVertices = 0;
+		for (ExecutionJobVertex ejv : tasks.values()) {
+			totalVertices += ejv.getParallelism();
+		}
+
+		this.numVerticesTotal = totalVertices;
 	}
 
 	public boolean isLegacyScheduling() {

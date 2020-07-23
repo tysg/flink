@@ -53,11 +53,14 @@ import org.apache.flink.runtime.jobmaster.LogicalSlot;
 import org.apache.flink.runtime.jobmaster.SlotRequestId;
 import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.messages.TaskBackPressureResponse;
+import org.apache.flink.runtime.rescale.RescaleID;
+import org.apache.flink.runtime.rescale.RescaleOptions;
 import org.apache.flink.runtime.shuffle.NettyShuffleMaster;
 import org.apache.flink.runtime.shuffle.PartitionDescriptor;
 import org.apache.flink.runtime.shuffle.ProducerDescriptor;
 import org.apache.flink.runtime.shuffle.ShuffleDescriptor;
 import org.apache.flink.runtime.shuffle.ShuffleMaster;
+import org.apache.flink.runtime.state.KeyGroupRange;
 import org.apache.flink.runtime.taskmanager.TaskManagerLocation;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkException;
@@ -488,6 +491,17 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 			slotProviderStrategy,
 			locationPreferenceConstraint,
 			allPreviousExecutionGraphAllocationIds)
+			.thenCompose(slot -> registerProducedPartitions(slot.getTaskManagerLocation()));
+	}
+
+	public CompletableFuture<Execution> allocateAndAssignSlotForExecution(RescaleID rescaleId) {
+		final ExecutionGraph executionGraph = getVertex().getExecutionGraph();
+		getVertex().updateRescaleId(rescaleId);
+
+		return allocateAndAssignSlotForExecution(
+			executionGraph.getSlotProviderStrategy(),
+			LocationPreferenceConstraint.ANY,
+			Collections.emptySet())
 			.thenCompose(slot -> registerProducedPartitions(slot.getTaskManagerLocation()));
 	}
 
@@ -953,6 +967,28 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 	@Override
 	public void fail(Throwable t) {
 		processFail(t, false);
+	}
+
+	public CompletableFuture<Void> scheduleRescale(
+		RescaleID rescaleId,
+		RescaleOptions rescaleOptions,
+		@Nullable KeyGroupRange keyGroupRange) throws ExecutionGraphException {
+		throw new IllegalArgumentException("scheduleRescale is not suppported now.");
+	}
+
+	public CompletableFuture<Void> scheduleRescale(
+		RescaleID rescaleId,
+		RescaleOptions rescaleOptions,
+		@Nullable KeyGroupRange keyGroupRange,
+		int idInModel) throws ExecutionGraphException {
+
+		getVertex().setIdInModel(idInModel);
+
+		return scheduleRescale(rescaleId, rescaleOptions, keyGroupRange);
+	}
+
+	public CompletableFuture<Void> deploy(KeyGroupRange keyGroupRange, int idInModel) throws JobException {
+		throw new IllegalArgumentException("deploy is not suppported now.");
 	}
 
 	/**

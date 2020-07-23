@@ -76,6 +76,7 @@ import org.apache.flink.runtime.query.KvStateClientProxy;
 import org.apache.flink.runtime.query.KvStateRegistry;
 import org.apache.flink.runtime.query.KvStateServer;
 import org.apache.flink.runtime.registration.RegistrationConnectionListener;
+import org.apache.flink.runtime.rescale.RescaleOptions;
 import org.apache.flink.runtime.resourcemanager.ResourceManagerGateway;
 import org.apache.flink.runtime.resourcemanager.ResourceManagerId;
 import org.apache.flink.runtime.resourcemanager.TaskExecutorRegistration;
@@ -618,6 +619,66 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 			}
 		} catch (TaskSubmissionException e) {
 			return FutureUtils.completedExceptionally(e);
+		}
+	}
+
+	@Override
+	public CompletableFuture<Acknowledge> rescaleTask(
+		ExecutionAttemptID executionAttemptID,
+		TaskDeploymentDescriptor tdd,
+		JobMasterId jobMasterId,
+		RescaleOptions rescaleOptions,
+		Time timeout) {
+
+		final Task task = taskSlotTable.getTask(executionAttemptID);
+
+		if (task != null) {
+			try {
+				try {
+					tdd.loadBigData(blobCacheService.getPermanentBlobService());
+				} catch (IOException | ClassNotFoundException e) {
+					throw new TaskException("Could not re-integrate offloaded TaskDeploymentDescriptor data.", e);
+				}
+
+				final TaskInformation taskInformation;
+				try {
+					taskInformation = tdd.getSerializedTaskInformation().deserializeValue(getClass().getClassLoader());
+				} catch (IOException | ClassNotFoundException e) {
+					throw new TaskException("Could not deserialize the job or task information.", e);
+				}
+
+				task.updateTaskConfiguration(taskInformation);
+
+				task.prepareRescalingComponent(
+					tdd.getRescaleId(),
+					rescaleOptions,
+					tdd.getProducedPartitions(),
+					tdd.getInputGates());
+
+				if (rescaleOptions.isScalingPartitions()) {
+					task.createNewResultPartitions();
+				}
+
+				if (rescaleOptions.isRepartition()) {
+					log.info("++++++ update task state: " + tdd.getSubtaskIndex() + "  " + tdd.getExecutionAttemptId());
+					throw new IllegalArgumentException("update task state is not suppported now.");
+				}
+
+				if (rescaleOptions.isUpdateKeyGroupRange()) {
+					log.info("++++++ update task keyGroupRange for subtask: " + tdd.getSubtaskIndex() + "  " + tdd.getExecutionAttemptId());
+					throw new IllegalArgumentException("update keygroup range is not suppported now.");
+				}
+
+				return CompletableFuture.completedFuture(Acknowledge.get());
+			} catch (Exception e) {
+				log.error("++++++ rescaleTask err", e);
+				return FutureUtils.completedExceptionally(e);
+			}
+		} else {
+			final String message = "Cannot find task to update its configuration " + executionAttemptID + '.';
+
+			log.debug(message);
+			return FutureUtils.completedExceptionally(new TaskException(message));
 		}
 	}
 

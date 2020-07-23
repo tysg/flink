@@ -16,22 +16,11 @@
  * limitations under the License.
  */
 
-package org.apache.flink.streaming.controlplane.streammanager.exceptions;
+package org.apache.flink.runtime.rescale;
 
-import org.apache.flink.util.FlinkException;
+import org.apache.flink.runtime.checkpoint.PendingCheckpoint;
+import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
 
-public class StreamManagerException extends FlinkException {
-    private static final long serialVersionUID = -3978431963865449031L;
-
-    public StreamManagerException(String message) {
-        super(message);
-    }
-
-    public StreamManagerException(Throwable cause) {
-        super(cause);
-    }
-
-    public StreamManagerException(String message, Throwable cause) {
-        super(message, cause);
-    }
+public interface RescalepointAcknowledgeListener {
+	void onReceiveRescalepointAcknowledge(ExecutionAttemptID attemptID, PendingCheckpoint checkpoint);
 }
