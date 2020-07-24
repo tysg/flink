@@ -27,6 +27,7 @@ import org.apache.flink.runtime.dispatcher.DispatcherGateway;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
 import org.apache.flink.runtime.jobgraph.JobGraph;
+import org.apache.flink.runtime.jobmaster.JMTMRegistrationSuccess;
 import org.apache.flink.runtime.jobmaster.JobMasterGateway;
 import org.apache.flink.runtime.jobmaster.JobMasterId;
 import org.apache.flink.runtime.jobmaster.JobMasterRegistrationSuccess;
@@ -73,6 +74,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	private final FatalErrorHandler fatalErrorHandler;
 
 	private final LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever;
+
+	private JobMasterGateway jobMasterGateway = null;
 
     /*
 
@@ -164,6 +167,13 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		checkNotNull(jobManagerResourceId);
 		checkNotNull(jobManagerAddress);
 		checkNotNull(jobId);
+
+//		if (jobMasterGateway != null) {
+//			final RegistrationResponse response = new JobMasterRegistrationSuccess<>(
+//				getFencingToken(),
+//				resourceId);
+//			return CompletableFuture.completedFuture(response);
+//		}
 
 		if (!jobLeaderIdService.containsJob(jobId)) {
 			try {
@@ -288,7 +298,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 		// TODO: HeartBeatService
 
-		return new JobMasterRegistrationSuccess<StreamManagerId>(
+		return new JobMasterRegistrationSuccess<>(
 			getFencingToken(),
 			resourceId);
 	}

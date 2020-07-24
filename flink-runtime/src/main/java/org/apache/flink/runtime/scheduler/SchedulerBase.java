@@ -78,6 +78,7 @@ import org.apache.flink.runtime.metrics.groups.JobManagerJobMetricGroup;
 import org.apache.flink.runtime.query.KvStateLocation;
 import org.apache.flink.runtime.query.KvStateLocationRegistry;
 import org.apache.flink.runtime.query.UnknownKvStateLocation;
+import org.apache.flink.runtime.rescale.JobRescaleCoordinator;
 import org.apache.flink.runtime.rest.handler.legacy.backpressure.BackPressureStatsTracker;
 import org.apache.flink.runtime.rest.handler.legacy.backpressure.OperatorBackPressureStats;
 import org.apache.flink.runtime.scheduler.strategy.ExecutionVertexID;
@@ -163,6 +164,8 @@ public abstract class SchedulerBase implements SchedulerNG {
 		"SchedulerBase is not initialized with proper main thread executor. " +
 			"Call to SchedulerBase.setMainThreadExecutor(...) required.");
 
+	private final JobRescaleCoordinator jobRescaleCoordinator;
+
 	public SchedulerBase(
 		final Logger log,
 		final JobGraph jobGraph,
@@ -218,6 +221,9 @@ public abstract class SchedulerBase implements SchedulerNG {
 		this.failoverTopology = executionGraph.getFailoverTopology();
 
 		this.inputsLocationsRetriever = new ExecutionGraphToInputsLocationsRetrieverAdapter(executionGraph);
+
+		this.jobRescaleCoordinator = new JobRescaleCoordinator(
+			jobGraph, executionGraph, userCodeLoader);
 	}
 
 	private ExecutionGraph createAndRestoreExecutionGraph(
@@ -441,11 +447,13 @@ public abstract class SchedulerBase implements SchedulerNG {
 	public void setMainThreadExecutor(final ComponentMainThreadExecutor mainThreadExecutor) {
 		this.mainThreadExecutor = checkNotNull(mainThreadExecutor);
 		executionGraph.start(mainThreadExecutor);
+		jobRescaleCoordinator.init(getMainThreadExecutor());
 	}
 
 	@Override
 	public void registerJobStatusListener(final JobStatusListener jobStatusListener) {
 		executionGraph.registerJobStatusListener(jobStatusListener);
+		executionGraph.registerJobStatusListener(jobRescaleCoordinator.createActivatorDeactivator());
 	}
 
 	@Override
