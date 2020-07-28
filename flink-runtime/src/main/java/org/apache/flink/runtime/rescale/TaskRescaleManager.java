@@ -121,10 +121,13 @@ public class TaskRescaleManager {
 	}
 
 	public void createNewResultPartitions() throws IOException {
+		// TODO: understand how resultpartitions are created in 1.10.0
 		int counter = 0;
 		for (ResultPartitionDeploymentDescriptor desc : rescaleMeta.getResultPartitionDeploymentDescriptors()) {
 
 		}
+
+		throw new IllegalArgumentException("createNewResultPartitions is not suppported now.");
 	}
 
 	public ResultPartitionWriter[] substituteResultPartitions(ResultPartitionWriter[] oldWriters) {

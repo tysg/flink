@@ -643,6 +643,7 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 				final TaskInformation taskInformation;
 				try {
 					taskInformation = tdd.getSerializedTaskInformation().deserializeValue(getClass().getClassLoader());
+					taskInformation.setIdInModel(tdd.getIdInModel());
 				} catch (IOException | ClassNotFoundException e) {
 					throw new TaskException("Could not deserialize the job or task information.", e);
 				}
@@ -661,12 +662,15 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 
 				if (rescaleOptions.isRepartition()) {
 					log.info("++++++ update task state: " + tdd.getSubtaskIndex() + "  " + tdd.getExecutionAttemptId());
-					throw new IllegalArgumentException("update task state is not suppported now.");
+					task.assignNewState(
+						tdd.getKeyGroupRange(),
+						tdd.getIdInModel(),
+						tdd.getTaskRestore());
 				}
 
 				if (rescaleOptions.isUpdateKeyGroupRange()) {
 					log.info("++++++ update task keyGroupRange for subtask: " + tdd.getSubtaskIndex() + "  " + tdd.getExecutionAttemptId());
-					throw new IllegalArgumentException("update keygroup range is not suppported now.");
+					task.updateKeyGroupRange(tdd.getKeyGroupRange());
 				}
 
 				return CompletableFuture.completedFuture(Acknowledge.get());

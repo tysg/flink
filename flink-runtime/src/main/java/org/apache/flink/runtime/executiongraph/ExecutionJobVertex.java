@@ -468,6 +468,7 @@ public class ExecutionJobVertex implements AccessExecutionJobVertex, Archiveable
 			this.inputs.add(ires);
 
 			int consumerIndex = ires.registerConsumer();
+			iresConsumerIndex.put(ires.getId(), consumerIndex);
 
 			for (int i = 0; i < parallelism; i++) {
 				ExecutionVertex ev = taskVertices[i];

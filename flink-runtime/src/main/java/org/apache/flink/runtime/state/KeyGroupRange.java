@@ -18,6 +18,7 @@
 
 package org.apache.flink.runtime.state;
 
+import org.apache.flink.runtime.rescale.RescaleID;
 import org.apache.flink.util.Preconditions;
 
 import java.io.Serializable;
@@ -186,4 +187,6 @@ public class KeyGroupRange implements KeyGroupsList, Serializable {
 	public static KeyGroupRange of(int startKeyGroup, int endKeyGroup) {
 		return startKeyGroup <= endKeyGroup ? new KeyGroupRange(startKeyGroup, endKeyGroup) : EMPTY_KEY_GROUP_RANGE;
 	}
+
+	public static KeyGroupRange DEFAULT = new KeyGroupRange();
 }

@@ -502,7 +502,7 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 			executionGraph.getSlotProviderStrategy(),
 			LocationPreferenceConstraint.ANY,
 			Collections.emptySet())
-			.thenCompose(slot -> registerProducedPartitions(slot.getTaskManagerLocation()));
+			.thenCompose(slot -> registerProducedPartitions(slot.getTaskManagerLocation(), false));
 	}
 
 	/**
@@ -973,7 +973,60 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 		RescaleID rescaleId,
 		RescaleOptions rescaleOptions,
 		@Nullable KeyGroupRange keyGroupRange) throws ExecutionGraphException {
-		throw new IllegalArgumentException("scheduleRescale is not suppported now.");
+
+		getVertex().updateRescaleId(rescaleId);
+
+		assertRunningInJobMasterMainThread();
+
+		final LogicalSlot slot = assignedResource;
+		checkNotNull(slot, "Try to rescale a vertex which isn't assigned slot.");
+
+		if(this.state != RUNNING) {
+			throw new IllegalStateException("The vertex must be in RUNNING state to be rescaled. Found state " + this.state);
+		}
+
+		try {
+			if (LOG.isInfoEnabled()) {
+				LOG.info(String.format("Deploying %s (attempt #%d) to %s", vertex.getTaskNameWithSubtaskIndex(),
+					attemptNumber, getAssignedResourceLocation()));
+			}
+
+			final TaskDeploymentDescriptor deployment = TaskDeploymentDescriptorFactory
+				.fromExecutionVertex(vertex, attemptNumber)
+				.createDeploymentDescriptor(
+					slot.getAllocationId(),
+					slot.getPhysicalSlotNumber(),
+					taskRestore,
+					producedPartitions.values());
+
+			// null taskRestore to let it be GC'ed
+			taskRestore = null;
+
+			final TaskManagerGateway taskManagerGateway = slot.getTaskManagerGateway();
+
+			final ComponentMainThreadExecutor jobMasterMainThreadExecutor =
+				vertex.getExecutionGraph().getJobMasterMainThreadExecutor();
+
+			return CompletableFuture
+				.supplyAsync(() -> taskManagerGateway.rescaleTask(attemptId, deployment, rescaleOptions, rpcTimeout), executor)
+				.thenCompose(Function.identity())
+				.handleAsync((ack, failure) -> {
+					if (failure != null) {
+						LOG.error("++++++ scheduleRescale err: ", failure);
+						throw new CompletionException(failure);
+					}
+					return null;
+				}, jobMasterMainThreadExecutor);
+
+		}
+		catch (Throwable t) {
+			markFailed(t);
+
+			if (isLegacyScheduling()) {
+				ExceptionUtils.rethrow(t);
+			}
+		}
+		return null;
 	}
 
 	public CompletableFuture<Void> scheduleRescale(

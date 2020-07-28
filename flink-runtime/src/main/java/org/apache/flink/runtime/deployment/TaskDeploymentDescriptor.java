@@ -149,8 +149,13 @@ public final class TaskDeploymentDescriptor implements Serializable {
 	private final JobManagerTaskRestore taskRestore;
 
 	/** The ID referencing the rescale id of the task*/
-	private RescaleID rescaleId;
+	private RescaleID rescaleId = RescaleID.DEFAULT;
 
+	/** The id in Streamswitch. */
+	private int idInModel = 0;
+
+	/** Assigned keyGroupRange. */
+	private KeyGroupRange keyGroupRange = KeyGroupRange.DEFAULT;
 
 	public TaskDeploymentDescriptor(
 		JobID jobId,
@@ -281,6 +286,15 @@ public final class TaskDeploymentDescriptor implements Serializable {
 
 	public RescaleID getRescaleId() {
 		return rescaleId;
+	}
+
+	public KeyGroupRange getKeyGroupRange() {
+		return keyGroupRange;
+	}
+
+
+	public int getIdInModel() {
+		return idInModel;
 	}
 
 	/**
