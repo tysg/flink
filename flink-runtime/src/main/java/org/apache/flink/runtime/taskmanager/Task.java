@@ -31,10 +31,7 @@ import org.apache.flink.runtime.accumulators.AccumulatorRegistry;
 import org.apache.flink.runtime.blob.BlobCacheService;
 import org.apache.flink.runtime.blob.PermanentBlobKey;
 import org.apache.flink.runtime.broadcast.BroadcastVariableManager;
-import org.apache.flink.runtime.checkpoint.CheckpointException;
-import org.apache.flink.runtime.checkpoint.CheckpointFailureReason;
-import org.apache.flink.runtime.checkpoint.CheckpointMetaData;
-import org.apache.flink.runtime.checkpoint.CheckpointOptions;
+import org.apache.flink.runtime.checkpoint.*;
 import org.apache.flink.runtime.clusterframework.types.AllocationID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.deployment.InputGateDeploymentDescriptor;
@@ -62,10 +59,15 @@ import org.apache.flink.runtime.jobgraph.tasks.InputSplitProvider;
 import org.apache.flink.runtime.memory.MemoryManager;
 import org.apache.flink.runtime.metrics.groups.TaskMetricGroup;
 import org.apache.flink.runtime.query.TaskKvStateRegistry;
+import org.apache.flink.runtime.rescale.RescaleID;
+import org.apache.flink.runtime.rescale.RescaleOptions;
+import org.apache.flink.runtime.rescale.TaskRescaleManager;
 import org.apache.flink.runtime.shuffle.ShuffleEnvironment;
 import org.apache.flink.runtime.shuffle.ShuffleIOOwnerContext;
 import org.apache.flink.runtime.state.CheckpointListener;
+import org.apache.flink.runtime.state.KeyGroupRange;
 import org.apache.flink.runtime.state.TaskStateManager;
+import org.apache.flink.runtime.state.TaskStateManagerImpl;
 import org.apache.flink.runtime.taskexecutor.BackPressureSampleableTask;
 import org.apache.flink.runtime.taskexecutor.GlobalAggregateManager;
 import org.apache.flink.runtime.taskexecutor.KvStateService;
@@ -269,6 +271,8 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 	/** This class loader should be set as the context class loader for threads that may dynamically load user code. */
 	private ClassLoader userCodeClassLoader;
 
+	private final TaskRescaleManager taskRescaleManager;
+
 	/**
 	 * <p><b>IMPORTANT:</b> This constructor may not start any work that would need to
 	 * be undone in the case of a failing task deployment.</p>
@@ -398,6 +402,15 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 
 		// finally, create the executing thread, but do not start it
 		executingThread = new Thread(TASK_THREADS_GROUP, this, taskNameWithSubtask);
+
+		taskRescaleManager = new TaskRescaleManager(
+			jobId,
+			executionId,
+			taskNameWithSubtaskAndId,
+			this,
+			ioManager,
+			metrics,
+			resultPartitionConsumableNotifier);
 	}
 
 	// ------------------------------------------------------------------------
@@ -1205,6 +1218,39 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 		else {
 			LOG.debug("Ignoring checkpoint commit notification for non-running task {}.", taskNameWithSubtask);
 		}
+	}
+
+	// ------------------------------------------------------------------------
+	//  Actions on rescale
+	// ------------------------------------------------------------------------
+
+	public void updateTaskConfiguration(TaskInformation newTaskInfo) {
+		this.taskConfiguration.addAll(newTaskInfo.getTaskConfiguration());
+	}
+
+	public void prepareRescalingComponent(
+		RescaleID rescaleId,
+		RescaleOptions rescaleOptions,
+		Collection<ResultPartitionDeploymentDescriptor> resultPartitionDeploymentDescriptors,
+		Collection<InputGateDeploymentDescriptor> inputGateDeploymentDescriptors) {
+
+		taskRescaleManager.prepareRescaleMeta(
+			rescaleId,
+			rescaleOptions,
+			resultPartitionDeploymentDescriptors,
+			inputGateDeploymentDescriptors);
+	}
+
+	public void assignNewState(KeyGroupRange keyGroupRange, int idInModel, JobManagerTaskRestore taskRestore) {
+		throw new IllegalArgumentException("assignNewState is not suppported now.");
+	}
+
+	public void updateKeyGroupRange(KeyGroupRange keyGroupRange) {
+		throw new IllegalArgumentException("assignNewState is not suppported now.");
+	}
+
+	public void createNewResultPartitions() throws IOException {
+		taskRescaleManager.createNewResultPartitions();
 	}
 
 	// ------------------------------------------------------------------------

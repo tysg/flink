@@ -32,6 +32,7 @@ import org.apache.flink.runtime.jobmaster.JobMasterId;
 import org.apache.flink.runtime.jobmaster.JobMasterRegistrationSuccess;
 import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.registration.RegistrationResponse;
+import org.apache.flink.runtime.resourcemanager.JobLeaderIdActions;
 import org.apache.flink.runtime.resourcemanager.JobLeaderIdService;
 import org.apache.flink.runtime.resourcemanager.registration.JobManagerRegistration;
 import org.apache.flink.runtime.rpc.*;
@@ -41,6 +42,7 @@ import org.apache.flink.streaming.controlplane.streammanager.exceptions.StreamMa
 import org.apache.flink.util.OptionalConsumer;
 
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -86,6 +88,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 	private JobManagerRegistration jobManagerRegistration = null;
 
+	private JobID jobId = null;
+
 	// ------------------------------------------------------------------------
 
 	public StreamManager(RpcService rpcService,
@@ -127,6 +131,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	 */
 	@Override
 	public CompletableFuture<Acknowledge> start(StreamManagerId newStreamManagerId) throws Exception {
+		jobLeaderIdService.start(new JobLeaderIdActionsImpl());
+
 		// make sure we receive RPC and async calls
 		start();
 
@@ -276,12 +282,14 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					jobId,
 					jobManagerResourceId,
 					jobMasterGateway);
+				this.jobId = jobId;
 			}
 		} else {
 			this.jobManagerRegistration = new JobManagerRegistration(
 				jobId,
 				jobManagerResourceId,
 				jobMasterGateway);
+			this.jobId = jobId;
 		}
 
 		log.info("Registered job manager {}@{} for job {}.", jobMasterGateway.getFencingToken(), jobManagerAddress, jobId);
@@ -381,5 +389,60 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 		// The fatal error handler implementation should make sure that this call is non-blocking
 		fatalErrorHandler.onFatalError(t);
+	}
+
+	protected void jobLeaderLostLeadership(JobID jobId, JobMasterId oldJobMasterId) {
+		if (jobId == this.jobId) {
+
+			if (Objects.equals(jobManagerRegistration.getJobMasterId(), oldJobMasterId)) {
+				disconnectJobManager(jobId, new Exception("Job leader lost leadership."));
+			} else {
+				log.debug("Discarding job leader lost leadership, because a new job leader was found for job {}. ", jobId);
+			}
+		} else {
+			log.debug("Discard job leader lost leadership for outdated leader {} for job {}.", oldJobMasterId, jobId);
+		}
+	}
+
+	protected void removeJob(JobID jobId) {
+		try {
+			jobLeaderIdService.removeJob(jobId);
+		} catch (Exception e) {
+			log.warn("Could not properly remove the job {} from the job leader id service.", jobId, e);
+		}
+
+		if (jobId == this.jobId) {
+			disconnectJobManager(jobId, new Exception("Job " + jobId + "was removed"));
+		}
+	}
+
+	private class JobLeaderIdActionsImpl implements JobLeaderIdActions {
+
+		@Override
+		public void jobLeaderLostLeadership(final JobID jobId, final JobMasterId oldJobMasterId) {
+			runAsync(new Runnable() {
+				@Override
+				public void run() {
+					StreamManager.this.jobLeaderLostLeadership(jobId, oldJobMasterId);
+				}
+			});
+		}
+
+		@Override
+		public void notifyJobTimeout(final JobID jobId, final UUID timeoutId) {
+			runAsync(new Runnable() {
+				@Override
+				public void run() {
+					if (jobLeaderIdService.isValidTimeout(jobId, timeoutId)) {
+						removeJob(jobId);
+					}
+				}
+			});
+		}
+
+		@Override
+		public void handleError(Throwable error) {
+			onFatalError(error);
+		}
 	}
 }

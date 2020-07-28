@@ -26,6 +26,8 @@ import org.apache.flink.runtime.clusterframework.types.AllocationID;
 import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
 import org.apache.flink.runtime.executiongraph.JobInformation;
 import org.apache.flink.runtime.executiongraph.TaskInformation;
+import org.apache.flink.runtime.rescale.RescaleID;
+import org.apache.flink.runtime.state.KeyGroupRange;
 import org.apache.flink.util.FileUtils;
 import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.SerializedValue;
@@ -145,6 +147,10 @@ public final class TaskDeploymentDescriptor implements Serializable {
 	/** Information to restore the task. This can be null if there is no state to restore. */
 	@Nullable
 	private final JobManagerTaskRestore taskRestore;
+
+	/** The ID referencing the rescale id of the task*/
+	private RescaleID rescaleId;
+
 
 	public TaskDeploymentDescriptor(
 		JobID jobId,
@@ -271,6 +277,10 @@ public final class TaskDeploymentDescriptor implements Serializable {
 
 	public AllocationID getAllocationId() {
 		return allocationId;
+	}
+
+	public RescaleID getRescaleId() {
+		return rescaleId;
 	}
 
 	/**
