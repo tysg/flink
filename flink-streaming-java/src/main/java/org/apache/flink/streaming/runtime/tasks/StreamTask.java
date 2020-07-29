@@ -25,12 +25,7 @@ import org.apache.flink.core.fs.CloseableRegistry;
 import org.apache.flink.core.fs.FileSystemSafetyNet;
 import org.apache.flink.metrics.Counter;
 import org.apache.flink.metrics.SimpleCounter;
-import org.apache.flink.runtime.checkpoint.CheckpointException;
-import org.apache.flink.runtime.checkpoint.CheckpointFailureReason;
-import org.apache.flink.runtime.checkpoint.CheckpointMetaData;
-import org.apache.flink.runtime.checkpoint.CheckpointMetrics;
-import org.apache.flink.runtime.checkpoint.CheckpointOptions;
-import org.apache.flink.runtime.checkpoint.TaskStateSnapshot;
+import org.apache.flink.runtime.checkpoint.*;
 import org.apache.flink.runtime.execution.CancelTaskException;
 import org.apache.flink.runtime.execution.Environment;
 import org.apache.flink.runtime.io.network.api.CancelCheckpointMarker;
@@ -41,16 +36,17 @@ import org.apache.flink.runtime.io.network.api.writer.RecordWriterBuilder;
 import org.apache.flink.runtime.io.network.api.writer.RecordWriterDelegate;
 import org.apache.flink.runtime.io.network.api.writer.ResultPartitionWriter;
 import org.apache.flink.runtime.io.network.api.writer.SingleRecordWriter;
+import org.apache.flink.runtime.io.network.partition.ResultPartition;
+import org.apache.flink.runtime.io.network.partition.consumer.InputGate;
+import org.apache.flink.runtime.io.network.partition.consumer.SingleInputGate;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobgraph.tasks.AbstractInvokable;
 import org.apache.flink.runtime.metrics.groups.OperatorMetricGroup;
 import org.apache.flink.runtime.plugable.SerializationDelegate;
-import org.apache.flink.runtime.state.CheckpointStorageWorkerView;
-import org.apache.flink.runtime.state.CheckpointStreamFactory;
-import org.apache.flink.runtime.state.StateBackend;
-import org.apache.flink.runtime.state.StateBackendLoader;
-import org.apache.flink.runtime.state.TaskStateManager;
+import org.apache.flink.runtime.rescale.TaskRescaleManager;
+import org.apache.flink.runtime.state.*;
 import org.apache.flink.runtime.taskmanager.DispatcherThreadFactory;
+import org.apache.flink.runtime.taskmanager.RuntimeEnvironment;
 import org.apache.flink.runtime.util.ExecutorThreadFactory;
 import org.apache.flink.runtime.util.FatalExitExceptionHandler;
 import org.apache.flink.streaming.api.TimeCharacteristic;
@@ -211,7 +207,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 	/** Thread pool for async snapshot workers. */
 	private ExecutorService asyncOperationsThreadPool;
 
-	private final RecordWriterDelegate<SerializationDelegate<StreamRecord<OUT>>> recordWriter;
+	private RecordWriterDelegate<SerializationDelegate<StreamRecord<OUT>>> recordWriter;
 
 	protected final MailboxProcessor mailboxProcessor;
 
@@ -869,6 +865,8 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 				//           impact progress of the streaming topology
 				checkpointState(checkpointMetaData, checkpointOptions, checkpointMetrics);
 
+				// Step (4): Check whether the checkpoint is rescalepoint type, and do rescaling if it is.
+				checkRescalePoint(checkpointMetaData, checkpointOptions, checkpointMetrics);
 			});
 
 			return true;
@@ -1046,6 +1044,88 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 		if (isRunning) {
 			getEnvironment().failExternally(exception);
 		}
+	}
+
+	// ------------------------------------------------------------------------
+	//  Rescale
+	// ------------------------------------------------------------------------
+
+	protected void reconnect() {}
+
+	private void initReconnect() {
+		TaskRescaleManager rescaleManager = ((RuntimeEnvironment) getEnvironment()).taskRescaleManager;
+
+		if (!rescaleManager.isScalingTarget()) {
+			return;
+		}
+		LOG.info("++++++ trigger target vertex rescaling: " + this.toString());
+		// this line is to record the time to redistribute
+//		long start = System.nanoTime();
+
+		try {
+			// update gate
+			if (rescaleManager.isScalingGates()) {
+				for (InputGate gate : getEnvironment().getAllInputGates()) {
+					rescaleManager.substituteInputGateChannels((SingleInputGate) gate);
+				}
+			}
+
+			// update output (writers)
+			if (rescaleManager.isScalingPartitions()) {
+				ResultPartitionWriter[] oldWriterCopies =
+					rescaleManager.substituteResultPartitions(getEnvironment().getAllWriters());
+
+				recordWriter = createRecordWriterDelegate(configuration, getEnvironment());
+
+				RecordWriterOutput[] oldStreamOutputCopies =
+					operatorChain.substituteRecordWriter(this, recordWriter);
+
+				//  close old output and unregister partitions
+				for (RecordWriterOutput<?> streamOutput : oldStreamOutputCopies) {
+					streamOutput.flush();
+					streamOutput.close();
+				}
+
+				rescaleManager.unregisterPartitions((ResultPartition[]) oldWriterCopies);
+			}
+
+			reconnect();
+		} catch (Exception e) {
+			LOG.info("++++++ error", e);
+		} finally {
+			rescaleManager.finish();
+//			System.out.println("redistribute id: " + this.toString() + " time: " + (System.nanoTime() - start));
+			// complete reconnection, then start to process tuple,
+			// the total migration time is T(complete reconnection) - T(receive barrior).
+			System.out.println(this.toString() + " completed reconnection: " + System.currentTimeMillis());
+		}
+	}
+
+	private void checkRescalePoint(
+		CheckpointMetaData checkpointMetaData,
+		CheckpointOptions checkpointOptions,
+		CheckpointMetrics checkpointMetrics) {
+
+		if (!checkpointOptions.getCheckpointType().isRescalepoint()) {
+			return;
+		}
+
+		// add a timer for measuring blocking time
+		System.out.println(this.toString() + " received checkpoint: " + System.currentTimeMillis());
+
+		initReconnect();
+	}
+
+	@Override
+	public void reinitializeState(KeyGroupRange keyGroupRange, int idInModel) {
+		LOG.info("++++++ let's reinitialize state: " + this.toString() + "  " + keyGroupRange + "  idInModel: " + idInModel);
+		throw new IllegalArgumentException("reinitializeState is not suppported now.");
+	}
+
+	@Override
+	public void updateKeyGroupRange(KeyGroupRange keyGroupRange) {
+		LOG.info("++++++ updateKeyGroupRange: "  + this.toString() + "  " + keyGroupRange);
+		throw new IllegalArgumentException("updateKeyGroupRange is not suppported now.");
 	}
 
 	// ------------------------------------------------------------------------
