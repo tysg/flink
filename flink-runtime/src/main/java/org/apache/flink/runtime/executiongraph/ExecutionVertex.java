@@ -187,6 +187,9 @@ public class ExecutionVertex implements AccessExecutionVertex, Archiveable<Archi
 
 		this.timeout = timeout;
 		this.inputSplits = new ArrayList<>();
+
+		this.rescaleId = RescaleID.DEFAULT;
+		this.idInModel = subTaskIndex;
 	}
 
 

@@ -38,6 +38,7 @@ import org.apache.flink.streaming.runtime.streamstatus.StatusWatermarkValve;
 import org.apache.flink.streaming.runtime.streamstatus.StreamStatus;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
@@ -63,7 +64,7 @@ public final class StreamTaskNetworkInput<T> implements StreamTaskInput<T> {
 
 	private final DeserializationDelegate<StreamElement> deserializationDelegate;
 
-	private final RecordDeserializer<DeserializationDelegate<StreamElement>>[] recordDeserializers;
+	private RecordDeserializer<DeserializationDelegate<StreamElement>>[] recordDeserializers;
 
 	/** Valve that controls how watermarks and stream statuses are forwarded. */
 	private final StatusWatermarkValve statusWatermarkValve;
@@ -73,6 +74,8 @@ public final class StreamTaskNetworkInput<T> implements StreamTaskInput<T> {
 	private int lastChannel = UNSPECIFIED;
 
 	private RecordDeserializer<DeserializationDelegate<StreamElement>> currentRecordDeserializer = null;
+
+	private final IOManager ioManager;
 
 	@SuppressWarnings("unchecked")
 	public StreamTaskNetworkInput(
@@ -94,6 +97,8 @@ public final class StreamTaskNetworkInput<T> implements StreamTaskInput<T> {
 
 		this.statusWatermarkValve = checkNotNull(statusWatermarkValve);
 		this.inputIndex = inputIndex;
+
+		this.ioManager = ioManager;
 	}
 
 	@VisibleForTesting
@@ -110,6 +115,8 @@ public final class StreamTaskNetworkInput<T> implements StreamTaskInput<T> {
 		this.recordDeserializers = recordDeserializers;
 		this.statusWatermarkValve = statusWatermarkValve;
 		this.inputIndex = inputIndex;
+
+		this.ioManager = null;
 	}
 
 	@Override
@@ -220,5 +227,26 @@ public final class StreamTaskNetworkInput<T> implements StreamTaskInput<T> {
 
 			recordDeserializers[channelIndex] = null;
 		}
+	}
+
+	public void reconnect() {
+		// TODO: if the num of channel is the same, do we need to update all those stuff?
+		int numInputChannels = checkpointedInputGate.getNumberOfInputChannels();
+
+		RecordDeserializer<DeserializationDelegate<StreamElement>>[] oldDeserializer =
+			Arrays.copyOf(recordDeserializers, recordDeserializers.length);
+		recordDeserializers = new SpillingAdaptiveSpanningRecordDeserializer[numInputChannels];
+
+		for (int i = 0; i < recordDeserializers.length; i++) {
+			if (i < oldDeserializer.length) {
+				recordDeserializers[i] = oldDeserializer[i];
+			} else {
+				recordDeserializers[i] = new SpillingAdaptiveSpanningRecordDeserializer<>(
+					ioManager.getSpillingDirectoriesPaths());
+			}
+		}
+
+		statusWatermarkValve.rescale(numInputChannels);
+		checkpointedInputGate.updateHandlerBufferChannels(numInputChannels);
 	}
 }

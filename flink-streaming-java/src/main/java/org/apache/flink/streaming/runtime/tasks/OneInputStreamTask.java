@@ -26,6 +26,8 @@ import org.apache.flink.runtime.execution.Environment;
 import org.apache.flink.runtime.io.network.partition.consumer.InputGate;
 import org.apache.flink.runtime.metrics.MetricNames;
 import org.apache.flink.runtime.metrics.groups.TaskIOMetricGroup;
+import org.apache.flink.runtime.rescale.TaskRescaleManager;
+import org.apache.flink.runtime.taskmanager.RuntimeEnvironment;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.watermark.Watermark;
@@ -104,6 +106,19 @@ public class OneInputStreamTask<IN, OUT> extends StreamTask<OUT, OneInputStreamO
 		headOperator.getMetricGroup().gauge(MetricNames.IO_CURRENT_INPUT_WATERMARK, this.inputWatermarkGauge);
 		// wrap watermark gauge since registered metrics must be unique
 		getEnvironment().getMetricGroup().gauge(MetricNames.IO_CURRENT_INPUT_WATERMARK, this.inputWatermarkGauge::getValue);
+	}
+
+	@Override
+	public void reconnect() {
+		TaskRescaleManager rescaleManager = ((RuntimeEnvironment) getEnvironment()).taskRescaleManager;
+
+		if (!rescaleManager.isScalingTarget()) {
+			return;
+		}
+
+		if (rescaleManager.isScalingGates()) {
+			((StreamOneInputProcessor) inputProcessor).reconnect();
+		}
 	}
 
 	private CheckpointedInputGate createCheckpointedInputGate() throws IOException {

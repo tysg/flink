@@ -60,7 +60,7 @@ public class CheckpointBarrierTracker extends CheckpointBarrierHandler {
 	 * The number of channels. Once that many barriers have been received for a checkpoint, the
 	 * checkpoint is considered complete.
 	 */
-	private final int totalNumberOfInputChannels;
+	private int totalNumberOfInputChannels;
 
 	/**
 	 * All checkpoints for which some (but not all) barriers have been received, and that are not
@@ -88,6 +88,11 @@ public class CheckpointBarrierTracker extends CheckpointBarrierHandler {
 	@Override
 	public boolean isBlocked(int channelIndex) {
 		return false;
+	}
+
+	@Override
+	public void updateTotalNumberOfInputChannels(int newNumberOfInputChannels) {
+		this.totalNumberOfInputChannels = newNumberOfInputChannels;
 	}
 
 	@Override

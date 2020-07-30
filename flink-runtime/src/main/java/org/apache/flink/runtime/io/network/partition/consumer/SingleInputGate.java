@@ -126,7 +126,7 @@ public class SingleInputGate extends InputGate {
 	private final int consumedSubpartitionIndex;
 
 	/** The number of input channels (equivalent to the number of consumed partitions). */
-	private final int numberOfInputChannels;
+	private int numberOfInputChannels;
 
 	/**
 	 * Input channels. There is a one input channel for each consumed intermediate result partition.
@@ -141,9 +141,9 @@ public class SingleInputGate extends InputGate {
 	 * Field guaranteeing uniqueness for inputChannelsWithData queue. Both of those fields should be unified
 	 * onto one.
 	 */
-	private final BitSet enqueuedInputChannelsWithData;
+	private BitSet enqueuedInputChannelsWithData;
 
-	private final BitSet channelsWithEndOfPartitionEvents;
+	private BitSet channelsWithEndOfPartitionEvents;
 
 	/** The partition producer state listener. */
 	private final PartitionProducerStateProvider partitionProducerStateProvider;
@@ -219,7 +219,7 @@ public class SingleInputGate extends InputGate {
 	}
 
 	@VisibleForTesting
-	void requestPartitions() throws IOException, InterruptedException {
+	public void requestPartitions() throws IOException, InterruptedException {
 		synchronized (requestLock) {
 			if (!requestedPartitionsFlag) {
 				if (closeFuture.isDone()) {
@@ -256,6 +256,10 @@ public class SingleInputGate extends InputGate {
 
 	public IntermediateDataSetID getConsumedResultId() {
 		return consumedResultId;
+	}
+
+	public int getConsumedSubpartitionIndex() {
+		return consumedSubpartitionIndex;
 	}
 
 	/**
@@ -454,6 +458,38 @@ public class SingleInputGate extends InputGate {
 				inputChannelsWithData.notifyAll();
 			}
 		}
+	}
+
+
+	public void reset(int numberOfInputChannels) {
+		synchronized (requestLock) {
+			for (InputChannel inputChannel : inputChannels.values()) {
+				try {
+					inputChannel.releaseAllResources();
+				}
+				catch (IOException e) {
+					LOG.warn("{}: Error during release of channel resources: {}.",
+						owningTaskName, e.getMessage(), e);
+				}
+			}
+
+			this.inputChannels.clear();
+		}
+
+		this.numberOfInputChannels = numberOfInputChannels;
+
+//		this.networkBufferPool = null;
+//		this.bufferPool = null;
+
+		// TODO: check whether we need to reinitialize the inputChannels hashmap
+//		this.inputChannels = new HashMap<>(numberOfInputChannels);
+
+		this.enqueuedInputChannelsWithData = new BitSet(numberOfInputChannels);
+		this.channelsWithEndOfPartitionEvents = new BitSet(numberOfInputChannels);
+
+		this.requestedPartitionsFlag = false;
+		this.pendingEvents.clear();
+		this.retriggerLocalRequestTimer = null;
 	}
 
 	@Override

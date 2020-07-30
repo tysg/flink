@@ -24,6 +24,7 @@ import org.apache.flink.runtime.checkpoint.CheckpointMetaData;
 import org.apache.flink.runtime.checkpoint.CheckpointMetrics;
 import org.apache.flink.runtime.checkpoint.CheckpointOptions;
 import org.apache.flink.runtime.execution.Environment;
+import org.apache.flink.runtime.state.KeyGroupRange;
 
 import java.util.concurrent.Future;
 
@@ -255,5 +256,13 @@ public abstract class AbstractInvokable {
 	 */
 	public Future<Void> notifyCheckpointCompleteAsync(long checkpointId) {
 		throw new UnsupportedOperationException(String.format("notifyCheckpointCompleteAsync not supported by %s", this.getClass().getName()));
+	}
+
+	public void reinitializeState(KeyGroupRange keyGroupRange, int idInModel) {
+		throw new UnsupportedOperationException(String.format("reinitializeState not supported by %s", this.getClass().getName()));
+	}
+
+	public void updateKeyGroupRange(KeyGroupRange keyGroupRange) {
+		throw new UnsupportedOperationException(String.format("updateKeyGroupRange not supported by %s", this.getClass().getName()));
 	}
 }

@@ -22,6 +22,7 @@ import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
 import org.apache.flink.runtime.executiongraph.IntermediateResultPartition;
 import org.apache.flink.runtime.jobgraph.IntermediateResultPartitionID;
+import org.apache.flink.runtime.rescale.RescaleID;
 
 import java.io.Serializable;
 
@@ -42,14 +43,21 @@ public final class ResultPartitionID implements Serializable {
 
 	private final ExecutionAttemptID producerId;
 
+	private final RescaleID rescaleId;
+
 	@VisibleForTesting
 	public ResultPartitionID() {
-		this(new IntermediateResultPartitionID(), new ExecutionAttemptID());
+		this(new IntermediateResultPartitionID(), new ExecutionAttemptID(), RescaleID.DEFAULT);
 	}
 
 	public ResultPartitionID(IntermediateResultPartitionID partitionId, ExecutionAttemptID producerId) {
+		this(partitionId, producerId, RescaleID.DEFAULT);
+	}
+
+	public ResultPartitionID(IntermediateResultPartitionID partitionId, ExecutionAttemptID producerId, RescaleID rescaleId) {
 		this.partitionId = checkNotNull(partitionId);
 		this.producerId = checkNotNull(producerId);
+		this.rescaleId = checkNotNull(rescaleId);
 	}
 
 	public IntermediateResultPartitionID getPartitionId() {
@@ -60,12 +68,18 @@ public final class ResultPartitionID implements Serializable {
 		return producerId;
 	}
 
+	public RescaleID getRescaleId() {
+		return rescaleId;
+	}
+
 	@Override
 	public boolean equals(Object obj) {
 		if (obj != null && obj.getClass() == ResultPartitionID.class) {
 			ResultPartitionID o = (ResultPartitionID) obj;
 
-			return o.getPartitionId().equals(partitionId) && o.getProducerId().equals(producerId);
+			return o.getPartitionId().equals(partitionId)
+				&& o.getProducerId().equals(producerId)
+				&& o.getRescaleId().equals(rescaleId);
 		}
 
 		return false;

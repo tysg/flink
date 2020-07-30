@@ -100,4 +100,8 @@ public abstract class CheckpointBarrierHandler {
 			toNotifyOnCheckpoint.abortCheckpointOnBarrier(checkpointId, cause);
 		}
 	}
+
+	public void updateTotalNumberOfInputChannels(int numInputChannels) {
+		throw new IllegalArgumentException("updateTotalNumberOfInputChannels is not suppported now.");
+	}
 }

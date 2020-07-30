@@ -43,10 +43,10 @@ public class CheckpointBarrierAligner extends CheckpointBarrierHandler {
 	private static final Logger LOG = LoggerFactory.getLogger(CheckpointBarrierAligner.class);
 
 	/** Flags that indicate whether a channel is currently blocked/buffered. */
-	private final boolean[] blockedChannels;
+	private boolean[] blockedChannels;
 
 	/** The total number of channels that this buffer handles data from. */
-	private final int totalNumberOfInputChannels;
+	private int totalNumberOfInputChannels;
 
 	private final String taskName;
 
@@ -332,5 +332,17 @@ public class CheckpointBarrierAligner extends CheckpointBarrierHandler {
 			new CheckpointException(
 				"Max buffered bytes: " + maxBufferedBytes,
 				CheckpointFailureReason.CHECKPOINT_DECLINED_ALIGNMENT_LIMIT_EXCEEDED));
+	}
+
+	@Override
+	public void updateTotalNumberOfInputChannels(int newNumberOfInputChannels) {
+		for (boolean blocked : blockedChannels) {
+			if (blocked) {
+				LOG.info("++++++ Some channels are blocked, cannot do rescaling");
+				throw new RuntimeException("Some channels are blocked, cannot do rescaling");
+			}
+		}
+		totalNumberOfInputChannels = newNumberOfInputChannels;
+		blockedChannels = new boolean[newNumberOfInputChannels];
 	}
 }

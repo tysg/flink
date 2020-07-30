@@ -271,7 +271,7 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 	/** This class loader should be set as the context class loader for threads that may dynamically load user code. */
 	private ClassLoader userCodeClassLoader;
 
-	private final TaskRescaleManager taskRescaleManager;
+	private TaskRescaleManager taskRescaleManager = null;
 
 	/**
 	 * <p><b>IMPORTANT:</b> This constructor may not start any work that would need to
@@ -396,21 +396,24 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 			//noinspection deprecation
 			((NettyShuffleEnvironment) shuffleEnvironment)
 				.registerLegacyNetworkMetrics(metrics.getIOMetricGroup(), resultPartitionWriters, gates);
+
+			taskRescaleManager = new TaskRescaleManager(
+				jobId,
+				executionId,
+				taskNameWithSubtaskAndId,
+				this,
+				(NettyShuffleEnvironment) shuffleEnvironment,
+				taskEventDispatcher,
+				ioManager,
+				metrics,
+				resultPartitionConsumableNotifier,
+				taskShuffleContext);
 		}
 
 		invokableHasBeenCanceled = new AtomicBoolean(false);
 
 		// finally, create the executing thread, but do not start it
 		executingThread = new Thread(TASK_THREADS_GROUP, this, taskNameWithSubtask);
-
-		taskRescaleManager = new TaskRescaleManager(
-			jobId,
-			executionId,
-			taskNameWithSubtaskAndId,
-			this,
-			ioManager,
-			metrics,
-			resultPartitionConsumableNotifier);
 	}
 
 	// ------------------------------------------------------------------------
@@ -687,6 +690,7 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 				taskEventDispatcher,
 				checkpointResponder,
 				taskManagerConfig,
+				taskRescaleManager,
 				metrics,
 				this);
 
