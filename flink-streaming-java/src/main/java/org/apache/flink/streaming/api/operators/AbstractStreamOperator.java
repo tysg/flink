@@ -189,8 +189,9 @@ public abstract class AbstractStreamOperator<OUT>
 		} catch (Exception e) {
 			LOG.warn("An error occurred while instantiating task metrics.", e);
 			this.metrics = UnregisteredMetricGroups.createUnregisteredOperatorMetricGroup();
-			this.output = new UpdatableOutput<>(output);
 		}
+
+		this.output = new UpdatableOutput<>(output);
 
 		try {
 			Configuration taskManagerConfig = environment.getTaskManagerInfo().getConfiguration();

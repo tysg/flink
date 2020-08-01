@@ -46,6 +46,7 @@ import org.apache.flink.runtime.plugable.SerializationDelegate;
 import org.apache.flink.runtime.rescale.TaskRescaleManager;
 import org.apache.flink.runtime.state.*;
 import org.apache.flink.runtime.taskmanager.DispatcherThreadFactory;
+import org.apache.flink.runtime.taskmanager.InputGateWithMetrics;
 import org.apache.flink.runtime.taskmanager.RuntimeEnvironment;
 import org.apache.flink.runtime.util.ExecutorThreadFactory;
 import org.apache.flink.runtime.util.FatalExitExceptionHandler;
@@ -1066,7 +1067,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 			// update gate
 			if (rescaleManager.isScalingGates()) {
 				for (InputGate gate : getEnvironment().getAllInputGates()) {
-					rescaleManager.substituteInputGateChannels((SingleInputGate) gate);
+					rescaleManager.substituteInputGateChannels((SingleInputGate) ((InputGateWithMetrics) gate).getInputGate());
 				}
 			}
 
@@ -1086,7 +1087,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 					streamOutput.close();
 				}
 
-				rescaleManager.unregisterPartitions((ResultPartition[]) oldWriterCopies);
+				rescaleManager.unregisterPartitions(oldWriterCopies);
 			}
 
 			reconnect();
