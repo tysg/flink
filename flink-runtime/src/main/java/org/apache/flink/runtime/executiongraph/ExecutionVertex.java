@@ -301,6 +301,10 @@ public class ExecutionVertex implements AccessExecutionVertex, Archiveable<Archi
 		this.rescaleId = rescaleId;
 	}
 
+	public RescaleID getRescaleId() {
+		return rescaleId;
+	}
+
 	public void setIdInModel(int idInModel) {
 		this.idInModel = idInModel;
 	}

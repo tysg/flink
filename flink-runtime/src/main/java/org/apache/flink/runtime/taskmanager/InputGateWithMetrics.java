@@ -89,4 +89,8 @@ public class InputGateWithMetrics extends InputGate {
 		numBytesIn.inc(bufferOrEvent.getSize());
 		return bufferOrEvent;
 	}
+
+	public InputGate getInputGate() {
+		return inputGate;
+	}
 }

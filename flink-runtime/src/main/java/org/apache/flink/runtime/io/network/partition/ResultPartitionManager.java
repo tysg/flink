@@ -19,6 +19,7 @@
 package org.apache.flink.runtime.io.network.partition;
 
 import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
+import org.apache.flink.runtime.io.network.api.writer.ResultPartitionWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -96,14 +97,16 @@ public class ResultPartitionManager implements ResultPartitionProvider {
 		}
 	}
 
-	public void releasePartitionsBy(ResultPartition partition) {
+	public void releasePartitionsBy(ResultPartitionWriter partition) {
 		synchronized (registeredPartitions) {
 			ResultPartitionID partitionId = partition.getPartitionId();
 
 			registeredPartitions.remove(partitionId);
 			registeredPartitionsByExecutionID.get(partitionId.getProducerId()).remove(partitionId);
 
-			partition.release();
+			if (partition instanceof ResultPartition) {
+				((ResultPartition) partition).release();
+			}
 		}
 	}
 

@@ -969,12 +969,20 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 		processFail(t, false);
 	}
 
+	public void updateProducedPartitions(RescaleID rescaleId) {
+		// update produced partitions for sync.
+		getVertex().updateRescaleId(rescaleId);
+		for (Map.Entry producedPartition : producedPartitions.entrySet()) {
+			((ResultPartitionDeploymentDescriptor) producedPartition.getValue())
+				.getShuffleDescriptor()
+				.updateResultPartitionId(vertex.getRescaleId());
+		}
+	}
+
 	public CompletableFuture<Void> scheduleRescale(
 		RescaleID rescaleId,
 		RescaleOptions rescaleOptions,
 		@Nullable KeyGroupRange keyGroupRange) throws ExecutionGraphException {
-
-		getVertex().updateRescaleId(rescaleId);
 
 		assertRunningInJobMasterMainThread();
 

@@ -442,10 +442,6 @@ public class CheckpointCoordinator {
 	//  Triggering Checkpoints and Savepoints
 	// --------------------------------------------------------------------------------------------
 
-	public CompletableFuture<CompletedCheckpoint> triggerRescalePoint(long timestamp) {
-		throw new IllegalArgumentException("triggerRescalePoint is not suppported now.");
-	}
-
 	/**
 	 * Triggers a savepoint with the given savepoint directory as a target.
 	 *
@@ -552,6 +548,25 @@ public class CheckpointCoordinator {
 		}
 	}
 
+	public CompletableFuture<CompletedCheckpoint> triggerRescalePoint(long timestamp) {
+		CheckpointProperties props = CheckpointProperties.forRescalePoint();
+
+		final CompletableFuture<CompletedCheckpoint> resultFuture = new CompletableFuture<>();
+		try {
+			return triggerCheckpoint(
+				timestamp,
+				props,
+				null,
+				false,
+				false);
+		} catch (CheckpointException e) {
+			Throwable cause = new CheckpointException("Failed to trigger savepoint.", e.getCheckpointFailureReason());
+			resultFuture.completeExceptionally(cause);
+		}
+		// return the generated checkpointID
+		return null;
+	}
+
 	@VisibleForTesting
 	public CompletableFuture<CompletedCheckpoint> triggerCheckpoint(
 			long timestamp,
@@ -620,6 +635,11 @@ public class CheckpointCoordinator {
 			checkpointStorageLocation = props.isSavepoint() ?
 					checkpointStorage.initializeLocationForSavepoint(checkpointID, externalSavepointLocation) :
 					checkpointStorage.initializeLocationForCheckpoint(checkpointID);
+
+			// set checkpointId for rescale ack listener
+			if (props.isRescalepoint()) {
+				rescalepointAcknowledgeListener.setCheckpointId(checkpointID);
+			}
 		}
 		catch (Throwable t) {
 			int numUnsuccessful = numUnsuccessfulCheckpointsTriggers.incrementAndGet();
@@ -840,6 +860,10 @@ public class CheckpointCoordinator {
 					case SUCCESS:
 						LOG.debug("Received acknowledge message for checkpoint {} from task {} of job {} at {}.",
 							checkpointId, message.getTaskExecutionId(), message.getJob(), taskManagerLocationInfo);
+
+						if (rescalepointAcknowledgeListener != null) {
+							rescalepointAcknowledgeListener.onReceiveRescalepointAcknowledge(message.getTaskExecutionId(), checkpoint);
+						}
 
 						if (checkpoint.areTasksFullyAcknowledged()) {
 							completePendingCheckpoint(checkpoint);

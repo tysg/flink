@@ -20,6 +20,7 @@ package org.apache.flink.runtime.shuffle;
 
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionID;
+import org.apache.flink.runtime.rescale.RescaleID;
 
 import java.io.Serializable;
 import java.util.Collection;
@@ -66,4 +67,6 @@ public interface ShuffleDescriptor extends Serializable {
 	 * @return the resource id of the producing task executor if the partition occupies local resources there
 	 */
 	Optional<ResourceID> storesLocalResourcesOn();
+
+	void updateResultPartitionId(RescaleID rescaleId);
 }

@@ -43,7 +43,7 @@ public final class ResultPartitionID implements Serializable {
 
 	private final ExecutionAttemptID producerId;
 
-	private final RescaleID rescaleId;
+	private RescaleID rescaleId;
 
 	@VisibleForTesting
 	public ResultPartitionID() {
@@ -87,11 +87,15 @@ public final class ResultPartitionID implements Serializable {
 
 	@Override
 	public int hashCode() {
-		return partitionId.hashCode() ^ producerId.hashCode();
+		return partitionId.hashCode() ^ producerId.hashCode() ^ rescaleId.hashCode();
 	}
 
 	@Override
 	public String toString() {
-		return partitionId.toString() + "@" + producerId.toString();
+		return partitionId.toString() + "@" + producerId.toString() + "@" + rescaleId.toString();
+	}
+
+	public void setRescaleId(RescaleID rescaleId) {
+		this.rescaleId = rescaleId;
 	}
 }

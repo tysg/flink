@@ -236,7 +236,23 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 
 			for (ExecutionVertex vertex : tasks.get(jobId).getTaskVertices()) {
 				Execution execution = vertex.getCurrentExecutionAttempt();
+				execution.updateProducedPartitions(rescaleId);
+			}
+
+			for (ExecutionVertex vertex : tasks.get(jobId).getTaskVertices()) {
+				Execution execution = vertex.getCurrentExecutionAttempt();
 				rescaleCandidatesFutures.add(execution.scheduleRescale(rescaleId, RescaleOptions.RESCALE_PARTITIONS_ONLY, null));
+			}
+		}
+
+		for (int subtaskIndex = 0; subtaskIndex < targetVertex.getTaskVertices().length; subtaskIndex++) {
+			ExecutionVertex vertex = targetVertex.getTaskVertices()[subtaskIndex];
+			Execution execution = vertex.getCurrentExecutionAttempt();
+			execution.updateProducedPartitions(rescaleId);
+
+			if (!jobRescalePartitionAssignment.isSubtaskModified(subtaskIndex)) {
+				rescaleCandidatesFutures.add(
+					execution.scheduleRescale(rescaleId, RescaleOptions.RESCALE_BOTH, null));
 			}
 		}
 
@@ -247,16 +263,6 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 				Execution execution = vertex.getCurrentExecutionAttempt();
 				notYetAcknowledgedTasks.add(execution.getAttemptId());
 				rescaleCandidatesFutures.add(execution.scheduleRescale(rescaleId, RescaleOptions.RESCALE_GATES_ONLY, null));
-			}
-		}
-
-		for (int subtaskIndex = 0; subtaskIndex < targetVertex.getTaskVertices().length; subtaskIndex++) {
-			if (!jobRescalePartitionAssignment.isSubtaskModified(subtaskIndex)) {
-				ExecutionVertex vertex = targetVertex.getTaskVertices()[subtaskIndex];
-				Execution execution = vertex.getCurrentExecutionAttempt();
-
-				rescaleCandidatesFutures.add(
-					execution.scheduleRescale(rescaleId, RescaleOptions.RESCALE_BOTH, null));
 			}
 		}
 
@@ -272,12 +278,8 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 			.thenRunAsync(() -> {
 				try {
 					checkpointCoordinator.stopCheckpointScheduler();
-					checkpointCoordinator.triggerRescalePoint(System.currentTimeMillis())
-						.whenComplete((completedCheckpoint, throwable) -> {
-							if (throwable == null) {
-								LOG.info("++++++ Make rescalepoint with checkpointId=" + completedCheckpoint.getCheckpointID());
-							}
-						});
+					checkpointCoordinator.triggerRescalePoint(System.currentTimeMillis());
+					LOG.info("++++++ Make rescalepoint with checkpointId=" + checkpointId);
 				} catch (Exception e) {
 					failExecution(e);
 					throw new CompletionException(e);
@@ -371,6 +373,21 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 				try {
 					Collection<CompletableFuture<Void>> rescaleCandidatesFutures = new ArrayList<>();
 
+					// before schedule rescale, need to update produced partitions
+					for (Map.Entry<RescaleOptions, List<ExecutionVertex>> entry : rescaleCandidates.entrySet()) {
+						for (ExecutionVertex vertex : entry.getValue()) {
+							Execution execution = vertex.getCurrentExecutionAttempt();
+							execution.updateProducedPartitions(rescaleId);
+						}
+					}
+
+					for (int subtaskIndex = 0; subtaskIndex < targetVertex.getTaskVertices().length; subtaskIndex++) {
+						ExecutionVertex vertex = targetVertex.getTaskVertices()[subtaskIndex];
+						Execution execution = vertex.getCurrentExecutionAttempt();
+						execution.updateProducedPartitions(rescaleId);
+					}
+
+					// then start to do schedule rescale
 					for (Map.Entry<RescaleOptions, List<ExecutionVertex>> entry : rescaleCandidates.entrySet()) {
 						for (ExecutionVertex vertex : entry.getValue()) {
 							Execution execution = vertex.getCurrentExecutionAttempt();
@@ -408,12 +425,8 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 			.thenRunAsync(() -> {
 				try {
 					checkpointCoordinator.stopCheckpointScheduler();
-					checkpointCoordinator.triggerRescalePoint(System.currentTimeMillis())
-						.whenComplete((completedCheckpoint, throwable) -> {
-							if (throwable == null) {
-								LOG.info("++++++ Make rescalepoint with checkpointId=" + completedCheckpoint.getCheckpointID());
-							}
-						});
+					checkpointCoordinator.triggerRescalePoint(System.currentTimeMillis());
+					LOG.info("++++++ Make rescalepoint with checkpointId=" + checkpointId);
 				} catch (Exception e) {
 					failExecution(e);
 					throw new CompletionException(e);
@@ -489,12 +502,8 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 			.thenRunAsync(() -> {
 				try {
 					checkpointCoordinator.stopCheckpointScheduler();
-					checkpointCoordinator.triggerRescalePoint(System.currentTimeMillis())
-						.whenComplete((completedCheckpoint, throwable) -> {
-							if (throwable == null) {
-								LOG.info("++++++ Make rescalepoint with checkpointId=" + completedCheckpoint.getCheckpointID());
-							}
-						});
+					checkpointCoordinator.triggerRescalePoint(System.currentTimeMillis());
+					LOG.info("++++++ Make rescalepoint with checkpointId=" + checkpointId);
 				} catch (Exception e) {
 					failExecution(e);
 					throw new CompletionException(e);
@@ -748,6 +757,11 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 				}
 			}, mainThreadExecutor);
 		}
+	}
+
+	@Override
+	public void setCheckpointId(long checkpointId) {
+		this.checkpointId = checkpointId;
 	}
 
 	public JobStatusListener createActivatorDeactivator() {

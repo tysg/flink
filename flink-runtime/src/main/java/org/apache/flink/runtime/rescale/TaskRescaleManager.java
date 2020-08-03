@@ -76,7 +76,7 @@ public class TaskRescaleManager {
 
 	private volatile TaskRescaleMeta rescaleMeta;
 
-	private volatile ResultPartition[] storedOldWriterCopies;
+	private volatile ResultPartitionWriter[] storedOldWriterCopies;
 
 	public TaskRescaleManager(
 		JobID jobId,
@@ -173,10 +173,10 @@ public class TaskRescaleManager {
 
 	// We cannot do it immediately because downstream's gate is still polling from the old partitions (barrier haven't pass to downstream)
 	// so we store the oldWriterCopies and unregister them in next scaling.
-	public void unregisterPartitions(ResultPartition[] oldWriterCopies) {
+	public void unregisterPartitions(ResultPartitionWriter[] oldWriterCopies) {
 		if (storedOldWriterCopies != null) {
 			shuffleEnvironment.unregisterPartitions(storedOldWriterCopies);
-			for (ResultPartition partition : storedOldWriterCopies) {
+			for (ResultPartitionWriter partition : storedOldWriterCopies) {
 				taskEventDispatcher.unregisterPartition(partition.getPartitionId());
 			}
 		}
@@ -201,10 +201,10 @@ public class TaskRescaleManager {
 		@SuppressWarnings("deprecation")
 		InputChannelMetrics inputChannelMetrics = new InputChannelMetrics(taskShuffleContext.getInputGroup(), taskShuffleContext.getParentGroup());
 
-		InputChannel inputChannel = null;
+		InputChannel inputChannel;
 		for (int i = 0; i < shuffleDescriptors.length; i++) {
 			int finalI = i;
-			applyWithShuffleTypeCheck(
+			inputChannel = applyWithShuffleTypeCheck(
 				NettyShuffleDescriptor.class,
 				shuffleDescriptors[i],
 				unknownShuffleDescriptor -> {
@@ -216,6 +216,8 @@ public class TaskRescaleManager {
 						finalI,
 						nettyShuffleDescriptor,
 						inputChannelMetrics));
+			ResultPartitionID resultPartitionID = inputChannel.getPartitionId();
+			inputGate.setInputChannel(resultPartitionID.getPartitionId(), inputChannel);
 		}
 	}
 
@@ -263,8 +265,6 @@ public class TaskRescaleManager {
 		private final Collection<ResultPartitionDeploymentDescriptor> resultPartitionDeploymentDescriptors;
 		private final Collection<InputGateDeploymentDescriptor> inputGateDeploymentDescriptors;
 
-		private final ResultPartition[] newPartitions;
-
 		private final ResultPartitionWriter[] newConsumableNotifyingPartitionWriters;
 
 		TaskRescaleMeta(
@@ -278,9 +278,6 @@ public class TaskRescaleManager {
 
 			this.resultPartitionDeploymentDescriptors = checkNotNull(resultPartitionDeploymentDescriptors);
 			this.inputGateDeploymentDescriptors = checkNotNull(inputGateDeploymentDescriptors);
-
-			this.newPartitions = new ResultPartition[resultPartitionDeploymentDescriptors.size()];
-
 			this.newConsumableNotifyingPartitionWriters = new ResultPartitionWriter[resultPartitionDeploymentDescriptors.size()];
 		}
 
@@ -300,16 +297,10 @@ public class TaskRescaleManager {
 			return inputGateDeploymentDescriptors;
 		}
 
-		public ResultPartition getNewPartitions(int index) {
-			checkState(index >= 0 && index < newPartitions.length, "given index out of boundary");
+		public ResultPartitionWriter getNewPartitions(int index) {
+			checkState(index >= 0 && index < this.newConsumableNotifyingPartitionWriters.length, "given index out of boundary");
 
-			return newPartitions[index];
-		}
-
-		public void addNewPartitions(int index, ResultPartition partition) {
-			checkState(index >= 0 && index < newPartitions.length, "given index out of boundary");
-
-			newPartitions[index] = partition;
+			return newConsumableNotifyingPartitionWriters[index];
 		}
 
 		public void addNewPartitions(int index, ResultPartitionWriter partition) {

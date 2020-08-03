@@ -1553,7 +1553,7 @@ public class ExecutionGraph implements AccessExecutionGraph {
 
 		final ExecutionVertex taskVertex = taskVertices[subtaskIndex];
 		final Execution execution = taskVertex.getCurrentExecutionAttempt();
-		return new ResultPartitionID(resultPartitionId, execution.getAttemptId());
+		return new ResultPartitionID(resultPartitionId, execution.getAttemptId(), taskVertex.getRescaleId());
 	}
 
 	/**

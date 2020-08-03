@@ -287,10 +287,10 @@ public class NettyShuffleEnvironment implements ShuffleEnvironment<ResultPartiti
 		return true;
 	}
 
-	public void unregisterPartitions(ResultPartition[] partitions) {
+	public void unregisterPartitions(ResultPartitionWriter[] partitions) {
 		synchronized (lock) {
 			if (partitions != null) {
-				for (ResultPartition partition : partitions) {
+				for (ResultPartitionWriter partition : partitions) {
 					resultPartitionManager.releasePartitionsBy(partition);
 					try {
 						partition.close();

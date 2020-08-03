@@ -52,6 +52,7 @@ import org.apache.flink.runtime.jobmaster.SlotOwner;
 import org.apache.flink.runtime.jobmaster.SlotRequestId;
 import org.apache.flink.runtime.jobmaster.TestingLogicalSlotBuilder;
 import org.apache.flink.runtime.jobmaster.slotpool.SlotProvider;
+import org.apache.flink.runtime.rescale.RescaleID;
 import org.apache.flink.runtime.shuffle.NettyShuffleMaster;
 import org.apache.flink.runtime.shuffle.PartitionDescriptor;
 import org.apache.flink.runtime.shuffle.ProducerDescriptor;
@@ -328,6 +329,11 @@ public class ExecutionPartitionLifecycleTest extends TestLogger {
 				@Override
 				public Optional<ResourceID> storesLocalResourcesOn() {
 					return Optional.of(producerDescriptor.getProducerLocation());
+				}
+
+				@Override
+				public void updateResultPartitionId(RescaleID rescaleId) {
+
 				}
 			});
 		}

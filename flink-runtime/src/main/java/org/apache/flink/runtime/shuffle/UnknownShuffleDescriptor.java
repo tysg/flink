@@ -20,6 +20,7 @@ package org.apache.flink.runtime.shuffle;
 
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionID;
+import org.apache.flink.runtime.rescale.RescaleID;
 
 import java.util.Optional;
 
@@ -55,5 +56,10 @@ public final class UnknownShuffleDescriptor implements ShuffleDescriptor {
 	@Override
 	public Optional<ResourceID> storesLocalResourcesOn() {
 		return Optional.empty();
+	}
+
+	@Override
+	public void updateResultPartitionId(RescaleID rescaleId) {
+
 	}
 }

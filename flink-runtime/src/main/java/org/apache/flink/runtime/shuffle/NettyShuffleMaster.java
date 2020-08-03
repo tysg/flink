@@ -38,7 +38,8 @@ public enum NettyShuffleMaster implements ShuffleMaster<NettyShuffleDescriptor> 
 
 		ResultPartitionID resultPartitionID = new ResultPartitionID(
 			partitionDescriptor.getPartitionId(),
-			producerDescriptor.getProducerExecutionId());
+			producerDescriptor.getProducerExecutionId(),
+			partitionDescriptor.getRescaleId());
 
 		NettyShuffleDescriptor shuffleDeploymentDescriptor = new NettyShuffleDescriptor(
 			producerDescriptor.getProducerLocation(),
