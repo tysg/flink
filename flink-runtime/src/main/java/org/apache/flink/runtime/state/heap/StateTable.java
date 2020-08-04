@@ -302,6 +302,7 @@ public abstract class StateTable<K, N, S>
 	 * Translates a key-group id to the internal array offset.
 	 */
 	private int indexToOffset(int index) {
+		// remap the hashed index to aligned index.
 		return index - keyGroupOffset;
 	}
 

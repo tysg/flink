@@ -276,10 +276,11 @@ public class StreamTaskStateInitializerImpl implements StreamTaskStateInitialize
 
 		TaskInfo taskInfo = environment.getTaskInfo();
 
-//		final KeyGroupRange keyGroupRange = KeyGroupRangeAssignment.computeKeyGroupRangeForOperatorIndex(
-//			taskInfo.getMaxNumberOfParallelSubtasks(),
-//			taskInfo.getNumberOfParallelSubtasks(),
-//			taskInfo.getIndexOfThisSubtask());
+		// TODO: put assigned keygrouprange to taskInfo.
+		final KeyGroupRange keyGroupRange = KeyGroupRangeAssignment.computeKeyGroupRangeForOperatorIndex(
+			taskInfo.getMaxNumberOfParallelSubtasks(),
+			taskInfo.getNumberOfParallelSubtasks(),
+			taskInfo.getIndexOfThisSubtask());
 
 		// Now restore processing is included in backend building/constructing process, so we need to make sure
 		// each stream constructed in restore could also be closed in case of task cancel, for example the data
@@ -294,8 +295,8 @@ public class StreamTaskStateInitializerImpl implements StreamTaskStateInitialize
 					operatorIdentifierText,
 					keySerializer,
 					taskInfo.getMaxNumberOfParallelSubtasks(),
-					assignedKeyGroupRange,
-//					keyGroupRange,
+//					assignedKeyGroupRange,
+					keyGroupRange,
 					environment.getTaskKvStateRegistry(),
 					TtlTimeProvider.DEFAULT,
 					metricGroup,
