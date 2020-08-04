@@ -39,6 +39,7 @@ import org.apache.flink.runtime.memory.MemoryManager;
 import org.apache.flink.runtime.metrics.groups.TaskMetricGroup;
 import org.apache.flink.runtime.query.TaskKvStateRegistry;
 import org.apache.flink.runtime.rescale.TaskRescaleManager;
+import org.apache.flink.runtime.state.KeyGroupRange;
 import org.apache.flink.runtime.state.TaskStateManager;
 
 import java.util.Map;
@@ -91,6 +92,8 @@ public class RuntimeEnvironment implements Environment {
 
 	public final TaskRescaleManager taskRescaleManager;
 
+	public final KeyGroupRange keyGroupRange;
+
 	// ------------------------------------------------------------------------
 
 	public RuntimeEnvironment(
@@ -117,6 +120,7 @@ public class RuntimeEnvironment implements Environment {
 		CheckpointResponder checkpointResponder,
 		TaskManagerRuntimeInfo taskManagerInfo,
 		TaskRescaleManager taskRescaleManager,
+		KeyGroupRange keyGroupRange,
 		TaskMetricGroup metrics,
 		Task containingTask) {
 
@@ -145,6 +149,7 @@ public class RuntimeEnvironment implements Environment {
 		this.containingTask = containingTask;
 		this.taskRescaleManager = checkNotNull(taskRescaleManager);
 		this.metrics = metrics;
+		this.keyGroupRange = keyGroupRange;
 	}
 
 	// ------------------------------------------------------------------------

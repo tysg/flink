@@ -19,6 +19,7 @@ package org.apache.flink.streaming.runtime.tasks;
 
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.annotation.VisibleForTesting;
+import org.apache.flink.api.common.TaskInfo;
 import org.apache.flink.api.common.accumulators.Accumulator;
 import org.apache.flink.configuration.TaskManagerOptions;
 import org.apache.flink.core.fs.CloseableRegistry;
@@ -214,6 +215,10 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 
 	private Long syncSavepointId = null;
 
+	private final KeyGroupRange assignedKeyGroupRange;
+
+	private volatile int idInModel;
+
 	// ------------------------------------------------------------------------
 
 	/**
@@ -279,6 +284,17 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 		this.actionExecutor = Preconditions.checkNotNull(actionExecutor);
 		this.mailboxProcessor = new MailboxProcessor(this::processInput, mailbox, actionExecutor);
 		this.asyncExceptionHandler = new StreamTaskAsyncExceptionHandler(environment);
+
+		KeyGroupRange range = ((RuntimeEnvironment) getEnvironment()).keyGroupRange;
+		TaskInfo taskInfo = getEnvironment().getTaskInfo();
+
+		this.assignedKeyGroupRange = range != null ? range :
+			KeyGroupRangeAssignment.computeKeyGroupRangeForOperatorIndex(
+				taskInfo.getMaxNumberOfParallelSubtasks(),
+				taskInfo.getNumberOfParallelSubtasks(),
+				taskInfo.getIndexOfThisSubtask());
+
+		this.idInModel = getEnvironment().getTaskInfo().getIndexOfThisSubtask();
 	}
 
 	// ------------------------------------------------------------------------
@@ -743,6 +759,10 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 		return operatorChain.getStreamOutputs();
 	}
 
+	public KeyGroupRange getAssignedKeyGroupRange() {
+		return assignedKeyGroupRange;
+	}
+
 	// ------------------------------------------------------------------------
 	//  Checkpoint and Restore
 	// ------------------------------------------------------------------------
@@ -1120,13 +1140,33 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 	@Override
 	public void reinitializeState(KeyGroupRange keyGroupRange, int idInModel) {
 		LOG.info("++++++ let's reinitialize state: " + this.toString() + "  " + keyGroupRange + "  idInModel: " + idInModel);
-		throw new IllegalArgumentException("reinitializeState is not suppported now.");
+
+		try {
+			actionExecutor.runThrowing(() -> {
+				this.assignedKeyGroupRange.update(keyGroupRange);
+//				this.idInModel = idInModel;
+
+				initializeStateAndOpen();
+
+				initReconnect();
+			});
+		} catch (Exception e) {
+			LOG.info("++++++ error", e);
+			throw new RuntimeException(e);
+		}
+//		throw new IllegalArgumentException("reinitializeState is not suppported now.");
 	}
 
 	@Override
 	public void updateKeyGroupRange(KeyGroupRange keyGroupRange) {
 		LOG.info("++++++ updateKeyGroupRange: "  + this.toString() + "  " + keyGroupRange);
-		throw new IllegalArgumentException("updateKeyGroupRange is not suppported now.");
+
+		TaskRescaleManager rescaleManager = ((RuntimeEnvironment) getEnvironment()).taskRescaleManager;
+
+		this.assignedKeyGroupRange.update(keyGroupRange);
+
+		rescaleManager.finish();
+//		throw new IllegalArgumentException("updateKeyGroupRange is not suppported now.");
 	}
 
 	// ------------------------------------------------------------------------

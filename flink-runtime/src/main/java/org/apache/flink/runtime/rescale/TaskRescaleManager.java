@@ -136,6 +136,8 @@ public class TaskRescaleManager {
 	}
 
 	public void createNewResultPartitions() throws IOException {
+		//TODO: metrics will be created which should be reusable, need to understand and update the logic.
+
 		// produced intermediate result partitions
 		final ResultPartitionWriter[] newResultPartitionWriters = shuffleEnvironment.createResultPartitionWriters(
 			taskShuffleContext,

@@ -98,13 +98,14 @@ public class StreamTaskStateInitializerImpl implements StreamTaskStateInitialize
 
 	@Override
 	public StreamOperatorStateContext streamOperatorStateContext(
-		@Nonnull OperatorID operatorID,
-		@Nonnull String operatorClassName,
-		@Nonnull ProcessingTimeService processingTimeService,
-		@Nonnull KeyContext keyContext,
-		@Nullable TypeSerializer<?> keySerializer,
-		@Nonnull CloseableRegistry streamTaskCloseableRegistry,
-		@Nonnull MetricGroup metricGroup) throws Exception {
+            @Nonnull OperatorID operatorID,
+            @Nonnull String operatorClassName,
+            @Nonnull ProcessingTimeService processingTimeService,
+			@Nullable KeyGroupRange assignedKeyGroupRange,
+			@Nonnull KeyContext keyContext,
+            @Nullable TypeSerializer<?> keySerializer,
+            @Nonnull CloseableRegistry streamTaskCloseableRegistry,
+            @Nonnull MetricGroup metricGroup) throws Exception {
 
 		TaskInfo taskInfo = environment.getTaskInfo();
 		OperatorSubtaskDescriptionText operatorSubtaskDescription =
@@ -129,6 +130,7 @@ public class StreamTaskStateInitializerImpl implements StreamTaskStateInitialize
 
 			// -------------- Keyed State Backend --------------
 			keyedStatedBackend = keyedStatedBackend(
+				assignedKeyGroupRange,
 				keySerializer,
 				operatorIdentifierText,
 				prioritizedOperatorSubtaskStates,
@@ -259,6 +261,7 @@ public class StreamTaskStateInitializerImpl implements StreamTaskStateInitialize
 	}
 
 	protected <K> AbstractKeyedStateBackend<K> keyedStatedBackend(
+		KeyGroupRange assignedKeyGroupRange,
 		TypeSerializer<K> keySerializer,
 		String operatorIdentifierText,
 		PrioritizedOperatorSubtaskState prioritizedOperatorSubtaskStates,
@@ -273,10 +276,10 @@ public class StreamTaskStateInitializerImpl implements StreamTaskStateInitialize
 
 		TaskInfo taskInfo = environment.getTaskInfo();
 
-		final KeyGroupRange keyGroupRange = KeyGroupRangeAssignment.computeKeyGroupRangeForOperatorIndex(
-			taskInfo.getMaxNumberOfParallelSubtasks(),
-			taskInfo.getNumberOfParallelSubtasks(),
-			taskInfo.getIndexOfThisSubtask());
+//		final KeyGroupRange keyGroupRange = KeyGroupRangeAssignment.computeKeyGroupRangeForOperatorIndex(
+//			taskInfo.getMaxNumberOfParallelSubtasks(),
+//			taskInfo.getNumberOfParallelSubtasks(),
+//			taskInfo.getIndexOfThisSubtask());
 
 		// Now restore processing is included in backend building/constructing process, so we need to make sure
 		// each stream constructed in restore could also be closed in case of task cancel, for example the data
@@ -291,7 +294,8 @@ public class StreamTaskStateInitializerImpl implements StreamTaskStateInitialize
 					operatorIdentifierText,
 					keySerializer,
 					taskInfo.getMaxNumberOfParallelSubtasks(),
-					keyGroupRange,
+					assignedKeyGroupRange,
+//					keyGroupRange,
 					environment.getTaskKvStateRegistry(),
 					TtlTimeProvider.DEFAULT,
 					metricGroup,

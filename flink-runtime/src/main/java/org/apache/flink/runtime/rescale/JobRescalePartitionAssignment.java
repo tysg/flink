@@ -218,20 +218,20 @@ public class JobRescalePartitionAssignment {
 	}
 
 	private void generateAlignedKeyGroupRanges() {
-//		int keyGroupStart = 0;
-//		for (int subTaskIndex = 0; subTaskIndex < partitionAssignment.keySet().size(); subTaskIndex++) {
-//			int rangeSize = partitionAssignment.get(subTaskIndex).size();
-//
-//			KeyGroupRange keyGroupRange = rangeSize == 0 ?
-//				KeyGroupRange.EMPTY_KEY_GROUP_RANGE :
-//				new KeyGroupRange(
-//					keyGroupStart,
-//					keyGroupStart + rangeSize - 1,
-//					partitionAssignment.get(subTaskIndex));
-//
-//			alignedKeyGroupRanges.add(keyGroupRange);
-//			keyGroupStart += rangeSize;
-//		}
+		int keyGroupStart = 0;
+		for (int subTaskIndex = 0; subTaskIndex < partitionAssignment.keySet().size(); subTaskIndex++) {
+			int rangeSize = partitionAssignment.get(subTaskIndex).size();
+
+			KeyGroupRange keyGroupRange = rangeSize == 0 ?
+				KeyGroupRange.EMPTY_KEY_GROUP_RANGE :
+				new KeyGroupRange(
+					keyGroupStart,
+					keyGroupStart + rangeSize - 1,
+					partitionAssignment.get(subTaskIndex));
+
+			alignedKeyGroupRanges.add(keyGroupRange);
+			keyGroupStart += rangeSize;
+		}
 	}
 
 	private void generateExecutorIdMapping() {

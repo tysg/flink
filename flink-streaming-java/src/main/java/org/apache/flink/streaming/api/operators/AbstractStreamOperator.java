@@ -251,12 +251,15 @@ public abstract class AbstractStreamOperator<OUT>
 			Preconditions.checkNotNull(containingTask.getCancelables());
 		final StreamTaskStateInitializer streamTaskStateManager =
 			Preconditions.checkNotNull(containingTask.createStreamTaskStateInitializer());
+		final KeyGroupRange assignedKeyGroupRange =
+			containingTask.getAssignedKeyGroupRange();
 
 		final StreamOperatorStateContext context =
 			streamTaskStateManager.streamOperatorStateContext(
 				getOperatorID(),
 				getClass().getSimpleName(),
 				getProcessingTimeService(),
+				assignedKeyGroupRange,
 				this,
 				keySerializer,
 				streamTaskCloseableRegistry,

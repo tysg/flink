@@ -699,7 +699,7 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 	 *
 	 * @throws JobException if the execution cannot be deployed to the assigned resource
 	 */
-	public void deploy() throws JobException {
+	public CompletableFuture<Acknowledge> deploy() throws JobException {
 		assertRunningInJobMasterMainThread();
 
 		final LogicalSlot slot  = assignedResource;
@@ -738,7 +738,7 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 			// race double check, did we fail/cancel and do we need to release the slot?
 			if (this.state != DEPLOYING) {
 				slot.releaseSlot(new FlinkException("Actual state of execution " + this + " (" + state + ") does not match expected state DEPLOYING."));
-				return;
+				return null;
 			}
 
 			if (LOG.isInfoEnabled()) {
@@ -764,7 +764,7 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 
 			// We run the submission in the future executor so that the serialization of large TDDs does not block
 			// the main thread and sync back to the main thread once submission is completed.
-			CompletableFuture.supplyAsync(() -> taskManagerGateway.submitTask(deployment, rpcTimeout), executor)
+			return CompletableFuture.supplyAsync(() -> taskManagerGateway.submitTask(deployment, rpcTimeout), executor)
 				.thenCompose(Function.identity())
 				.whenCompleteAsync(
 					(ack, failure) -> {
@@ -791,6 +791,8 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 				ExceptionUtils.rethrow(t);
 			}
 		}
+
+		return null;
 	}
 
 	public void cancel() {
@@ -984,6 +986,8 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 		RescaleOptions rescaleOptions,
 		@Nullable KeyGroupRange keyGroupRange) throws ExecutionGraphException {
 
+		getVertex().assignKeyGroupRange(keyGroupRange);
+
 		assertRunningInJobMasterMainThread();
 
 		final LogicalSlot slot = assignedResource;
@@ -1049,7 +1053,12 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 	}
 
 	public CompletableFuture<Void> deploy(KeyGroupRange keyGroupRange, int idInModel) throws JobException {
-		throw new IllegalArgumentException("deploy is not suppported now.");
+		getVertex().assignKeyGroupRange(keyGroupRange);
+		getVertex().setIdInModel(idInModel);
+
+		return this.deploy()
+			.handle((ack, failure) -> null);
+//		throw new IllegalArgumentException("deploy is not suppported now.");
 	}
 
 	/**

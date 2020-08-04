@@ -18,11 +18,20 @@
 package org.apache.flink.streaming.controlplane.rescale;
 
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.runtime.jobgraph.*;
+import org.apache.flink.runtime.jobgraph.DistributionPattern;
+import org.apache.flink.runtime.jobgraph.IntermediateDataSet;
+import org.apache.flink.runtime.jobgraph.JobEdge;
+import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.rescale.JobGraphRescaler;
+import org.apache.flink.runtime.jobgraph.JobVertex;
+import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.graph.StreamEdge;
-import org.apache.flink.streaming.runtime.partitioner.*;
+import org.apache.flink.streaming.runtime.partitioner.AssignedKeyGroupStreamPartitioner;
+import org.apache.flink.streaming.runtime.partitioner.ForwardPartitioner;
+import org.apache.flink.streaming.runtime.partitioner.KeyGroupStreamPartitioner;
+import org.apache.flink.streaming.runtime.partitioner.RebalancePartitioner;
+import org.apache.flink.streaming.runtime.partitioner.StreamPartitioner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,7 +41,7 @@ import java.util.Map;
 
 public class StreamJobGraphRescaler extends JobGraphRescaler {
 
-	static final Logger LOG = LoggerFactory.getLogger(org.apache.flink.streaming.controlplane.rescale.StreamJobGraphRescaler.class);
+	static final Logger LOG = LoggerFactory.getLogger(StreamJobGraphRescaler.class);
 
 	public StreamJobGraphRescaler(JobGraph jobGraph, ClassLoader userCodeLoader) {
 		super(jobGraph, userCodeLoader);
@@ -100,26 +109,76 @@ public class StreamJobGraphRescaler extends JobGraphRescaler {
 	}
 
 	private Map<String, StreamEdge> updateEdgePartition(
-			JobEdge jobEdge,
-			Map<Integer, List<Integer>> partitionAssignment,
-			List<StreamEdge> upstreamOutEdges,
-			List<StreamEdge> downstreamInEdges) {
+		JobEdge jobEdge,
+		Map<Integer, List<Integer>> partitionAssignment,
+		List<StreamEdge> upstreamOutEdges,
+		List<StreamEdge> downstreamInEdges) {
 
 		Map<String, StreamEdge> updatedEdges = new HashMap<>();
 
 		for (StreamEdge outEdge : upstreamOutEdges) {
 			for (StreamEdge inEdge : downstreamInEdges) {
 				if (outEdge.equals(inEdge)) {
+
+					StreamPartitioner oldPartitioner = outEdge.getPartitioner();
+					StreamPartitioner newPartitioner = null;
+
+					if (oldPartitioner instanceof ForwardPartitioner) {
+						System.out.println("update vertex of ForwardPartitioner");
+						newPartitioner = new RebalancePartitioner();
+					} else if (oldPartitioner instanceof KeyGroupStreamPartitioner && partitionAssignment != null) {
+						System.out.println("update vertex of KeyGroupStreamPartitioner");
+						KeyGroupStreamPartitioner keyGroupStreamPartitioner = (KeyGroupStreamPartitioner) oldPartitioner;
+
+						newPartitioner = new AssignedKeyGroupStreamPartitioner(
+							keyGroupStreamPartitioner.getKeySelector(),
+							keyGroupStreamPartitioner.getMaxParallelism(),
+							partitionAssignment);
+					} else if (oldPartitioner instanceof AssignedKeyGroupStreamPartitioner && partitionAssignment != null) {
+						System.out.println("update vertex of AssignedKeyGroupStreamPartitioner");
+
+						((AssignedKeyGroupStreamPartitioner) oldPartitioner).updateNewPartitionAssignment(partitionAssignment);
+						newPartitioner = oldPartitioner;
+					}
+					// TODO scaling: StreamEdge.edgeId contains partitioner string, update it?
+					// TODO scaling: what if RescalePartitioner
+
+					if (newPartitioner != null) {
+						jobEdge.setDistributionPattern(DistributionPattern.ALL_TO_ALL);
+						jobEdge.setShipStrategyName(newPartitioner.toString());
+
+						System.out.println(outEdge.getEdgeId());
+
+						outEdge.setPartitioner(newPartitioner);
+						inEdge.setPartitioner(newPartitioner);
+
+						updatedEdges.put(inEdge.getEdgeId(), inEdge);
+					}
 				}
 			}
 		}
+
 		return updatedEdges;
 	}
 
 	private void updateAllOperatorsConfig(StreamConfig chainEntryPointConfig, Map<String, StreamEdge> updatedEdges) {
+		updateOperatorConfig(chainEntryPointConfig, updatedEdges);
 
+		Map<Integer, StreamConfig> chainedConfigs = chainEntryPointConfig.getTransitiveChainedTaskConfigs(userCodeLoader);
+		for (Map.Entry<Integer, StreamConfig> entry : chainedConfigs.entrySet()) {
+			updateOperatorConfig(entry.getValue(), updatedEdges);
+		}
+		chainEntryPointConfig.setTransitiveChainedTaskConfigs(chainedConfigs);
 	}
 
 	private void updateOperatorConfig(StreamConfig operatorConfig, Map<String, StreamEdge> updatedEdges) {
+		List<StreamEdge> nonChainedOutputs = operatorConfig.getNonChainedOutputs(userCodeLoader);
+		for (int i = 0; i < nonChainedOutputs.size(); i++) {
+			StreamEdge edge = nonChainedOutputs.get(i);
+			if (updatedEdges.containsKey(edge.getEdgeId())) {
+				nonChainedOutputs.set(i, updatedEdges.get(edge.getEdgeId()));
+			}
+		}
+		operatorConfig.setNonChainedOutputs(nonChainedOutputs);
 	}
 }

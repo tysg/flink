@@ -41,6 +41,7 @@ import org.apache.flink.runtime.jobmanager.scheduler.LocationPreferenceConstrain
 import org.apache.flink.runtime.jobmaster.LogicalSlot;
 import org.apache.flink.runtime.rescale.RescaleID;
 import org.apache.flink.runtime.scheduler.strategy.ExecutionVertexID;
+import org.apache.flink.runtime.state.KeyGroupRange;
 import org.apache.flink.runtime.taskmanager.TaskManagerLocation;
 import org.apache.flink.runtime.util.EvictingBoundedList;
 import org.apache.flink.util.ExceptionUtils;
@@ -101,6 +102,8 @@ public class ExecutionVertex implements AccessExecutionVertex, Archiveable<Archi
 	private final ArrayList<InputSplit> inputSplits;
 
 	private volatile RescaleID rescaleId;
+
+	private volatile KeyGroupRange keyGroupRange;
 
 	private volatile int idInModel;
 
@@ -299,6 +302,10 @@ public class ExecutionVertex implements AccessExecutionVertex, Archiveable<Archi
 
 	public void updateRescaleId(RescaleID rescaleId) {
 		this.rescaleId = rescaleId;
+	}
+
+	public void assignKeyGroupRange(KeyGroupRange keyGroupRange) {
+		this.keyGroupRange = keyGroupRange;
 	}
 
 	public RescaleID getRescaleId() {

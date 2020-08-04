@@ -1262,7 +1262,8 @@ public class StreamTaskTest extends TestLogger {
 			UnregisteredMetricGroups.createUnregisteredTaskMetricGroup(),
 			consumableNotifier,
 			partitionProducerStateChecker,
-			executor);
+			executor,
+			null);
 	}
 
 	// ------------------------------------------------------------------------
@@ -1429,13 +1430,13 @@ public class StreamTaskTest extends TestLogger {
 		@Override
 		public StreamTaskStateInitializer createStreamTaskStateInitializer() {
 			final StreamTaskStateInitializer streamTaskStateManager = super.createStreamTaskStateInitializer();
-			return (operatorID, operatorClassName, processingTimeService, keyContext, keySerializer, closeableRegistry, metricGroup) -> {
+			return (operatorID, operatorClassName, processingTimeService, assignedKeyGroupRange, keyContext, keySerializer, closeableRegistry, metricGroup) -> {
 
 				final StreamOperatorStateContext controller = streamTaskStateManager.streamOperatorStateContext(
 					operatorID,
 					operatorClassName,
 					processingTimeService,
-					keyContext,
+                        assignedKeyGroupRange, keyContext,
 					keySerializer,
 					closeableRegistry,
 					metricGroup);

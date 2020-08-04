@@ -230,7 +230,8 @@ public class TaskCheckpointingBehaviourTest extends TestLogger {
 				UnregisteredMetricGroups.createUnregisteredTaskMetricGroup(),
 				new NoOpResultPartitionConsumableNotifier(),
 				mock(PartitionProducerStateChecker.class),
-				Executors.directExecutor());
+				Executors.directExecutor(),
+			null);
 	}
 
 	// ------------------------------------------------------------------------

@@ -273,6 +273,10 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 
 	private TaskRescaleManager taskRescaleManager = null;
 
+	/** The begin KeyGroupRange used to initialize streamtask */
+	@Nullable
+	private KeyGroupRange keyGroupRange;
+
 	/**
 	 * <p><b>IMPORTANT:</b> This constructor may not start any work that would need to
 	 * be undone in the case of a failing task deployment.</p>
@@ -305,7 +309,8 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 		@Nonnull TaskMetricGroup metricGroup,
 		ResultPartitionConsumableNotifier resultPartitionConsumableNotifier,
 		PartitionProducerStateChecker partitionProducerStateChecker,
-		Executor executor) {
+		Executor executor,
+		@Nullable KeyGroupRange keyGroupRange) {
 
 		Preconditions.checkNotNull(jobInformation);
 		Preconditions.checkNotNull(taskInformation);
@@ -414,6 +419,8 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 
 		// finally, create the executing thread, but do not start it
 		executingThread = new Thread(TASK_THREADS_GROUP, this, taskNameWithSubtask);
+
+		this.keyGroupRange = keyGroupRange;
 	}
 
 	// ------------------------------------------------------------------------
@@ -691,6 +698,7 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 				checkpointResponder,
 				taskManagerConfig,
 				taskRescaleManager,
+				keyGroupRange,
 				metrics,
 				this);
 
@@ -1246,11 +1254,16 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 	}
 
 	public void assignNewState(KeyGroupRange keyGroupRange, int idInModel, JobManagerTaskRestore taskRestore) {
-		throw new IllegalArgumentException("assignNewState is not suppported now.");
+		((TaskStateManagerImpl) taskStateManager).updateTaskRestore(taskRestore);
+
+		invokable.reinitializeState(keyGroupRange, idInModel);
 	}
 
 	public void updateKeyGroupRange(KeyGroupRange keyGroupRange) {
-		throw new IllegalArgumentException("assignNewState is not suppported now.");
+		// it is better to keep those two be consistent.
+		this.keyGroupRange = keyGroupRange;
+		invokable.updateKeyGroupRange(keyGroupRange);
+//		throw new IllegalArgumentException("assignNewState is not suppported now.");
 	}
 
 	public void createNewResultPartitions() throws IOException {

@@ -122,8 +122,7 @@ public class IntermediateResult {
 				}
 			}
 			partitions = newPartitions;
-			return;
-//			throw new IllegalArgumentException("scale down is not supported now");
+			throw new IllegalArgumentException("scale in is not supported now");
 		}
 
 		this.numParallelProducers = numParallelProducers;

@@ -588,7 +588,8 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 				taskMetricGroup,
 				resultPartitionConsumableNotifier,
 				partitionStateChecker,
-				getRpcService().getExecutor());
+				getRpcService().getExecutor(),
+				tdd.getKeyGroupRange());
 
 			taskMetricGroup.gauge(MetricNames.IS_BACKPRESSURED, task::isBackPressured);
 
