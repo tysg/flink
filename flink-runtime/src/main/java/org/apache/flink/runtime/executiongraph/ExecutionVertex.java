@@ -308,6 +308,10 @@ public class ExecutionVertex implements AccessExecutionVertex, Archiveable<Archi
 		this.keyGroupRange = keyGroupRange;
 	}
 
+	public KeyGroupRange getKeyGroupRange() {
+		return keyGroupRange;
+	}
+
 	public RescaleID getRescaleId() {
 		return rescaleId;
 	}

@@ -40,6 +40,7 @@ import org.apache.flink.runtime.jobgraph.IntermediateDataSetID;
 import org.apache.flink.runtime.rescale.RescaleID;
 import org.apache.flink.runtime.shuffle.ShuffleDescriptor;
 import org.apache.flink.runtime.shuffle.UnknownShuffleDescriptor;
+import org.apache.flink.runtime.state.KeyGroupRange;
 import org.apache.flink.types.Either;
 import org.apache.flink.util.SerializedValue;
 
@@ -60,6 +61,7 @@ public class TaskDeploymentDescriptorFactory {
 	private final boolean allowUnknownPartitions;
 	private final int subtaskIndex;
 	private final ExecutionEdge[][] inputEdges;
+	private final KeyGroupRange keyGroupRange;
 
 	private TaskDeploymentDescriptorFactory(
 			ExecutionAttemptID executionId,
@@ -69,7 +71,8 @@ public class TaskDeploymentDescriptorFactory {
 			JobID jobID,
 			boolean allowUnknownPartitions,
 			int subtaskIndex,
-			ExecutionEdge[][] inputEdges) {
+			ExecutionEdge[][] inputEdges,
+			@Nullable KeyGroupRange keyGroupRange) {
 		this.executionId = executionId;
 		this.attemptNumber = attemptNumber;
 		this.serializedJobInformation = serializedJobInformation;
@@ -78,6 +81,7 @@ public class TaskDeploymentDescriptorFactory {
 		this.allowUnknownPartitions = allowUnknownPartitions;
 		this.subtaskIndex = subtaskIndex;
 		this.inputEdges = inputEdges;
+		this.keyGroupRange = keyGroupRange;
 	}
 
 	public TaskDeploymentDescriptor createDeploymentDescriptor(
@@ -85,7 +89,7 @@ public class TaskDeploymentDescriptorFactory {
 			int targetSlotNumber,
 			@Nullable JobManagerTaskRestore taskRestore,
 			Collection<ResultPartitionDeploymentDescriptor> producedPartitions) {
-		return new TaskDeploymentDescriptor(
+		TaskDeploymentDescriptor taskDeploymentDescriptor = new TaskDeploymentDescriptor(
 			jobID,
 			serializedJobInformation,
 			taskInfo,
@@ -97,6 +101,8 @@ public class TaskDeploymentDescriptorFactory {
 			taskRestore,
 			new ArrayList<>(producedPartitions),
 			createInputGateDeploymentDescriptors());
+		taskDeploymentDescriptor.setKeyGroupRange(keyGroupRange);
+		return taskDeploymentDescriptor;
 	}
 
 	private List<InputGateDeploymentDescriptor> createInputGateDeploymentDescriptors() {
@@ -146,7 +152,8 @@ public class TaskDeploymentDescriptorFactory {
 			executionGraph.getJobID(),
 			executionGraph.getScheduleMode().allowLazyDeployment(),
 			executionVertex.getParallelSubtaskIndex(),
-			executionVertex.getAllInputEdges());
+			executionVertex.getAllInputEdges(),
+			executionVertex.getKeyGroupRange());
 	}
 
 	private static MaybeOffloaded<JobInformation> getSerializedJobInformation(ExecutionGraph executionGraph) {

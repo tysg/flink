@@ -155,7 +155,7 @@ public final class TaskDeploymentDescriptor implements Serializable {
 	private int idInModel = 0;
 
 	/** Assigned keyGroupRange. */
-	private KeyGroupRange keyGroupRange = KeyGroupRange.DEFAULT;
+	private KeyGroupRange keyGroupRange;
 
 	public TaskDeploymentDescriptor(
 		JobID jobId,
@@ -290,6 +290,10 @@ public final class TaskDeploymentDescriptor implements Serializable {
 
 	public KeyGroupRange getKeyGroupRange() {
 		return keyGroupRange;
+	}
+
+	public void setKeyGroupRange(KeyGroupRange keyGroupRange) {
+		this.keyGroupRange = keyGroupRange;
 	}
 
 
