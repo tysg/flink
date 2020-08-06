@@ -975,9 +975,14 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 		// update produced partitions for sync.
 		getVertex().updateRescaleId(rescaleId);
 		for (Map.Entry producedPartition : producedPartitions.entrySet()) {
-			((ResultPartitionDeploymentDescriptor) producedPartition.getValue())
-				.getShuffleDescriptor()
+			IntermediateResultPartitionID intermediateResultPartitionID = (IntermediateResultPartitionID) producedPartition.getKey();
+			ResultPartitionDeploymentDescriptor resultPartitionDeploymentDescriptor = (ResultPartitionDeploymentDescriptor) producedPartition.getValue();
+			// update shuffle descriptor
+			resultPartitionDeploymentDescriptor.getShuffleDescriptor()
 				.updateResultPartitionId(vertex.getRescaleId());
+			// update partition descriptor
+			IntermediateResultPartition intermediateResultPartition = vertex.getProducedPartitions().get(intermediateResultPartitionID);
+			resultPartitionDeploymentDescriptor.setNumberOfSubpartitions(intermediateResultPartition.getConsumers().get(0).size());
 		}
 	}
 

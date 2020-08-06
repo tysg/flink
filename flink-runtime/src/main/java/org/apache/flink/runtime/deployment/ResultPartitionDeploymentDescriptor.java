@@ -81,6 +81,10 @@ public class ResultPartitionDeploymentDescriptor implements Serializable {
 		return partitionDescriptor.getNumberOfSubpartitions();
 	}
 
+	public void setNumberOfSubpartitions(int numberOfSubpartitions) {
+		partitionDescriptor.setNumberOfSubpartitions(numberOfSubpartitions);
+	}
+
 	public int getMaxParallelism() {
 		return maxParallelism;
 	}

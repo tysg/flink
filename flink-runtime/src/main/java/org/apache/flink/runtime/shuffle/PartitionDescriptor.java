@@ -53,7 +53,7 @@ public class PartitionDescriptor implements Serializable {
 	private final ResultPartitionType partitionType;
 
 	/** The number of subpartitions. */
-	private final int numberOfSubpartitions;
+	private int numberOfSubpartitions;
 
 	/** Connection index to identify this partition of intermediate result. */
 	private final int connectionIndex;
@@ -104,6 +104,10 @@ public class PartitionDescriptor implements Serializable {
 
 	void setRescaleId(RescaleID rescaleId) {
 		this.rescaleId = checkNotNull(rescaleId);
+	}
+
+	public void setNumberOfSubpartitions(int numberOfSubpartitions) {
+		this.numberOfSubpartitions = numberOfSubpartitions;
 	}
 
 	RescaleID getRescaleId() {
