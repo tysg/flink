@@ -991,7 +991,7 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 		RescaleOptions rescaleOptions,
 		@Nullable KeyGroupRange keyGroupRange) throws ExecutionGraphException {
 
-		getVertex().assignKeyGroupRange(keyGroupRange);
+		vertex.assignKeyGroupRange(keyGroupRange);
 
 		assertRunningInJobMasterMainThread();
 

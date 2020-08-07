@@ -1143,7 +1143,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 
 		try {
 			actionExecutor.runThrowing(() -> {
-				this.assignedKeyGroupRange.update(keyGro upRange);
+				this.assignedKeyGroupRange.update(keyGroupRange);
 //				this.idInModel = idInModel;
 
 				initializeStateAndOpen();
