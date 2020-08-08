@@ -40,6 +40,7 @@ import org.apache.flink.runtime.jobmanager.scheduler.NoResourceAvailableExceptio
 import org.apache.flink.runtime.jobmaster.LogicalSlot;
 import org.apache.flink.runtime.jobmaster.slotpool.SlotProvider;
 import org.apache.flink.runtime.metrics.groups.JobManagerJobMetricGroup;
+import org.apache.flink.runtime.rescale.RescaleActionListener;
 import org.apache.flink.runtime.rest.handler.legacy.backpressure.BackPressureStatsTracker;
 import org.apache.flink.runtime.scheduler.strategy.ExecutionVertexID;
 import org.apache.flink.runtime.scheduler.strategy.LazyFromSourcesSchedulingStrategy;
@@ -115,7 +116,8 @@ public class DefaultScheduler extends SchedulerBase implements SchedulerOperatio
 		final RestartBackoffTimeStrategy restartBackoffTimeStrategy,
 		final ExecutionVertexOperations executionVertexOperations,
 		final ExecutionVertexVersioner executionVertexVersioner,
-		final ExecutionSlotAllocatorFactory executionSlotAllocatorFactory) throws Exception {
+		final ExecutionSlotAllocatorFactory executionSlotAllocatorFactory,
+		final RescaleActionListener rescaleActionListener) throws Exception {
 
 		super(
 			log,
@@ -135,7 +137,8 @@ public class DefaultScheduler extends SchedulerBase implements SchedulerOperatio
 			shuffleMaster,
 			partitionTracker,
 			executionVertexVersioner,
-			false);
+			false,
+			rescaleActionListener);
 
 		this.log = log;
 
@@ -321,10 +324,10 @@ public class DefaultScheduler extends SchedulerBase implements SchedulerOperatio
 	}
 
 	private static Map<ExecutionVertexID, ExecutionVertexDeploymentOption> groupDeploymentOptionsByVertexId(
-			final Collection<ExecutionVertexDeploymentOption> executionVertexDeploymentOptions) {
+		final Collection<ExecutionVertexDeploymentOption> executionVertexDeploymentOptions) {
 		return executionVertexDeploymentOptions.stream().collect(Collectors.toMap(
-				ExecutionVertexDeploymentOption::getExecutionVertexId,
-				Function.identity()));
+			ExecutionVertexDeploymentOption::getExecutionVertexId,
+			Function.identity()));
 	}
 
 	private List<SlotExecutionVertexAssignment> allocateSlots(final List<ExecutionVertexDeploymentOption> executionVertexDeploymentOptions) {

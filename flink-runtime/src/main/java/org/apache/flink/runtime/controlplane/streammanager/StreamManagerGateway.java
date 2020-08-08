@@ -21,9 +21,11 @@ package org.apache.flink.runtime.controlplane.streammanager;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
+import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobmaster.JobMaster;
 import org.apache.flink.runtime.jobmaster.JobMasterId;
 import org.apache.flink.runtime.registration.RegistrationResponse;
+import org.apache.flink.runtime.rescale.JobRescalePartitionAssignment;
 import org.apache.flink.runtime.rpc.FencedRpcGateway;
 import org.apache.flink.runtime.rpc.RpcTimeout;
 
@@ -49,6 +51,7 @@ public interface StreamManagerGateway extends FencedRpcGateway<StreamManagerId> 
 		ResourceID jobMasterResourceId,
 		String jobMasterAddress,
 		JobID jobId,
+		ClassLoader userLoader,
 		@RpcTimeout Time timeout);
 
 	/**
@@ -60,5 +63,9 @@ public interface StreamManagerGateway extends FencedRpcGateway<StreamManagerId> 
 	void disconnectJobManager(
 		final JobID jobId,
 		final Exception cause);
+
+	void rescaleStreamJob(JobVertexID vertexID, int parallelism, JobRescalePartitionAssignment jobRescalePartitionAssignment);
+
+	void repartitionStreamJob(JobVertexID vertexID, int parallelism, JobRescalePartitionAssignment jobRescalePartitionAssignment);
 
 }

@@ -35,10 +35,10 @@ public interface JobRescaleAction {
 
 	class RescaleParamsWrapper {
 
-		final ActionType type;
-		final JobVertexID vertexID;
-		final int newParallelism;
-		final JobRescalePartitionAssignment jobRescalePartitionAssignment;
+		public final ActionType type;
+		public final JobVertexID vertexID;
+		public final int newParallelism;
+		public final JobRescalePartitionAssignment jobRescalePartitionAssignment;
 
 		public RescaleParamsWrapper(
 				ActionType type,

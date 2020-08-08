@@ -26,6 +26,7 @@ import org.apache.flink.runtime.checkpoint.PendingCheckpoint;
 import org.apache.flink.runtime.checkpoint.StateAssignmentOperation;
 import org.apache.flink.runtime.concurrent.ComponentMainThreadExecutor;
 import org.apache.flink.runtime.concurrent.FutureUtils;
+import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
 import org.apache.flink.runtime.executiongraph.*;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.api.common.JobStatus;
@@ -89,14 +90,15 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 	public JobRescaleCoordinator(
 			JobGraph jobGraph,
 			ExecutionGraph executionGraph,
-			ClassLoader userCodeLoader) {
+			ClassLoader userCodeLoader,
+			RescaleActionListener rescaleActionListener) {
 
 		this.jobGraph = jobGraph;
 		this.executionGraph = executionGraph;
 
 		this.notYetAcknowledgedTasks = new ArrayList<>();
 
-		this.streamSwitchAdaptor = new FlinkStreamSwitchAdaptor(this, executionGraph);
+		this.streamSwitchAdaptor = new FlinkStreamSwitchAdaptor(this, executionGraph, rescaleActionListener);
 		this.jobGraphRescaler = JobGraphRescaler.instantiate(jobGraph, userCodeLoader);
 	}
 
@@ -179,6 +181,10 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 		} catch (Exception e) {
 			failExecution(e);
 		}
+	}
+
+	private StreamManagerGateway getStreamManagerGateway(){
+		this.executionGraph.getCheckpointCoordinator().get
 	}
 
 	@Override

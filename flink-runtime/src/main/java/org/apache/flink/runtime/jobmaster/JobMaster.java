@@ -71,7 +71,8 @@ import org.apache.flink.runtime.registration.RegisteredRpcConnection;
 import org.apache.flink.runtime.registration.RegistrationResponse;
 import org.apache.flink.runtime.registration.RetryingRegistration;
 import org.apache.flink.runtime.registration.RetryingRegistrationConfiguration;
-import org.apache.flink.runtime.rescale.JobRescaleCoordinator;
+import org.apache.flink.runtime.rescale.JobRescaleAction;
+import org.apache.flink.runtime.rescale.RescaleActionListener;
 import org.apache.flink.runtime.resourcemanager.ResourceManagerGateway;
 import org.apache.flink.runtime.resourcemanager.ResourceManagerId;
 import org.apache.flink.runtime.rest.handler.legacy.backpressure.BackPressureStatsTracker;
@@ -205,6 +206,9 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 	private String streamManagerAddress;
 
 	@Nullable
+	private StreamManagerGateway currentStreamManagerGateway;
+
+	@Nullable
 	private EstablishedResourceManagerConnection establishedResourceManagerConnection;
 
 	private Map<String, Object> accumulators;
@@ -311,7 +315,12 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 			jobManagerJobMetricGroup,
 			jobMasterConfiguration.getSlotRequestTimeout(),
 			shuffleMaster,
-			partitionTracker);
+			partitionTracker,
+			wrapper -> {
+				checkState(currentStreamManagerGateway != null, "do not have stream manager gateway");
+				currentStreamManagerGateway.rescaleStreamJob(
+					wrapper.vertexID, wrapper.newParallelism, wrapper.jobRescalePartitionAssignment);
+			});
 	}
 
 	//----------------------------------------------------------------------------------------------
@@ -980,10 +989,11 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		log.info("Connecting to StreamManager ...");
 
 		this.streamingLeaderService.start(
-			new StreamingLeaderService.JobMasterLocation(getFencingToken(),
+			new StreamingLeaderService.JobMasterInfo(getFencingToken(),
 				resourceId,
 				getAddress(),
-				jobGraph.getJobID()),
+				jobGraph.getJobID(),
+				this.userCodeLoader),
 			getRpcService(),
 			highAvailabilityServices,
 			new StreamingLeaderListenerImpl(jobGraph.getJobID(), resourceId, getAddress(), getFencingToken())
@@ -1113,6 +1123,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		@Override
 		public void streamManagerGainedLeadership(JobID jobId, StreamManagerGateway streamManagerGateway, JMTMRegistrationSuccess registrationMessage) {
 			runAsync(() -> log.info("a new stream mamanger gained Leadership"));
+			currentStreamManagerGateway = streamManagerGateway;
 		}
 
 		@Override

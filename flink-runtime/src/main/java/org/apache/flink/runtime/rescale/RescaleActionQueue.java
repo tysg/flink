@@ -15,14 +15,17 @@ public class RescaleActionQueue extends Thread {
 
 	private final JobRescaleAction rescaleAction;
 
+	private final RescaleActionListener rescaleActionListener;
+
 	private final Queue<RescaleParamsWrapper> queue;
 
 	private boolean isFinished;
 
 	private volatile boolean isStop;
 
-	public RescaleActionQueue(JobRescaleAction rescaleAction) {
+	public RescaleActionQueue(JobRescaleAction rescaleAction, RescaleActionListener rescaleActionListener) {
 		this.rescaleAction = rescaleAction;
+		this.rescaleActionListener = rescaleActionListener;
 		this.queue = new LinkedList<>();
 	}
 
@@ -40,7 +43,8 @@ public class RescaleActionQueue extends Thread {
 					RescaleParamsWrapper wrapper = queue.poll();
 					if (wrapper != null) {
 						isFinished = false;
-						rescaleAction.parseParams(wrapper);
+//						rescaleAction.parseParams(wrapper);
+						rescaleActionListener.processRescaleParamsWrapper(wrapper);
 
 						while (!isFinished && !isStop) {
 							queue.wait(); // wait for finish
@@ -57,10 +61,10 @@ public class RescaleActionQueue extends Thread {
 	}
 
 	public void put(
-			JobRescaleAction.ActionType type,
-			JobVertexID vertexID,
-			int newParallelism,
-			JobRescalePartitionAssignment jobRescalePartitionAssignment) {
+		JobRescaleAction.ActionType type,
+		JobVertexID vertexID,
+		int newParallelism,
+		JobRescalePartitionAssignment jobRescalePartitionAssignment) {
 
 		put(new RescaleParamsWrapper(type, vertexID, newParallelism, jobRescalePartitionAssignment));
 	}

@@ -27,17 +27,21 @@ import org.apache.flink.runtime.dispatcher.DispatcherGateway;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
 import org.apache.flink.runtime.jobgraph.JobGraph;
+import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobmaster.JobMasterGateway;
 import org.apache.flink.runtime.jobmaster.JobMasterId;
 import org.apache.flink.runtime.jobmaster.JobMasterRegistrationSuccess;
 import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.registration.RegistrationResponse;
+import org.apache.flink.runtime.rescale.JobGraphRescaler;
+import org.apache.flink.runtime.rescale.JobRescalePartitionAssignment;
 import org.apache.flink.runtime.resourcemanager.JobLeaderIdActions;
 import org.apache.flink.runtime.resourcemanager.JobLeaderIdService;
 import org.apache.flink.runtime.resourcemanager.registration.JobManagerRegistration;
 import org.apache.flink.runtime.rpc.*;
 import org.apache.flink.runtime.rpc.akka.AkkaRpcServiceUtils;
 import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
+import org.apache.flink.streaming.controlplane.rescale.StreamJobGraphRescaler;
 import org.apache.flink.streaming.controlplane.streammanager.exceptions.StreamManagerException;
 import org.apache.flink.util.OptionalConsumer;
 
@@ -46,6 +50,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
+import static org.apache.flink.util.Preconditions.checkState;
 
 /**
  * @author trx
@@ -75,6 +80,10 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	private final FatalErrorHandler fatalErrorHandler;
 
 	private final LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever;
+
+	private final JobGraphRescaler jobGraphRescaler;
+
+	private CompletableFuture<Acknowledge> rescalePartitionFuture;
 
     /*
 
@@ -120,6 +129,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
         /*
         TODO: initialize other fields
          */
+		this.jobGraphRescaler = new StreamJobGraphRescaler(jobGraph, null);
 	}
 
 	/**
@@ -151,7 +161,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		CompletableFuture<Acknowledge> suspendFuture = callAsyncWithoutFencing(
 			() -> suspendManagement(cause),
 			RpcUtils.INF_TIMEOUT);
-		return suspendFuture.whenComplete(((acknowledge, throwable) -> stop()));
+		return suspendFuture.whenComplete((acknowledge, throwable) -> stop());
 	}
 
 	// ------------------------------------------------------------------------
@@ -164,6 +174,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		final ResourceID jobManagerResourceId,
 		final String jobManagerAddress,
 		final JobID jobId,
+		final ClassLoader userLoader,
 		final Time timeout) {
 
 		checkNotNull(jobMasterId);
@@ -237,6 +248,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 					return new RegistrationResponse.Decline(throwable.getMessage());
 				} else {
+					// save passed userCode ClassLoader to current JobGraphRescaler
+					this.jobGraphRescaler.setUserCodeLoader(userLoader);
 					return registrationResponse;
 				}
 			},
@@ -246,6 +259,17 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	@Override
 	public void disconnectJobManager(JobID jobId, Exception cause) {
 		closeJobManagerConnection(jobId, cause);
+	}
+
+	@Override
+	public void rescaleStreamJob(JobVertexID vertexID, int parallelism, JobRescalePartitionAssignment jobRescalePartitionAssignment) {
+		checkState(this.rescalePartitionFuture.isDone(), "Last rescale/repartition action haven't done");
+		jobGraphRescaler.rescale(vertexID, parallelism, jobRescalePartitionAssignment.getPartitionAssignment());
+	}
+
+	@Override
+	public void repartitionStreamJob(JobVertexID vertexID, int parallelism, JobRescalePartitionAssignment jobRescalePartitionAssignment) {
+
 	}
 
 

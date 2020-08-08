@@ -77,7 +77,7 @@ public class StreamingLeaderService {
 	/**
 	 * Address of the owner of this service. This address is used for the job manager connection.
 	 */
-	private JobMasterLocation jobMasterLocation;
+	private JobMasterInfo jobMasterInfo;
 
 	/**
 	 * Rpc service to use for establishing connections.
@@ -104,7 +104,7 @@ public class StreamingLeaderService {
 
 		state = StreamingLeaderService.State.CREATED;
 
-		jobMasterLocation = null;
+		jobMasterInfo = null;
 		rpcService = null;
 		highAvailabilityServices = null;
 		streamManagerLeaderListener = null;
@@ -118,13 +118,13 @@ public class StreamingLeaderService {
 	 * todo this method only connect the corresponding stream manager
 	 * Start the stream manager leader service with the given services.
 	 *
-	 * @param initialJobMasterLocation             to be used for establishing connections (source address)
+	 * @param initialJobMasterInfo             to be used for establishing connections (source address)
 	 * @param initialRpcService               to be used to create rpc connections
 	 * @param initialHighAvailabilityServices to create leader retrieval services for the different jobs
 	 * @param initialStreamingLeaderListener  listening for stream leader changes
 	 */
 	public void start(
-		final JobMasterLocation initialJobMasterLocation,
+		final JobMasterInfo initialJobMasterInfo,
 		final RpcService initialRpcService,
 		final HighAvailabilityServices initialHighAvailabilityServices,
 		final StreamingLeaderListener initialStreamingLeaderListener) throws Exception {
@@ -134,7 +134,7 @@ public class StreamingLeaderService {
 		} else {
 			LOG.info("Start job leader service.");
 
-			this.jobMasterLocation = Preconditions.checkNotNull(initialJobMasterLocation);
+			this.jobMasterInfo = Preconditions.checkNotNull(initialJobMasterInfo);
 			this.rpcService = Preconditions.checkNotNull(initialRpcService);
 			this.highAvailabilityServices = Preconditions.checkNotNull(initialHighAvailabilityServices);
 			this.streamManagerLeaderListener = Preconditions.checkNotNull(initialStreamingLeaderListener);
@@ -355,7 +355,7 @@ public class StreamingLeaderService {
 				LOG,
 				leaderAddress,
 				streamManagerId,
-				jobMasterLocation,
+				jobMasterInfo,
 				rpcService.getExecutor());
 
 			LOG.info("Try to register at job manager {} with leader id {}.", leaderAddress, streamManagerId.toUUID());
@@ -386,16 +386,16 @@ public class StreamingLeaderService {
 		 * Rpc connection for the job manager <--> task manager connection.
 		 */
 		private final class StreamManagerRegisteredRpcConnection extends RegisteredRpcConnection<StreamManagerId, StreamManagerGateway, JMTMRegistrationSuccess> {
-			private final JobMasterLocation jobMasterLocation;
+			private final JobMasterInfo jobMasterInfo;
 
 			StreamManagerRegisteredRpcConnection(
 				Logger log,
 				String targetAddress,
 				StreamManagerId streamManagerId,
-				JobMasterLocation jobMasterLocation,
+				JobMasterInfo jobMasterInfo,
 				Executor executor) {
 				super(log, targetAddress, streamManagerId, executor);
-				this.jobMasterLocation = jobMasterLocation;
+				this.jobMasterInfo = jobMasterInfo;
 			}
 
 			@Override
@@ -408,7 +408,7 @@ public class StreamingLeaderService {
 					getTargetAddress(),
 					getTargetLeaderId(),
 					retryingRegistrationConfiguration,
-					jobMasterLocation);
+					jobMasterInfo);
 			}
 
 			@Override
@@ -442,7 +442,7 @@ public class StreamingLeaderService {
 	private static final class StreamManagerRetryingRegistration
 		extends RetryingRegistration<StreamManagerId, StreamManagerGateway, JMTMRegistrationSuccess> {
 
-		private final JobMasterLocation jobMasterLocation;
+		private final JobMasterInfo jobMasterInfo;
 
 		StreamManagerRetryingRegistration(
 			Logger log,
@@ -452,7 +452,7 @@ public class StreamingLeaderService {
 			String targetAddress,
 			StreamManagerId streamManagerId,
 			RetryingRegistrationConfiguration retryingRegistrationConfiguration,
-			JobMasterLocation jobMasterLocation) {
+			JobMasterInfo jobMasterInfo) {
 			super(
 				log,
 				rpcService,
@@ -462,7 +462,7 @@ public class StreamingLeaderService {
 				streamManagerId,
 				retryingRegistrationConfiguration);
 
-			this.jobMasterLocation = jobMasterLocation;
+			this.jobMasterInfo = jobMasterInfo;
 		}
 
 		@Override
@@ -471,26 +471,33 @@ public class StreamingLeaderService {
 			StreamManagerId streamManagerId,
 			long timeoutMillis) {
 			return gateway.registerJobManager(
-				jobMasterLocation.jobMasterId,
-				jobMasterLocation.jobManagerResourceID,
-				jobMasterLocation.jobMasterRpcAddress,
-				jobMasterLocation.jobID,
+				jobMasterInfo.jobMasterId,
+				jobMasterInfo.jobManagerResourceID,
+				jobMasterInfo.jobMasterRpcAddress,
+				jobMasterInfo.jobID,
+				jobMasterInfo.userCodeClassLoader,
 				Time.milliseconds(timeoutMillis)
 			);
 		}
 	}
 
-	public static class JobMasterLocation {
+	public static class JobMasterInfo {
 		final JobMasterId jobMasterId;
 		final ResourceID jobManagerResourceID;
 		final String jobMasterRpcAddress;
 		final JobID jobID;
+		final ClassLoader userCodeClassLoader;
 
-		public JobMasterLocation(JobMasterId jobMasterId, ResourceID jobManagerResourceID, String jobMasterRpcAddress, JobID jobID) {
+		public JobMasterInfo(JobMasterId jobMasterId,
+							 ResourceID jobManagerResourceID,
+							 String jobMasterRpcAddress,
+							 JobID jobID,
+							 ClassLoader userCodeClassLoader) {
 			this.jobMasterId = jobMasterId;
 			this.jobManagerResourceID = jobManagerResourceID;
 			this.jobMasterRpcAddress = jobMasterRpcAddress;
 			this.jobID = jobID;
+			this.userCodeClassLoader = userCodeClassLoader;
 		}
 	}
 

@@ -6,6 +6,7 @@ import org.apache.flink.runtime.executiongraph.ExecutionJobVertex;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.rescale.JobRescaleAction;
 import org.apache.flink.runtime.rescale.JobRescalePartitionAssignment;
+import org.apache.flink.runtime.rescale.RescaleActionListener;
 import org.apache.flink.runtime.rescale.RescaleActionQueue;
 import org.apache.flink.runtime.rescale.controller.OperatorControllerListener;
 import org.apache.flink.runtime.rescale.controller.OperatorController;
@@ -33,9 +34,10 @@ public class FlinkStreamSwitchAdaptor {
 
 	public FlinkStreamSwitchAdaptor(
 		JobRescaleAction rescaleAction,
-		ExecutionGraph executionGraph) {
+		ExecutionGraph executionGraph,
+		RescaleActionListener rescaleActionListener) {
 
-		this.actionQueue = new RescaleActionQueue(rescaleAction);
+		this.actionQueue = new RescaleActionQueue(rescaleAction, rescaleActionListener);
 
 		this.controllers = new HashMap<>(executionGraph.getAllVertices().size());
 
