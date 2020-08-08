@@ -36,6 +36,7 @@ import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.messages.webmonitor.JobDetails;
 import org.apache.flink.runtime.registration.RegistrationResponse;
+import org.apache.flink.runtime.rescale.JobRescaleAction;
 import org.apache.flink.runtime.resourcemanager.ResourceManagerId;
 import org.apache.flink.runtime.rest.handler.legacy.backpressure.OperatorBackPressureStatsResponse;
 import org.apache.flink.runtime.rpc.FencedRpcGateway;
@@ -48,6 +49,7 @@ import org.apache.flink.runtime.taskmanager.TaskManagerLocation;
 import javax.annotation.Nullable;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -270,4 +272,9 @@ public interface JobMasterGateway extends
 	 * @return The updated aggregate
 	 */
 	CompletableFuture<Object> updateGlobalAggregate(String aggregateName, Object aggregand, byte[] serializedAggregationFunction);
+
+	void triggerJobRescale(
+			JobRescaleAction.RescaleParamsWrapper wrapper,
+			List<JobVertexID> involvedUpStream,
+			List<JobVertexID> involvedDownStream);
 }

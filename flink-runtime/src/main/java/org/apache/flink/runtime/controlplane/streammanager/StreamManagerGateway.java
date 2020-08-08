@@ -25,6 +25,7 @@ import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobmaster.JobMaster;
 import org.apache.flink.runtime.jobmaster.JobMasterId;
 import org.apache.flink.runtime.registration.RegistrationResponse;
+import org.apache.flink.runtime.rescale.JobRescaleAction;
 import org.apache.flink.runtime.rescale.JobRescalePartitionAssignment;
 import org.apache.flink.runtime.rpc.FencedRpcGateway;
 import org.apache.flink.runtime.rpc.RpcTimeout;
@@ -64,8 +65,6 @@ public interface StreamManagerGateway extends FencedRpcGateway<StreamManagerId> 
 		final JobID jobId,
 		final Exception cause);
 
-	void rescaleStreamJob(JobVertexID vertexID, int parallelism, JobRescalePartitionAssignment jobRescalePartitionAssignment);
-
-	void repartitionStreamJob(JobVertexID vertexID, int parallelism, JobRescalePartitionAssignment jobRescalePartitionAssignment);
+	void rescaleStreamJob(JobRescaleAction.RescaleParamsWrapper wrapper);
 
 }

@@ -43,6 +43,7 @@ import org.apache.flink.runtime.messages.checkpoint.DeclineCheckpoint;
 import org.apache.flink.runtime.messages.webmonitor.JobDetails;
 import org.apache.flink.runtime.query.KvStateLocation;
 import org.apache.flink.runtime.registration.RegistrationResponse;
+import org.apache.flink.runtime.rescale.JobRescaleAction;
 import org.apache.flink.runtime.resourcemanager.ResourceManagerId;
 import org.apache.flink.runtime.rest.handler.legacy.backpressure.OperatorBackPressureStatsResponse;
 import org.apache.flink.runtime.state.KeyGroupRange;
@@ -58,6 +59,7 @@ import javax.annotation.Nullable;
 
 import java.net.InetSocketAddress;
 import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
@@ -346,5 +348,10 @@ public class TestingJobMasterGateway implements JobMasterGateway {
 	@Override
 	public CompletableFuture<Object> updateGlobalAggregate(String aggregateName, Object aggregand, byte[] serializedAggregateFunction) {
 		return updateAggregateFunction.apply(aggregateName, aggregand, serializedAggregateFunction);
+	}
+
+	@Override
+	public void triggerJobRescale(JobRescaleAction.RescaleParamsWrapper wrapper, List<JobVertexID> involvedUpStream, List<JobVertexID> involvedDownStream) {
+
 	}
 }

@@ -315,6 +315,7 @@ public class StreamManagerDispatcherTest extends TestLogger {
 
 		assertEquals("stream manager runner do not start", Acknowledge.get(), acknowledgeFuture.get(3, TimeUnit.SECONDS));
 		assertEquals("job master can not connect to stream manager", Acknowledge.get(), isRegisterJobManagerFuture.get(3, TimeUnit.SECONDS));
+		Thread.sleep(100000000);
 	}
 
 	@Test

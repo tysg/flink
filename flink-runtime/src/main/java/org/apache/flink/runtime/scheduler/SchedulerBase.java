@@ -228,6 +228,11 @@ public abstract class SchedulerBase implements SchedulerNG {
 			jobGraph, executionGraph, userCodeLoader, rescaleActionListener);
 	}
 
+	@Override
+	public JobRescaleCoordinator getJobRescaleCoordinator() {
+		return jobRescaleCoordinator;
+	}
+
 	private ExecutionGraph createAndRestoreExecutionGraph(
 		JobManagerJobMetricGroup currentJobManagerJobMetricGroup,
 		ShuffleMaster<?> shuffleMaster,

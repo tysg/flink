@@ -82,7 +82,8 @@ public class LegacyScheduler extends SchedulerBase {
 			shuffleMaster,
 			partitionTracker,
 			new ExecutionVertexVersioner(),
-			true);
+			true,
+			rescaleActionListener);
 	}
 
 	@Override

@@ -72,7 +72,7 @@ import org.apache.flink.runtime.registration.RegistrationResponse;
 import org.apache.flink.runtime.registration.RetryingRegistration;
 import org.apache.flink.runtime.registration.RetryingRegistrationConfiguration;
 import org.apache.flink.runtime.rescale.JobRescaleAction;
-import org.apache.flink.runtime.rescale.RescaleActionListener;
+import org.apache.flink.runtime.rescale.JobRescaleCoordinator;
 import org.apache.flink.runtime.resourcemanager.ResourceManagerGateway;
 import org.apache.flink.runtime.resourcemanager.ResourceManagerId;
 import org.apache.flink.runtime.rest.handler.legacy.backpressure.BackPressureStatsTracker;
@@ -102,14 +102,7 @@ import javax.annotation.Nullable;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
@@ -318,8 +311,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 			partitionTracker,
 			wrapper -> {
 				checkState(currentStreamManagerGateway != null, "do not have stream manager gateway");
-				currentStreamManagerGateway.rescaleStreamJob(
-					wrapper.vertexID, wrapper.newParallelism, wrapper.jobRescalePartitionAssignment);
+				currentStreamManagerGateway.rescaleStreamJob(wrapper);
 			});
 	}
 
@@ -484,6 +476,29 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 	@Override
 	public void declineCheckpoint(DeclineCheckpoint decline) {
 		schedulerNG.declineCheckpoint(decline);
+	}
+
+	@Override
+	public void triggerJobRescale(JobRescaleAction.RescaleParamsWrapper wrapper,
+								  List<JobVertexID> involvedUpStream,
+								  List<JobVertexID> involvedDownStream) {
+		validateRunsInMainThread();
+
+		JobRescaleCoordinator rescaleCoordinator = this.schedulerNG.getJobRescaleCoordinator();
+		switch (wrapper.type) {
+			case REPARTITION:
+				rescaleCoordinator.repartition(wrapper.vertexID, wrapper.jobRescalePartitionAssignment,
+					involvedUpStream, involvedDownStream);
+				break;
+			case SCALE_OUT:
+				rescaleCoordinator.scaleOut(wrapper.vertexID, wrapper.newParallelism, wrapper.jobRescalePartitionAssignment,
+					involvedUpStream, involvedDownStream);
+				break;
+			case SCALE_IN:
+				rescaleCoordinator.scaleIn(wrapper.vertexID, wrapper.newParallelism, wrapper.jobRescalePartitionAssignment,
+					involvedUpStream, involvedDownStream);
+				break;
+		}
 	}
 
 	@Override

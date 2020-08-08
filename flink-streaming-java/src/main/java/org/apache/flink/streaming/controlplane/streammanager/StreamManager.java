@@ -20,6 +20,7 @@ package org.apache.flink.streaming.controlplane.streammanager;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Time;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerId;
@@ -34,6 +35,7 @@ import org.apache.flink.runtime.jobmaster.JobMasterRegistrationSuccess;
 import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.registration.RegistrationResponse;
 import org.apache.flink.runtime.rescale.JobGraphRescaler;
+import org.apache.flink.runtime.rescale.JobRescaleAction;
 import org.apache.flink.runtime.rescale.JobRescalePartitionAssignment;
 import org.apache.flink.runtime.resourcemanager.JobLeaderIdActions;
 import org.apache.flink.runtime.resourcemanager.JobLeaderIdService;
@@ -44,7 +46,9 @@ import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
 import org.apache.flink.streaming.controlplane.rescale.StreamJobGraphRescaler;
 import org.apache.flink.streaming.controlplane.streammanager.exceptions.StreamManagerException;
 import org.apache.flink.util.OptionalConsumer;
+import scala.Tuple12;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -262,14 +266,31 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	}
 
 	@Override
-	public void rescaleStreamJob(JobVertexID vertexID, int parallelism, JobRescalePartitionAssignment jobRescalePartitionAssignment) {
-		checkState(this.rescalePartitionFuture.isDone(), "Last rescale/repartition action haven't done");
-		jobGraphRescaler.rescale(vertexID, parallelism, jobRescalePartitionAssignment.getPartitionAssignment());
-	}
+	public void rescaleStreamJob(JobRescaleAction.RescaleParamsWrapper wrapper) {
+		validateRunsInMainThread();
 
-	@Override
-	public void repartitionStreamJob(JobVertexID vertexID, int parallelism, JobRescalePartitionAssignment jobRescalePartitionAssignment) {
-
+//		checkState(this.rescalePartitionFuture.isDone(), "Last rescale/repartition action haven't done");
+		Tuple2<List<JobVertexID>, List<JobVertexID>> involvedUpDownStream = null;
+		switch (wrapper.type) {
+			case SCALE_IN:
+			case SCALE_OUT:
+				involvedUpDownStream = jobGraphRescaler.rescale(
+					wrapper.vertexID,
+					wrapper.newParallelism,
+					wrapper.jobRescalePartitionAssignment.getPartitionAssignment());
+				break;
+			case REPARTITION:
+				involvedUpDownStream = jobGraphRescaler.repartition(
+					wrapper.vertexID,
+					wrapper.jobRescalePartitionAssignment.getPartitionAssignment());
+				break;
+			default:
+				log.warn("Not supported scale type:" + wrapper.type);
+				return;
+		}
+		JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
+		Tuple2<List<JobVertexID>, List<JobVertexID>> upDownStream = involvedUpDownStream;
+		runAsync(() -> jobMasterGateway.triggerJobRescale(wrapper, upDownStream.f0, upDownStream.f1));
 	}
 
 
