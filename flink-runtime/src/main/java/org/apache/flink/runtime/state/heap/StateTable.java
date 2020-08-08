@@ -296,11 +296,11 @@ public abstract class StateTable<K, N, S>
 	StateMap<K, N, S> getMapForKeyGroup(int keyGroupIndex) {
 		final int pos = indexToOffset(keyGroupIndex);
 
-		System.out.println(keyGroupIndex
-			+ " pos: " + pos
-			+ " start: " + keyGroupOffset
-			+ " kgr: " + keyContext.getKeyGroupRange()
-			+ " remapping: " + keyContext.getKeyGroupRange().getFromAlignedToHashed());
+//		System.out.println(keyGroupIndex
+//			+ " pos: " + pos
+//			+ " start: " + keyGroupOffset
+//			+ " kgr: " + keyContext.getKeyGroupRange()
+//			+ " remapping: " + keyContext.getKeyGroupRange().getFromAlignedToHashed());
 
 		if (pos >= 0 && pos < keyGroupedStateMaps.length) {
 			return keyGroupedStateMaps[pos];
