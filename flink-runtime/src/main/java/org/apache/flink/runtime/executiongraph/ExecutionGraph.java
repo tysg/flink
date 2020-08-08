@@ -853,7 +853,17 @@ public class ExecutionGraph implements AccessExecutionGraph {
 		}
 
 		this.numVerticesTotal = totalVertices;
+
+		updatePartitionReleaseStrategy();
 	}
+
+	public void updatePartitionReleaseStrategy(){
+		// the topology assigning should happen before notifying new vertices to failoverStrategy
+		LOG.info("++++++update partition release strategy");
+		executionTopology = new DefaultExecutionTopology(this);
+		partitionReleaseStrategy = partitionReleaseStrategyFactory.createInstance(getSchedulingTopology());
+	}
+
 
 	public boolean isLegacyScheduling() {
 		return legacyScheduling;

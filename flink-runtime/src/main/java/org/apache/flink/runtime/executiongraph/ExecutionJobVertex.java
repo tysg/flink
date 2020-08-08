@@ -536,8 +536,6 @@ public class ExecutionJobVertex implements AccessExecutionJobVertex, Archiveable
 				throw new RuntimeException("The intermediate result's partitions were not correctly assigned when doing rescaling.");
 			}
 		}
-
-
 		// TODO scaling: whether need to do something for InputSplitSource?
 
 		return createdTaskVertices;
