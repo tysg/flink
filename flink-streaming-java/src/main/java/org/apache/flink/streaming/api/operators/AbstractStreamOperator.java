@@ -56,6 +56,7 @@ import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.runtime.state.StateSnapshotContextSynchronousImpl;
 import org.apache.flink.runtime.state.VoidNamespace;
 import org.apache.flink.runtime.state.VoidNamespaceSerializer;
+import org.apache.flink.runtime.state.heap.HeapKeyedStateBackend;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.watermark.Watermark;
 import org.apache.flink.streaming.runtime.streamrecord.LatencyMarker;
@@ -289,6 +290,13 @@ public abstract class AbstractStreamOperator<OUT>
 		} finally {
 			closeFromRegistry(operatorStateInputs, streamTaskCloseableRegistry);
 			closeFromRegistry(keyedStateInputs, streamTaskCloseableRegistry);
+		}
+	}
+
+	@Override
+	public void updateKeyGroupOffset() {
+		if (keyedStateBackend instanceof HeapKeyedStateBackend) {
+			((HeapKeyedStateBackend) keyedStateBackend).updateKeyGroupOffset();
 		}
 	}
 

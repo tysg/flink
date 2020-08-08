@@ -1163,10 +1163,26 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 
 		TaskRescaleManager rescaleManager = ((RuntimeEnvironment) getEnvironment()).taskRescaleManager;
 
-		this.assignedKeyGroupRange.update(keyGroupRange);
+		actionExecutor.runThrowing(() -> {
+			this.assignedKeyGroupRange.update(keyGroupRange);
 
-		rescaleManager.finish();
+			// not only update keygroup range, but also the offset in statetable.
+			updateKeyGroupOffset();
+
+			rescaleManager.finish();
+		});
+
 //		throw new IllegalArgumentException("updateKeyGroupRange is not suppported now.");
+	}
+
+	private void updateKeyGroupOffset() {
+		StreamOperator<?>[] allOperators = operatorChain.getAllOperators();
+
+		for (StreamOperator<?> operator : allOperators) {
+			if (null != operator) {
+				operator.updateKeyGroupOffset();
+			}
+		}
 	}
 
 	// ------------------------------------------------------------------------

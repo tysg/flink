@@ -336,6 +336,12 @@ public class HeapKeyedStateBackend<K> extends AbstractKeyedStateBackend<K> {
 		}
 	}
 
+	public void updateKeyGroupOffset() {
+		for (StateTable registeredKVState : registeredKVStates.values()) {
+			registeredKVState.updateKeyGroupOffset();
+		}
+	}
+
 	@Override
 	public String toString() {
 		return "HeapKeyedStateBackend";
