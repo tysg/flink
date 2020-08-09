@@ -103,10 +103,7 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.*;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.apache.flink.util.Preconditions.checkState;
@@ -199,7 +196,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 	private String streamManagerAddress;
 
 	@Nullable
-	private StreamManagerGateway currentStreamManagerGateway;
+	private CompletableFuture<StreamManagerGateway> streamManagerGatewayFuture = new CompletableFuture<>();
 
 	@Nullable
 	private EstablishedResourceManagerConnection establishedResourceManagerConnection;
@@ -501,8 +498,17 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 	@Override
 	public void notifyStreamSwitchComplete(JobVertexID targetVertexID) {
 		checkNotNull(targetVertexID, "The targetVertexID is null. (jobMaster.notifyStreamSwitchComplete) ");
-		checkNotNull(currentStreamManagerGateway, "The currentStreamManagerGateway is null.");
-		currentStreamManagerGateway.streamSwitchComplete(targetVertexID);
+
+		try {
+			assert streamManagerGatewayFuture != null;
+			StreamManagerGateway gateway = streamManagerGatewayFuture.get();
+			gateway.streamSwitchComplete(targetVertexID);
+
+		} catch (InterruptedException | ExecutionException e) {
+			log.info("can not get stream manager gateway currently");
+			e.printStackTrace();
+		}
+
 	}
 
 	@Override
@@ -951,10 +957,12 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 
 			final ArchivedExecutionGraph archivedExecutionGraph = schedulerNG.requestJob();
 			scheduledExecutorService.execute(() -> jobCompletionActions.jobReachedGloballyTerminalState(archivedExecutionGraph));
-			//todo notify upper stream manager or make sm periodly check job status?
-			checkState(currentStreamManagerGateway != null, "do not have stream manager gateway");
-			this.currentStreamManagerGateway.jobStatusChanges(jobGraph.getJobID(), newJobStatus, timestamp, error);
 		}
+		//todo notify upper stream manager or make sm periodly check job status?
+		checkState(streamManagerGatewayFuture != null);
+		streamManagerGatewayFuture.thenAccept(
+			streamManagerGateway -> streamManagerGateway.jobStatusChanges(jobGraph.getJobID(), newJobStatus, timestamp, error)
+		);
 	}
 
 	private void notifyOfNewResourceManagerLeader(final String newResourceManagerAddress, final ResourceManagerId resourceManagerId) {
@@ -1144,13 +1152,21 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 
 		@Override
 		public void streamManagerGainedLeadership(JobID jobId, StreamManagerGateway streamManagerGateway, JobMasterRegistrationSuccess registrationMessage) {
-			log.info("a new stream manager gained Leadership:" + streamManagerGateway.toString());
-			currentStreamManagerGateway = streamManagerGateway;
+			log.info("a new stream manager gained Leadership:" + streamManagerGateway.getAddress());
+			assert streamManagerGatewayFuture != null;
+			streamManagerGatewayFuture.complete(streamManagerGateway);
 		}
 
 		@Override
 		public void streamManagerLostLeadership(JobID jobId, StreamManagerId streamManagerId) {
-
+			try {
+				assert streamManagerGatewayFuture != null;
+				checkState(streamManagerGatewayFuture.get(0L, TimeUnit.SECONDS).getFencingToken() == streamManagerId,
+					"The given stream manager id is not consistent with current stream manager id");
+				streamManagerGatewayFuture = new CompletableFuture<>();
+			} catch (InterruptedException | ExecutionException | TimeoutException e) {
+				e.printStackTrace();
+			}
 		}
 
 		@Override
