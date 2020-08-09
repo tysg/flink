@@ -1,15 +1,14 @@
-package org.apache.flink.runtime.rescale.streamswitch;
+package org.apache.flink.streaming.controlplane.rescale.streamswitch;
 
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.runtime.executiongraph.ExecutionGraph;
-import org.apache.flink.runtime.executiongraph.ExecutionJobVertex;
+import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
+import org.apache.flink.runtime.jobgraph.JobGraph;
+import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
-import org.apache.flink.runtime.rescale.JobRescaleAction;
 import org.apache.flink.runtime.rescale.JobRescalePartitionAssignment;
-import org.apache.flink.runtime.rescale.RescaleActionListener;
-import org.apache.flink.runtime.rescale.RescaleActionQueue;
-import org.apache.flink.runtime.rescale.controller.OperatorControllerListener;
-import org.apache.flink.runtime.rescale.controller.OperatorController;
+import org.apache.flink.streaming.controlplane.rescale.RescaleActionConsumer;
+import org.apache.flink.streaming.controlplane.rescale.controller.OperatorController;
+import org.apache.flink.streaming.controlplane.rescale.controller.OperatorControllerListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,13 +17,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.apache.flink.runtime.rescale.JobRescaleAction.ActionType.*;
+import static org.apache.flink.runtime.rescale.JobRescaleAction.ActionType.REPARTITION;
+import static org.apache.flink.runtime.rescale.JobRescaleAction.ActionType.SCALE_OUT;
 
 public class FlinkStreamSwitchAdaptor {
 
 	private static final Logger LOG = LoggerFactory.getLogger(FlinkStreamSwitchAdaptor.class);
 
-	private final RescaleActionQueue actionQueue;
+	private final RescaleActionConsumer actionConsumer;
 
 	private final Map<JobVertexID, FlinkOperatorController> controllers;
 
@@ -33,32 +33,31 @@ public class FlinkStreamSwitchAdaptor {
 //	private final long migrationInterval;
 
 	public FlinkStreamSwitchAdaptor(
-		JobRescaleAction rescaleAction,
-		ExecutionGraph executionGraph,
-		RescaleActionListener rescaleActionListener) {
+		StreamManagerGateway localGateway,
+		JobGraph jobGraph) {
 
-		this.actionQueue = new RescaleActionQueue(rescaleAction, rescaleActionListener);
+		this.actionConsumer = new RescaleActionConsumer(localGateway);
 
-		this.controllers = new HashMap<>(executionGraph.getAllVertices().size());
+		this.controllers = new HashMap<>(jobGraph.getNumberOfVertices());
 
-		this.config = executionGraph.getJobConfiguration();
+		this.config = jobGraph.getJobConfiguration();
 
 //		this.migrationInterval = config.getLong("streamswitch.system.migration_interval", 5000);
 
-		for (Map.Entry<JobVertexID, ExecutionJobVertex> entry : executionGraph.getAllVertices().entrySet()) {
-			JobVertexID vertexID = entry.getKey();
-			int parallelism = entry.getValue().getParallelism();
-			int maxParallelism = entry.getValue().getMaxParallelism();
+		for (JobVertex jobVertex : jobGraph.getVertices()) {
+			JobVertexID vertexID = jobVertex.getID();
+			int parallelism = jobVertex.getParallelism();
+			int maxParallelism = jobVertex.getMaxParallelism();
 
 			// TODO scaling: using DummyStreamSwitch for test purpose
 //			if (!entry.getValue().getName().toLowerCase().contains("join") && !entry.getValue().getName().toLowerCase().contains("window")) {
 //				continue;
 //			}
 			FlinkOperatorController controller;
-//
-			if (entry.getValue().getName().toLowerCase().contains("map")) {
+
+			if (jobVertex.getName().toLowerCase().contains("map")) {
 				controller = new DummyStreamSwitch("map");
-			} else if (entry.getValue().getName().toLowerCase().contains("filter")) {
+			} else if (jobVertex.getName().toLowerCase().contains("filter")) {
 				controller = new DummyStreamSwitch("filter");
 			} else {
 				continue;
@@ -68,14 +67,14 @@ public class FlinkStreamSwitchAdaptor {
 			OperatorControllerListener listener = new OperatorControllerListenerImpl(vertexID, parallelism, maxParallelism);
 
 			controller.init(listener, generateExecutorDelegates(parallelism), generateFinestPartitionDelegates(maxParallelism));
-			controller.initMetrics(rescaleAction.getJobGraph(), vertexID, config, parallelism);
+			controller.initMetrics(jobGraph, vertexID, config, parallelism);
 
 			this.controllers.put(vertexID, controller);
 		}
 	}
 
 	public void startControllers() {
-		actionQueue.start();
+		new Thread(actionConsumer).start();
 
 		for (OperatorController controller : controllers.values()) {
 			controller.start();
@@ -83,7 +82,7 @@ public class FlinkStreamSwitchAdaptor {
 	}
 
 	public void stopControllers() {
-		actionQueue.stopGracefully();
+		actionConsumer.stopGracefully();
 
 		for (OperatorController controller : controllers.values()) {
 			controller.stopGracefully();
@@ -100,7 +99,7 @@ public class FlinkStreamSwitchAdaptor {
 		LOG.info("++++++ onChangeImplemented triggered for jobVertex " + jobVertexID);
 		this.controllers.get(jobVertexID).onMigrationCompleted();
 
-		actionQueue.notifyFinished();
+		actionConsumer.notifyFinished();
 	}
 
 	public void onForceRetrieveMetrics(JobVertexID jobVertexID) {
@@ -171,14 +170,14 @@ public class FlinkStreamSwitchAdaptor {
 					executorMapping, oldExecutorMapping, oldRescalePA, numOpenedSubtask);
 
 //				rescaleAction.repartition(jobVertexID, jobRescalePartitionAssignment);
-				actionQueue.put(REPARTITION, jobVertexID, -1, jobRescalePartitionAssignment);
+				actionConsumer.put(REPARTITION, jobVertexID, -1, jobRescalePartitionAssignment);
 			} else {
 				// scale out
 				jobRescalePartitionAssignment = new JobRescalePartitionAssignment(
 					executorMapping, oldExecutorMapping, oldRescalePA, newParallelism);
 
 //				rescaleAction.scaleOut(jobVertexID, newParallelism, jobRescalePartitionAssignment);
-				actionQueue.put(SCALE_OUT, jobVertexID, newParallelism, jobRescalePartitionAssignment);
+				actionConsumer.put(SCALE_OUT, jobVertexID, newParallelism, jobRescalePartitionAssignment);
 				numOpenedSubtask = newParallelism;
 			}
 

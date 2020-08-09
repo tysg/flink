@@ -1,31 +1,30 @@
-package org.apache.flink.runtime.rescale;
+package org.apache.flink.streaming.controlplane.rescale;
 
+import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
+import org.apache.flink.runtime.rescale.JobRescaleAction;
+import org.apache.flink.runtime.rescale.JobRescalePartitionAssignment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.LinkedList;
 import java.util.Queue;
 
-import static org.apache.flink.runtime.rescale.JobRescaleAction.RescaleParamsWrapper;
 
-public class RescaleActionQueue extends Thread {
+public class RescaleActionConsumer implements Runnable {
 
-	private static final Logger LOG = LoggerFactory.getLogger(RescaleActionQueue.class);
+	private static final Logger LOG = LoggerFactory.getLogger(RescaleActionConsumer.class);
 
-	private final JobRescaleAction rescaleAction;
+	private final StreamManagerGateway localStreamManagerGateway;
 
-	private final RescaleActionListener rescaleActionListener;
-
-	private final Queue<RescaleParamsWrapper> queue;
+	private final Queue<JobRescaleAction.RescaleParamsWrapper> queue;
 
 	private boolean isFinished;
 
 	private volatile boolean isStop;
 
-	public RescaleActionQueue(JobRescaleAction rescaleAction, RescaleActionListener rescaleActionListener) {
-		this.rescaleAction = rescaleAction;
-		this.rescaleActionListener = rescaleActionListener;
+	public RescaleActionConsumer(StreamManagerGateway localStreamManagerGateway) {
+		this.localStreamManagerGateway = localStreamManagerGateway;
 		this.queue = new LinkedList<>();
 	}
 
@@ -40,16 +39,16 @@ public class RescaleActionQueue extends Thread {
 					if (isStop) {
 						return;
 					}
-					RescaleParamsWrapper wrapper = queue.poll();
+					JobRescaleAction.RescaleParamsWrapper wrapper = queue.poll();
 					if (wrapper != null) {
 						isFinished = false;
 //						rescaleAction.parseParams(wrapper);
-						rescaleActionListener.processRescaleParamsWrapper(wrapper);
+						localStreamManagerGateway.rescaleStreamJob(wrapper);
 
 						while (!isFinished && !isStop) {
 							queue.wait(); // wait for finish
 						}
-						sleep(1000); // 30ms delay for fully deployment
+						Thread.sleep(1000); // 30ms delay for fully deployment
 					}
 				} catch (Exception e) {
 					e.printStackTrace();
@@ -66,10 +65,10 @@ public class RescaleActionQueue extends Thread {
 		int newParallelism,
 		JobRescalePartitionAssignment jobRescalePartitionAssignment) {
 
-		put(new RescaleParamsWrapper(type, vertexID, newParallelism, jobRescalePartitionAssignment));
+		put(new JobRescaleAction.RescaleParamsWrapper(type, vertexID, newParallelism, jobRescalePartitionAssignment));
 	}
 
-	public void put(RescaleParamsWrapper wrapper) {
+	public void put(JobRescaleAction.RescaleParamsWrapper wrapper) {
 		synchronized (queue) {
 			queue.offer(wrapper);
 			queue.notify();
@@ -90,3 +89,5 @@ public class RescaleActionQueue extends Thread {
 		}
 	}
 }
+
+

@@ -29,7 +29,6 @@ import org.apache.flink.runtime.io.network.partition.JobMasterPartitionTracker;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobmaster.slotpool.SlotProvider;
 import org.apache.flink.runtime.metrics.groups.JobManagerJobMetricGroup;
-import org.apache.flink.runtime.rescale.RescaleActionListener;
 import org.apache.flink.runtime.rest.handler.legacy.backpressure.BackPressureStatsTracker;
 import org.apache.flink.runtime.shuffle.ShuffleMaster;
 
@@ -46,23 +45,22 @@ import java.util.concurrent.ScheduledExecutorService;
 public class LegacyScheduler extends SchedulerBase {
 
 	public LegacyScheduler(
-			final Logger log,
-			final JobGraph jobGraph,
-			final BackPressureStatsTracker backPressureStatsTracker,
-			final Executor ioExecutor,
-			final Configuration jobMasterConfiguration,
-			final SlotProvider slotProvider,
-			final ScheduledExecutorService futureExecutor,
-			final ClassLoader userCodeLoader,
-			final CheckpointRecoveryFactory checkpointRecoveryFactory,
-			final Time rpcTimeout,
-			final RestartStrategyFactory restartStrategyFactory,
-			final BlobWriter blobWriter,
-			final JobManagerJobMetricGroup jobManagerJobMetricGroup,
-			final Time slotRequestTimeout,
-			final ShuffleMaster<?> shuffleMaster,
-			final JobMasterPartitionTracker partitionTracker,
-			RescaleActionListener rescaleActionListener) throws Exception {
+		final Logger log,
+		final JobGraph jobGraph,
+		final BackPressureStatsTracker backPressureStatsTracker,
+		final Executor ioExecutor,
+		final Configuration jobMasterConfiguration,
+		final SlotProvider slotProvider,
+		final ScheduledExecutorService futureExecutor,
+		final ClassLoader userCodeLoader,
+		final CheckpointRecoveryFactory checkpointRecoveryFactory,
+		final Time rpcTimeout,
+		final RestartStrategyFactory restartStrategyFactory,
+		final BlobWriter blobWriter,
+		final JobManagerJobMetricGroup jobManagerJobMetricGroup,
+		final Time slotRequestTimeout,
+		final ShuffleMaster<?> shuffleMaster,
+		final JobMasterPartitionTracker partitionTracker) throws Exception {
 
 		super(
 			log,
@@ -82,8 +80,7 @@ public class LegacyScheduler extends SchedulerBase {
 			shuffleMaster,
 			partitionTracker,
 			new ExecutionVertexVersioner(),
-			true,
-			rescaleActionListener);
+			true);
 	}
 
 	@Override

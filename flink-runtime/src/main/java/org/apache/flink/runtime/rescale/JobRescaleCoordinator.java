@@ -56,8 +56,6 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 
 	private ComponentMainThreadExecutor mainThreadExecutor;
 
-	private FlinkStreamSwitchAdaptor streamSwitchAdaptor;
-
 	private final List<ExecutionAttemptID> notYetAcknowledgedTasks;
 
 	private JobStatusListener jobStatusListener;
@@ -87,16 +85,14 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 
 	public JobRescaleCoordinator(
 			JobGraph jobGraph,
-			ExecutionGraph executionGraph,
-			ClassLoader userCodeLoader,
-			RescaleActionListener rescaleActionListener) {
+			ExecutionGraph executionGraph) {
 
 		this.jobGraph = jobGraph;
 		this.executionGraph = executionGraph;
 
 		this.notYetAcknowledgedTasks = new ArrayList<>();
 
-		this.streamSwitchAdaptor = new FlinkStreamSwitchAdaptor(this, executionGraph, rescaleActionListener);
+//		this.streamSwitchAdaptor = new FlinkStreamSwitchAdaptor(this, executionGraph, rescaleActionListener);
 //		this.jobGraphRescaler = JobGraphRescaler.instantiate(jobGraph, userCodeLoader);
 	}
 
@@ -105,11 +101,11 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 	}
 
 	public void start() {
-		streamSwitchAdaptor.startControllers();
+//		streamSwitchAdaptor.startControllers();
 	}
 
 	public void stop() {
-		streamSwitchAdaptor.stopControllers();
+//		streamSwitchAdaptor.stopControllers();
 	}
 
 //	since this method is not used, I comment this method to avoid compiled error

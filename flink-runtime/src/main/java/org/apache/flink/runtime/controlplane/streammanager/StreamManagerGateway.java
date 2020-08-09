@@ -21,6 +21,7 @@ package org.apache.flink.runtime.controlplane.streammanager;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
+import org.apache.flink.runtime.executiongraph.JobStatusListener;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobmaster.JobMaster;
 import org.apache.flink.runtime.jobmaster.JobMasterId;
@@ -35,7 +36,7 @@ import java.util.concurrent.CompletableFuture;
 /**
  * rpc gateway interface
  */
-public interface StreamManagerGateway extends FencedRpcGateway<StreamManagerId> {
+public interface StreamManagerGateway extends FencedRpcGateway<StreamManagerId>, JobStatusListener {
 
 	/**
 	 * Register a {@link JobMaster} at the resource manager.

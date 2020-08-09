@@ -79,7 +79,6 @@ import org.apache.flink.runtime.query.KvStateLocation;
 import org.apache.flink.runtime.query.KvStateLocationRegistry;
 import org.apache.flink.runtime.query.UnknownKvStateLocation;
 import org.apache.flink.runtime.rescale.JobRescaleCoordinator;
-import org.apache.flink.runtime.rescale.RescaleActionListener;
 import org.apache.flink.runtime.rest.handler.legacy.backpressure.BackPressureStatsTracker;
 import org.apache.flink.runtime.rest.handler.legacy.backpressure.OperatorBackPressureStats;
 import org.apache.flink.runtime.scheduler.strategy.ExecutionVertexID;
@@ -185,8 +184,7 @@ public abstract class SchedulerBase implements SchedulerNG {
 		final ShuffleMaster<?> shuffleMaster,
 		final JobMasterPartitionTracker partitionTracker,
 		final ExecutionVertexVersioner executionVertexVersioner,
-		final boolean legacyScheduling,
-		final RescaleActionListener rescaleActionListener) throws Exception {
+		final boolean legacyScheduling) throws Exception {
 
 		this.log = checkNotNull(log);
 		this.jobGraph = checkNotNull(jobGraph);
@@ -225,7 +223,7 @@ public abstract class SchedulerBase implements SchedulerNG {
 		this.inputsLocationsRetriever = new ExecutionGraphToInputsLocationsRetrieverAdapter(executionGraph);
 
 		this.jobRescaleCoordinator = new JobRescaleCoordinator(
-			jobGraph, executionGraph, userCodeLoader, rescaleActionListener);
+			jobGraph, executionGraph);
 	}
 
 	@Override

@@ -40,7 +40,6 @@ import org.apache.flink.runtime.jobmanager.scheduler.NoResourceAvailableExceptio
 import org.apache.flink.runtime.jobmaster.LogicalSlot;
 import org.apache.flink.runtime.jobmaster.slotpool.SlotProvider;
 import org.apache.flink.runtime.metrics.groups.JobManagerJobMetricGroup;
-import org.apache.flink.runtime.rescale.RescaleActionListener;
 import org.apache.flink.runtime.rest.handler.legacy.backpressure.BackPressureStatsTracker;
 import org.apache.flink.runtime.scheduler.strategy.ExecutionVertexID;
 import org.apache.flink.runtime.scheduler.strategy.LazyFromSourcesSchedulingStrategy;
@@ -116,8 +115,7 @@ public class DefaultScheduler extends SchedulerBase implements SchedulerOperatio
 		final RestartBackoffTimeStrategy restartBackoffTimeStrategy,
 		final ExecutionVertexOperations executionVertexOperations,
 		final ExecutionVertexVersioner executionVertexVersioner,
-		final ExecutionSlotAllocatorFactory executionSlotAllocatorFactory,
-		final RescaleActionListener rescaleActionListener) throws Exception {
+		final ExecutionSlotAllocatorFactory executionSlotAllocatorFactory) throws Exception {
 
 		super(
 			log,
@@ -137,8 +135,7 @@ public class DefaultScheduler extends SchedulerBase implements SchedulerOperatio
 			shuffleMaster,
 			partitionTracker,
 			executionVertexVersioner,
-			false,
-			rescaleActionListener);
+			false);
 
 		this.log = log;
 

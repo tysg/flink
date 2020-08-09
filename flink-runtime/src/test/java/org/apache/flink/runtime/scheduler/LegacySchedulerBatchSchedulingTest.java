@@ -207,8 +207,8 @@ public class LegacySchedulerBatchSchedulingTest extends TestLogger {
 			UnregisteredMetricGroups.createUnregisteredJobManagerJobMetricGroup(),
 			slotRequestTimeout,
 			NettyShuffleMaster.INSTANCE,
-			NoOpJobMasterPartitionTracker.INSTANCE,
-			null);
+			NoOpJobMasterPartitionTracker.INSTANCE
+		);
 
 		legacyScheduler.setMainThreadExecutor(mainThreadExecutor);
 

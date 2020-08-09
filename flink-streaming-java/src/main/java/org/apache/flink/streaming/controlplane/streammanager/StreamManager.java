@@ -19,6 +19,7 @@
 package org.apache.flink.streaming.controlplane.streammanager;
 
 import org.apache.flink.api.common.JobID;
+import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
@@ -44,6 +45,7 @@ import org.apache.flink.runtime.rpc.*;
 import org.apache.flink.runtime.rpc.akka.AkkaRpcServiceUtils;
 import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
 import org.apache.flink.streaming.controlplane.rescale.StreamJobGraphRescaler;
+import org.apache.flink.streaming.controlplane.rescale.streamswitch.FlinkStreamSwitchAdaptor;
 import org.apache.flink.streaming.controlplane.streammanager.exceptions.StreamManagerException;
 import org.apache.flink.util.OptionalConsumer;
 import scala.Tuple12;
@@ -86,6 +88,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	private final LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever;
 
 	private final JobGraphRescaler jobGraphRescaler;
+
+	private final FlinkStreamSwitchAdaptor streamSwitchAdaptor;
 
 	private CompletableFuture<Acknowledge> rescalePartitionFuture;
 
@@ -133,6 +137,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
         /*
         TODO: initialize other fields
          */
+		this.streamSwitchAdaptor = new FlinkStreamSwitchAdaptor(this, jobGraph);
 		this.jobGraphRescaler = new StreamJobGraphRescaler(jobGraph, null);
 	}
 
@@ -359,10 +364,9 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		optLeaderConsumer.ifPresent(
 			gateway -> {
 				try {
-					log.info("connect successfully");
-					gateway.submitJob(jobGraph,
-						this.getAddress(),
-						Time.seconds(10));
+					log.info("connect dispatcher gateway successfully");
+					// todo, how to know job success run so we can start something related control plane (eg. streamSwitch)
+					gateway.submitJob(jobGraph, this.getAddress(), Time.seconds(10));
 				} catch (Exception e) {
 					log.error("Error while invoking runtime dispatcher RMI.", e);
 				}
@@ -458,6 +462,15 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 		if (jobId == this.jobId) {
 			disconnectJobManager(jobId, new Exception("Job " + jobId + "was removed"));
+		}
+	}
+
+	@Override
+	public void jobStatusChanges(JobID jobId, JobStatus newJobStatus, long timestamp, Throwable error) {
+		if (newJobStatus == JobStatus.RUNNING) {
+			this.streamSwitchAdaptor.startControllers();
+		} else {
+			this.streamSwitchAdaptor.stopControllers();
 		}
 	}
 

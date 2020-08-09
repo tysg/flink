@@ -308,11 +308,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 			jobManagerJobMetricGroup,
 			jobMasterConfiguration.getSlotRequestTimeout(),
 			shuffleMaster,
-			partitionTracker,
-			wrapper -> {
-				checkState(currentStreamManagerGateway != null, "do not have stream manager gateway");
-				currentStreamManagerGateway.rescaleStreamJob(wrapper);
-			});
+			partitionTracker);
 	}
 
 	//----------------------------------------------------------------------------------------------
@@ -947,6 +943,9 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 
 			final ArchivedExecutionGraph archivedExecutionGraph = schedulerNG.requestJob();
 			scheduledExecutorService.execute(() -> jobCompletionActions.jobReachedGloballyTerminalState(archivedExecutionGraph));
+			//todo notify upper stream manager or make sm periodly check job status?
+			checkState(currentStreamManagerGateway != null, "do not have stream manager gateway");
+			this.currentStreamManagerGateway.jobStatusChanges(jobGraph.getJobID(), newJobStatus, timestamp, error);
 		}
 	}
 
