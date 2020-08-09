@@ -68,4 +68,11 @@ public interface StreamManagerGateway extends FencedRpcGateway<StreamManagerId>,
 
 	void rescaleStreamJob(JobRescaleAction.RescaleParamsWrapper wrapper);
 
+	/**
+	 * The notification from the JobManager that changes completed:
+	 * Maybe 1. Assign states for repartition, 2. Rescale and assign states
+	 * @param targetVertexID the JobVertexID of target vertex
+	 */
+	void streamSwitchComplete(JobVertexID targetVertexID);
+
 }

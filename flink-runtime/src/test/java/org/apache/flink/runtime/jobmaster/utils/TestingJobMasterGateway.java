@@ -354,4 +354,9 @@ public class TestingJobMasterGateway implements JobMasterGateway {
 	public void triggerJobRescale(JobRescaleAction.RescaleParamsWrapper wrapper, List<JobVertexID> involvedUpStream, List<JobVertexID> involvedDownStream) {
 
 	}
+
+	@Override
+	public void notifyStreamSwitchComplete(JobVertexID targetVertexID) {
+
+	}
 }

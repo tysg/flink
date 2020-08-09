@@ -298,6 +298,12 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		runAsync(() -> jobMasterGateway.triggerJobRescale(wrapper, upDownStream.f0, upDownStream.f1));
 	}
 
+	@Override
+	public void streamSwitchComplete(JobVertexID targetVertexID) {
+		streamSwitchAdaptor.onMigrationExecutorsStopped(targetVertexID);
+		streamSwitchAdaptor.onChangeImplemented(targetVertexID);
+	}
+
 
 	//----------------------------------------------------------------------------------------------
 	// Internal methods

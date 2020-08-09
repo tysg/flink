@@ -26,14 +26,13 @@ import org.apache.flink.runtime.checkpoint.PendingCheckpoint;
 import org.apache.flink.runtime.checkpoint.StateAssignmentOperation;
 import org.apache.flink.runtime.concurrent.ComponentMainThreadExecutor;
 import org.apache.flink.runtime.concurrent.FutureUtils;
-import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
 import org.apache.flink.runtime.executiongraph.*;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobgraph.jsonplan.JsonPlanGenerator;
-import org.apache.flink.runtime.rescale.streamswitch.FlinkStreamSwitchAdaptor;
+import org.apache.flink.runtime.jobmaster.JobMasterGateway;
 import org.apache.flink.runtime.state.KeyGroupRange;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,6 +60,10 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 	private JobStatusListener jobStatusListener;
 
 	private final Object lock = new Object();
+
+	// TODO: to be decide whether 1. use listener or not, 2. use directly or Gateway
+	// private JobMaster jobManager;
+	private JobMasterGateway jobManagerGateway;
 
 	// mutable fields
 	private volatile boolean inProcess;
@@ -114,10 +117,15 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 //		this.executionGraph = executionGraph;
 //
 //		streamSwitchAdaptor.stopControllers();
-//		this.streamSwitchAdaptor = new FlinkStreamSwitchAdaptor(this, executionGraph);
-//
-//		streamSwitchAdaptor.startControllers();
+////		this.streamSwitchAdaptor = new FlinkStreamSwitchAdaptor(this, executionGraph);
+////
+////		streamSwitchAdaptor.startControllers();
 //	}
+
+	public void setJobManagerGateway(JobMasterGateway jobManagerGateway) {
+		checkNotNull(jobManagerGateway, "The jobManager set to RescaleCoordinator is null.");
+		this.jobManagerGateway = jobManagerGateway;
+	}
 
 	@Override
 	public JobGraph getJobGraph() {
@@ -585,8 +593,10 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 				clean();
 
 				// notify streamSwitch that change is finished
-				streamSwitchAdaptor.onMigrationExecutorsStopped(targetVertex.getJobVertexId());
-				streamSwitchAdaptor.onChangeImplemented(targetVertex.getJobVertexId());
+				checkNotNull(jobManagerGateway, "The jobMangerGateway wasn't set yet, notify StreamManager failed.");
+				jobManagerGateway.notifyStreamSwitchComplete(targetVertex.getJobVertexId());
+//				streamSwitchAdaptor.onMigrationExecutorsStopped(targetVertex.getJobVertexId());
+//				streamSwitchAdaptor.onChangeImplemented(targetVertex.getJobVertexId());
 			}, mainThreadExecutor);
 	}
 
@@ -655,8 +665,10 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 				clean();
 
 				// notify streamSwitch that change is finished
-				streamSwitchAdaptor.onMigrationExecutorsStopped(targetVertex.getJobVertexId());
-				streamSwitchAdaptor.onChangeImplemented(targetVertex.getJobVertexId());
+				checkNotNull(jobManagerGateway, "The jobMangerGateway wasn't set yet, notify StreamManager failed.");
+				jobManagerGateway.notifyStreamSwitchComplete(targetVertex.getJobVertexId());
+//				streamSwitchAdaptor.onMigrationExecutorsStopped(targetVertex.getJobVertexId());
+//				streamSwitchAdaptor.onChangeImplemented(targetVertex.getJobVertexId());
 			}, mainThreadExecutor);
 	}
 
@@ -713,8 +725,10 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 				clean();
 
 				// notify streamSwitch that change is finished
-				streamSwitchAdaptor.onMigrationExecutorsStopped(targetVertex.getJobVertexId());
-				streamSwitchAdaptor.onChangeImplemented(targetVertex.getJobVertexId());
+				checkNotNull(jobManagerGateway, "The jobMangerGateway wasn't set yet, notify StreamManager failed.");
+				jobManagerGateway.notifyStreamSwitchComplete(targetVertex.getJobVertexId());
+//				streamSwitchAdaptor.onMigrationExecutorsStopped(targetVertex.getJobVertexId());
+//				streamSwitchAdaptor.onChangeImplemented(targetVertex.getJobVertexId());
 			}, mainThreadExecutor);
 	}
 

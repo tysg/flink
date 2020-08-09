@@ -481,6 +481,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		validateRunsInMainThread();
 
 		JobRescaleCoordinator rescaleCoordinator = this.schedulerNG.getJobRescaleCoordinator();
+		rescaleCoordinator.setJobManagerGateway(this); // pass JobMasterGateway to JobRescaleCoordinator
 		switch (wrapper.type) {
 			case REPARTITION:
 				rescaleCoordinator.repartition(wrapper.vertexID, wrapper.jobRescalePartitionAssignment,
@@ -495,6 +496,13 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 					involvedUpStream, involvedDownStream);
 				break;
 		}
+	}
+
+	@Override
+	public void notifyStreamSwitchComplete(JobVertexID targetVertexID) {
+		checkNotNull(targetVertexID, "The targetVertexID is null. (jobMaster.notifyStreamSwitchComplete) ");
+		checkNotNull(currentStreamManagerGateway, "The currentStreamManagerGateway is null.");
+		currentStreamManagerGateway.streamSwitchComplete(targetVertexID);
 	}
 
 	@Override

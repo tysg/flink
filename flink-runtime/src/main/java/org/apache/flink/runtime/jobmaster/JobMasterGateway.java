@@ -277,4 +277,11 @@ public interface JobMasterGateway extends
 			JobRescaleAction.RescaleParamsWrapper wrapper,
 			List<JobVertexID> involvedUpStream,
 			List<JobVertexID> involvedDownStream);
+
+	/**
+	 * Notify StreamManager's StreamSwitchAdaptor that changes completed:
+	 * Maybe 1. Assign states for repartition, 2. Rescale and assign states
+	 * @param targetVertexID the JobVertexID of target vertex
+	 */
+	void notifyStreamSwitchComplete(JobVertexID targetVertexID);
 }
