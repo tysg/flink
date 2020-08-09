@@ -28,6 +28,7 @@ import org.apache.flink.runtime.controlplane.streammanager.StreamManagerId;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
 import org.apache.flink.runtime.jobmaster.JMTMRegistrationSuccess;
 import org.apache.flink.runtime.jobmaster.JobMasterId;
+import org.apache.flink.runtime.jobmaster.JobMasterRegistrationSuccess;
 import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalListener;
 import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalService;
 import org.apache.flink.runtime.registration.RegisteredRpcConnection;
@@ -254,7 +255,7 @@ public class StreamingLeaderService {
 		 */
 		@GuardedBy("lock")
 		@Nullable
-		private RegisteredRpcConnection<StreamManagerId, StreamManagerGateway, JMTMRegistrationSuccess> rpcConnection;
+		private RegisteredRpcConnection<StreamManagerId, StreamManagerGateway, JobMasterRegistrationSuccess> rpcConnection;
 
 		/**
 		 * Leader id of the current job leader.
@@ -385,7 +386,7 @@ public class StreamingLeaderService {
 		/**
 		 * Rpc connection for the job manager <--> task manager connection.
 		 */
-		private final class StreamManagerRegisteredRpcConnection extends RegisteredRpcConnection<StreamManagerId, StreamManagerGateway, JMTMRegistrationSuccess> {
+		private final class StreamManagerRegisteredRpcConnection extends RegisteredRpcConnection<StreamManagerId, StreamManagerGateway, JobMasterRegistrationSuccess> {
 			private final JobMasterInfo jobMasterInfo;
 
 			StreamManagerRegisteredRpcConnection(
@@ -399,7 +400,7 @@ public class StreamingLeaderService {
 			}
 
 			@Override
-			protected RetryingRegistration<StreamManagerId, StreamManagerGateway, JMTMRegistrationSuccess> generateRegistration() {
+			protected RetryingRegistration<StreamManagerId, StreamManagerGateway, JobMasterRegistrationSuccess> generateRegistration() {
 				return new StreamManagerRetryingRegistration(
 					LOG,
 					rpcService,
@@ -412,7 +413,7 @@ public class StreamingLeaderService {
 			}
 
 			@Override
-			protected void onRegistrationSuccess(JMTMRegistrationSuccess success) {
+			protected void onRegistrationSuccess(JobMasterRegistrationSuccess success) {
 				// filter out old registration attempts
 				if (Objects.equals(getTargetLeaderId(), getCurrentStreamManagerId())) {
 					log.info("Successful registration at job manager {} for job {}.", getTargetAddress(), jobId);
@@ -440,7 +441,7 @@ public class StreamingLeaderService {
 	 * Retrying registration for the job manager <--> task manager connection.
 	 */
 	private static final class StreamManagerRetryingRegistration
-		extends RetryingRegistration<StreamManagerId, StreamManagerGateway, JMTMRegistrationSuccess> {
+		extends RetryingRegistration<StreamManagerId, StreamManagerGateway, JobMasterRegistrationSuccess> {
 
 		private final JobMasterInfo jobMasterInfo;
 

@@ -1136,8 +1136,8 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 
 
 		@Override
-		public void streamManagerGainedLeadership(JobID jobId, StreamManagerGateway streamManagerGateway, JMTMRegistrationSuccess registrationMessage) {
-			runAsync(() -> log.info("a new stream mamanger gained Leadership"));
+		public void streamManagerGainedLeadership(JobID jobId, StreamManagerGateway streamManagerGateway, JobMasterRegistrationSuccess registrationMessage) {
+			log.info("a new stream manager gained Leadership:" + streamManagerGateway.toString());
 			currentStreamManagerGateway = streamManagerGateway;
 		}
 
