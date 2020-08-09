@@ -6,6 +6,7 @@ import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.rescale.JobRescalePartitionAssignment;
+import org.apache.flink.runtime.state.KeyGroupRangeAssignment;
 import org.apache.flink.streaming.controlplane.rescale.RescaleActionConsumer;
 import org.apache.flink.streaming.controlplane.rescale.controller.OperatorController;
 import org.apache.flink.streaming.controlplane.rescale.controller.OperatorControllerListener;
@@ -47,7 +48,7 @@ public class FlinkStreamSwitchAdaptor {
 		for (JobVertex jobVertex : jobGraph.getVertices()) {
 			JobVertexID vertexID = jobVertex.getID();
 			int parallelism = jobVertex.getParallelism();
-			int maxParallelism = jobVertex.getMaxParallelism();
+			int maxParallelism = getMaxParallelism(jobVertex);
 
 			// TODO scaling: using DummyStreamSwitch for test purpose
 //			if (!entry.getValue().getName().toLowerCase().contains("join") && !entry.getValue().getName().toLowerCase().contains("window")) {
@@ -71,6 +72,18 @@ public class FlinkStreamSwitchAdaptor {
 
 			this.controllers.put(vertexID, controller);
 		}
+	}
+
+	private static int getMaxParallelism(JobVertex jobVertex) {
+		final int vertexParallelism = jobVertex.getParallelism();
+		final int defaultParallelism = 1;
+		int numTaskVertices = vertexParallelism > 0 ? vertexParallelism : defaultParallelism;
+
+		final int configuredMaxParallelism = jobVertex.getMaxParallelism();
+
+		// if no max parallelism was configured by the user, we calculate and set a default
+		return configuredMaxParallelism != -1 ?
+			configuredMaxParallelism : KeyGroupRangeAssignment.computeDefaultMaxParallelism(numTaskVertices);
 	}
 
 	public void startControllers() {
