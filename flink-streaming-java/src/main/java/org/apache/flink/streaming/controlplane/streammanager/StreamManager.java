@@ -278,6 +278,10 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		Tuple2<List<JobVertexID>, List<JobVertexID>> involvedUpDownStream = null;
 		switch (wrapper.type) {
 			case SCALE_IN:
+				involvedUpDownStream = jobGraphRescaler.repartition(
+					wrapper.vertexID,
+					wrapper.jobRescalePartitionAssignment.getPartitionAssignment());
+				break;
 			case SCALE_OUT:
 				involvedUpDownStream = jobGraphRescaler.rescale(
 					wrapper.vertexID,
