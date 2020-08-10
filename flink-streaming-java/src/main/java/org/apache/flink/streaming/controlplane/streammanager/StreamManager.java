@@ -37,7 +37,6 @@ import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.registration.RegistrationResponse;
 import org.apache.flink.runtime.rescale.JobGraphRescaler;
 import org.apache.flink.runtime.rescale.JobRescaleAction;
-import org.apache.flink.runtime.rescale.JobRescalePartitionAssignment;
 import org.apache.flink.runtime.resourcemanager.JobLeaderIdActions;
 import org.apache.flink.runtime.resourcemanager.JobLeaderIdService;
 import org.apache.flink.runtime.resourcemanager.registration.JobManagerRegistration;
@@ -48,7 +47,6 @@ import org.apache.flink.streaming.controlplane.rescale.StreamJobGraphRescaler;
 import org.apache.flink.streaming.controlplane.rescale.streamswitch.FlinkStreamSwitchAdaptor;
 import org.apache.flink.streaming.controlplane.streammanager.exceptions.StreamManagerException;
 import org.apache.flink.util.OptionalConsumer;
-import scala.Tuple12;
 
 import java.util.List;
 import java.util.Objects;
@@ -78,6 +76,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	private final ResourceID resourceId;
 
 	private final JobGraph jobGraph;
+
+	private final ClassLoader userCodeLoader;
 
 	private final Time rpcTimeout;
 
@@ -113,6 +113,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						 StreamManagerConfiguration streamManagerConfiguration,
 						 ResourceID resourceId,
 						 JobGraph jobGraph,
+						 ClassLoader userCodeLoader,
 						 HighAvailabilityServices highAvailabilityService,
 						 JobLeaderIdService jobLeaderIdService,
 						 LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever,
@@ -122,6 +123,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		this.streamManagerConfiguration = checkNotNull(streamManagerConfiguration);
 		this.resourceId = checkNotNull(resourceId);
 		this.jobGraph = checkNotNull(jobGraph);
+		this.userCodeLoader = checkNotNull(userCodeLoader);
 		this.rpcTimeout = streamManagerConfiguration.getRpcTimeout();
 		this.highAvailabilityServices = checkNotNull(highAvailabilityService);
 		this.fatalErrorHandler = checkNotNull(fatalErrorHandler);
@@ -134,11 +136,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		log.debug("Initializing sm for job {} ({})", jobName, jid);
 		log.info("Initializing sm for job {} ({})", jobName, jid);
 
-        /*
-        TODO: initialize other fields
-         */
 		this.streamSwitchAdaptor = new FlinkStreamSwitchAdaptor(this, jobGraph);
-		this.jobGraphRescaler = new StreamJobGraphRescaler(jobGraph, null);
+		this.jobGraphRescaler = new StreamJobGraphRescaler(jobGraph, userCodeLoader);
 	}
 
 	/**
@@ -299,11 +298,11 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		}
 		JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
 		Tuple2<List<JobVertexID>, List<JobVertexID>> upDownStream = involvedUpDownStream;
-		runAsync(() -> jobMasterGateway.triggerJobRescale(wrapper, upDownStream.f0, upDownStream.f1));
+		runAsync(() -> jobMasterGateway.triggerJobRescale(wrapper, jobGraph, upDownStream.f0, upDownStream.f1));
 	}
 
 	@Override
-	public void streamSwitchComplete(JobVertexID targetVertexID) {
+	public void streamSwitchCompleted(JobVertexID targetVertexID) {
 		streamSwitchAdaptor.onMigrationExecutorsStopped(targetVertexID);
 		streamSwitchAdaptor.onChangeImplemented(targetVertexID);
 	}
@@ -476,7 +475,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	}
 
 	@Override
-	public void jobStatusChanges(JobID jobId, JobStatus newJobStatus, long timestamp, Throwable error) {
+	public void jobStatusChanged(JobID jobId, JobStatus newJobStatus, long timestamp, Throwable error) {
 		if (newJobStatus == JobStatus.RUNNING) {
 			this.streamSwitchAdaptor.startControllers();
 		} else {

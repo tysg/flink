@@ -11,18 +11,21 @@ public interface JobRescaleAction {
 
 	void repartition(JobVertexID vertexID,
 					 JobRescalePartitionAssignment jobRescalePartitionAssignment,
+					 JobGraph jobGraph,
 					 List<JobVertexID> involvedUpStream,
 					 List<JobVertexID> involvedDownStream);
 
 	void scaleOut(JobVertexID vertexID,
 				  int newParallelism,
 				  JobRescalePartitionAssignment jobRescalePartitionAssignment,
+				  JobGraph jobGraph,
 				  List<JobVertexID> involvedUpStream,
 				  List<JobVertexID> involvedDownStream);
 
 	void scaleIn(JobVertexID vertexID,
 				 int newParallelism,
 				 JobRescalePartitionAssignment jobRescalePartitionAssignment,
+				 JobGraph jobGraph,
 				 List<JobVertexID> involvedUpStream,
 				 List<JobVertexID> involvedDownStream);
 

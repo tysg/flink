@@ -19,6 +19,7 @@
 package org.apache.flink.runtime.controlplane.streammanager;
 
 import org.apache.flink.api.common.JobID;
+import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.executiongraph.JobStatusListener;
@@ -36,7 +37,7 @@ import java.util.concurrent.CompletableFuture;
 /**
  * rpc gateway interface
  */
-public interface StreamManagerGateway extends FencedRpcGateway<StreamManagerId>, JobStatusListener {
+public interface StreamManagerGateway extends FencedRpcGateway<StreamManagerId> {
 
 	/**
 	 * Register a {@link JobMaster} at the resource manager.
@@ -73,6 +74,18 @@ public interface StreamManagerGateway extends FencedRpcGateway<StreamManagerId>,
 	 * Maybe 1. Assign states for repartition, 2. Rescale and assign states
 	 * @param targetVertexID the JobVertexID of target vertex
 	 */
-	void streamSwitchComplete(JobVertexID targetVertexID);
+	void streamSwitchCompleted(JobVertexID targetVertexID);
 
+	/**
+	 * This method is called whenever the status of the job changes.
+	 *
+	 * @param jobId         The ID of the job.
+	 * @param newJobStatus  The status the job switched to.
+	 * @param timestamp     The timestamp when the status transition occurred.
+	 * @param error         In case the job status switches to a failure state, this is the
+	 *                      exception that caused the failure.
+	 */
+	void jobStatusChanged(JobID jobId, JobStatus newJobStatus, long timestamp, Throwable error);
+
+//	void notifyStreamSwitchComplete(JobVertexID jobVertexId);
 }

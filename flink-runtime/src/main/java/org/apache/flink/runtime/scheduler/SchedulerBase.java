@@ -458,7 +458,7 @@ public abstract class SchedulerBase implements SchedulerNG {
 	@Override
 	public void registerJobStatusListener(final JobStatusListener jobStatusListener) {
 		executionGraph.registerJobStatusListener(jobStatusListener);
-		executionGraph.registerJobStatusListener(jobRescaleCoordinator.createActivatorDeactivator());
+//		executionGraph.registerJobStatusListener(jobRescaleCoordinator.createActivatorDeactivator());
 	}
 
 	@Override

@@ -103,12 +103,6 @@ public class FlinkStreamSwitchAdaptor {
 	}
 
 	public void onChangeImplemented(JobVertexID jobVertexID) {
-		// sleep period of time
-//		try {
-//			Thread.sleep(migrationInterval);
-//		} catch (InterruptedException e) {
-//			e.printStackTrace();
-//		}
 		LOG.info("++++++ onChangeImplemented triggered for jobVertex " + jobVertexID);
 		this.controllers.get(jobVertexID).onMigrationCompleted();
 

@@ -26,6 +26,7 @@ import org.apache.flink.runtime.checkpoint.PendingCheckpoint;
 import org.apache.flink.runtime.checkpoint.StateAssignmentOperation;
 import org.apache.flink.runtime.concurrent.ComponentMainThreadExecutor;
 import org.apache.flink.runtime.concurrent.FutureUtils;
+import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
 import org.apache.flink.runtime.executiongraph.*;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.api.common.JobStatus;
@@ -49,7 +50,7 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 
 	private static final Logger LOG = LoggerFactory.getLogger(JobRescaleCoordinator.class);
 
-	private final JobGraph jobGraph;
+	private JobGraph jobGraph;
 
 	private ExecutionGraph executionGraph;
 
@@ -57,13 +58,11 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 
 	private final List<ExecutionAttemptID> notYetAcknowledgedTasks;
 
-	private JobStatusListener jobStatusListener;
-
 	private final Object lock = new Object();
 
 	// TODO: to be decide whether 1. use listener or not, 2. use directly or Gateway
 	// private JobMaster jobManager;
-	private JobMasterGateway jobManagerGateway;
+	private StreamManagerGateway streamManagerGateway;
 
 	// mutable fields
 	private volatile boolean inProcess;
@@ -103,13 +102,6 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 		this.mainThreadExecutor = mainThreadExecutor;
 	}
 
-	public void start() {
-//		streamSwitchAdaptor.startControllers();
-	}
-
-	public void stop() {
-//		streamSwitchAdaptor.stopControllers();
-	}
 
 //	since this method is not used, I comment this method to avoid compiled error
 //	public void assignExecutionGraph(ExecutionGraph executionGraph) {
@@ -122,9 +114,9 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 ////		streamSwitchAdaptor.startControllers();
 //	}
 
-	public void setJobManagerGateway(JobMasterGateway jobManagerGateway) {
-		checkNotNull(jobManagerGateway, "The jobManager set to RescaleCoordinator is null.");
-		this.jobManagerGateway = jobManagerGateway;
+	public void setStreamManagerGateway(StreamManagerGateway streamManagerGateway) {
+		checkNotNull(streamManagerGateway, "The streamManagerGateway set to RescaleCoordinator is null.");
+		this.streamManagerGateway = streamManagerGateway;
 	}
 
 	@Override
@@ -134,11 +126,14 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 
 	@Override
 	public void repartition(JobVertexID vertexID, JobRescalePartitionAssignment jobRescalePartitionAssignment,
+							JobGraph jobGraph,
 							List<JobVertexID> involvedUpstream,
 							List<JobVertexID> involvedDownstream) {
 		checkState(!inProcess, "Current rescaling hasn't finished.");
 		inProcess = true;
 		actionType = ActionType.REPARTITION;
+
+		this.jobGraph = jobGraph;
 
 		rescaleId = RescaleID.generateNextID();
 		this.jobRescalePartitionAssignment = jobRescalePartitionAssignment;
@@ -164,11 +159,14 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 	@Override
 	public void scaleOut(JobVertexID vertexID, int parallelism,
 						 JobRescalePartitionAssignment jobRescalePartitionAssignment,
+						 JobGraph jobGraph,
 						 List<JobVertexID> involvedUpstream,
 						 List<JobVertexID> involvedDownstream) {
 		checkState(!inProcess, "Current rescaling hasn't finished.");
 		inProcess = true;
 		actionType = ActionType.SCALE_OUT;
+
+		this.jobGraph = jobGraph;
 
 		rescaleId = RescaleID.generateNextID();
 		this.jobRescalePartitionAssignment = jobRescalePartitionAssignment;
@@ -194,11 +192,14 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 	@Override
 	public void scaleIn(JobVertexID vertexID, int parallelism,
 						JobRescalePartitionAssignment jobRescalePartitionAssignment,
+						JobGraph jobGraph,
 						List<JobVertexID> involvedUpstream,
 						List<JobVertexID> involvedDownstream) {
 		checkState(!inProcess, "Current rescaling hasn't finished.");
 		inProcess = true;
 		actionType = ActionType.SCALE_IN;
+
+		this.jobGraph = jobGraph;
 
 		rescaleId = RescaleID.generateNextID();
 		this.jobRescalePartitionAssignment = jobRescalePartitionAssignment;
@@ -593,10 +594,10 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 				clean();
 
 				// notify streamSwitch that change is finished
-				checkNotNull(jobManagerGateway, "The jobMangerGateway wasn't set yet, notify StreamManager failed.");
-				jobManagerGateway.notifyStreamSwitchComplete(targetVertex.getJobVertexId());
-//				streamSwitchAdaptor.onMigrationExecutorsStopped(targetVertex.getJobVertexId());
-//				streamSwitchAdaptor.onChangeImplemented(targetVertex.getJobVertexId());
+				checkNotNull(streamManagerGateway, "The streamManagerGateway wasn't set yet, notify StreamManager failed.");
+
+				LOG.info("++++++ StreamSwitch in Stream Manager notify migration completed");
+				streamManagerGateway.streamSwitchCompleted(targetVertex.getJobVertexId());
 			}, mainThreadExecutor);
 	}
 
@@ -665,10 +666,9 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 				clean();
 
 				// notify streamSwitch that change is finished
-				checkNotNull(jobManagerGateway, "The jobMangerGateway wasn't set yet, notify StreamManager failed.");
-				jobManagerGateway.notifyStreamSwitchComplete(targetVertex.getJobVertexId());
-//				streamSwitchAdaptor.onMigrationExecutorsStopped(targetVertex.getJobVertexId());
-//				streamSwitchAdaptor.onChangeImplemented(targetVertex.getJobVertexId());
+				checkNotNull(streamManagerGateway, "The jobMangerGateway wasn't set yet, notify StreamManager failed.");
+				LOG.info("++++++ StreamSwitch in Stream Manager notify migration completed");
+				streamManagerGateway.streamSwitchCompleted(targetVertex.getJobVertexId());
 			}, mainThreadExecutor);
 	}
 
@@ -725,10 +725,9 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 				clean();
 
 				// notify streamSwitch that change is finished
-				checkNotNull(jobManagerGateway, "The jobMangerGateway wasn't set yet, notify StreamManager failed.");
-				jobManagerGateway.notifyStreamSwitchComplete(targetVertex.getJobVertexId());
-//				streamSwitchAdaptor.onMigrationExecutorsStopped(targetVertex.getJobVertexId());
-//				streamSwitchAdaptor.onChangeImplemented(targetVertex.getJobVertexId());
+				checkNotNull(streamManagerGateway, "The jobMangerGateway wasn't set yet, notify StreamManager failed.");
+				LOG.info("++++++ StreamSwitch in Stream Manager notify migration completed");
+				streamManagerGateway.streamSwitchCompleted(targetVertex.getJobVertexId());
 			}, mainThreadExecutor);
 	}
 
@@ -783,29 +782,25 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 		this.checkpointId = checkpointId;
 	}
 
-	public JobStatusListener createActivatorDeactivator() {
-		if (jobStatusListener == null) {
-			jobStatusListener = new JobRescaleCoordinatorDeActivator(this);
-		}
-
-		return jobStatusListener;
-	}
-
-	private static class JobRescaleCoordinatorDeActivator implements JobStatusListener {
-
-		private final JobRescaleCoordinator coordinator;
-
-		public JobRescaleCoordinatorDeActivator(JobRescaleCoordinator coordinator) {
-			this.coordinator = checkNotNull(coordinator);
-		}
-
-		@Override
-		public void jobStatusChanges(JobID jobId, JobStatus newJobStatus, long timestamp, Throwable error) {
-			if (newJobStatus == JobStatus.RUNNING) {
-				coordinator.start();
-			} else {
-				coordinator.stop();
-			}
-		}
-	}
+//	public JobStatusListener createActivatorDeactivator() {
+//		if (jobStatusListener == null) {
+//			jobStatusListener = new JobRescaleCoordinatorDeActivator(this);
+//		}
+//
+//		return jobStatusListener;
+//	}
+//
+//	private static class JobRescaleCoordinatorDeActivator implements JobStatusListener {
+//
+//		private final JobRescaleCoordinator coordinator;
+//
+//		public JobRescaleCoordinatorDeActivator(JobRescaleCoordinator coordinator) {
+//			this.coordinator = checkNotNull(coordinator);
+//		}
+//
+//		@Override
+//		public void jobStatusChanges(JobID jobId, JobStatus newJobStatus, long timestamp, Throwable error) {
+//
+//		}
+//	}
 }

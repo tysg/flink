@@ -32,6 +32,7 @@ import org.apache.flink.runtime.executiongraph.ExecutionVertex;
 import org.apache.flink.runtime.io.network.partition.ResultPartition;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionID;
 import org.apache.flink.runtime.jobgraph.IntermediateDataSetID;
+import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.messages.webmonitor.JobDetails;
@@ -274,14 +275,14 @@ public interface JobMasterGateway extends
 	CompletableFuture<Object> updateGlobalAggregate(String aggregateName, Object aggregand, byte[] serializedAggregationFunction);
 
 	void triggerJobRescale(
-			JobRescaleAction.RescaleParamsWrapper wrapper,
-			List<JobVertexID> involvedUpStream,
-			List<JobVertexID> involvedDownStream);
+		JobRescaleAction.RescaleParamsWrapper wrapper,
+		JobGraph jobGraph, List<JobVertexID> involvedUpStream,
+		List<JobVertexID> involvedDownStream);
 
 	/**
 	 * Notify StreamManager's StreamSwitchAdaptor that changes completed:
 	 * Maybe 1. Assign states for repartition, 2. Rescale and assign states
 	 * @param targetVertexID the JobVertexID of target vertex
 	 */
-	void notifyStreamSwitchComplete(JobVertexID targetVertexID);
+//	void notifyStreamSwitchComplete(JobVertexID targetVertexID);
 }

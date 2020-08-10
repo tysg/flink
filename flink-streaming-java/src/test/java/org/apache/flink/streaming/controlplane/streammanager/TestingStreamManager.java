@@ -51,6 +51,7 @@ public class TestingStreamManager extends StreamManager {
 			streamManagerConfiguration,
 			resourceId,
 			jobGraph,
+			null,
 			highAvailabilityService,
 			jobLeaderIdService,
 			dispatcherGatewayRetriever,

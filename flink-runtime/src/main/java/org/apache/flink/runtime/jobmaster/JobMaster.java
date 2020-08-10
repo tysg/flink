@@ -473,43 +473,43 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 
 	@Override
 	public void triggerJobRescale(JobRescaleAction.RescaleParamsWrapper wrapper,
+								  JobGraph jobGraph,
 								  List<JobVertexID> involvedUpStream,
 								  List<JobVertexID> involvedDownStream) {
 		validateRunsInMainThread();
 
-		JobRescaleCoordinator rescaleCoordinator = this.schedulerNG.getJobRescaleCoordinator();
-		rescaleCoordinator.setJobManagerGateway(this); // pass JobMasterGateway to JobRescaleCoordinator
+		JobRescaleCoordinator rescaleCoordinator = schedulerNG.getJobRescaleCoordinator();
 		switch (wrapper.type) {
 			case REPARTITION:
 				rescaleCoordinator.repartition(wrapper.vertexID, wrapper.jobRescalePartitionAssignment,
-					involvedUpStream, involvedDownStream);
+					jobGraph, involvedUpStream, involvedDownStream);
 				break;
 			case SCALE_OUT:
 				rescaleCoordinator.scaleOut(wrapper.vertexID, wrapper.newParallelism, wrapper.jobRescalePartitionAssignment,
-					involvedUpStream, involvedDownStream);
+					jobGraph, involvedUpStream, involvedDownStream);
 				break;
 			case SCALE_IN:
 				rescaleCoordinator.scaleIn(wrapper.vertexID, wrapper.newParallelism, wrapper.jobRescalePartitionAssignment,
-					involvedUpStream, involvedDownStream);
+					jobGraph, involvedUpStream, involvedDownStream);
 				break;
 		}
 	}
 
-	@Override
-	public void notifyStreamSwitchComplete(JobVertexID targetVertexID) {
-		checkNotNull(targetVertexID, "The targetVertexID is null. (jobMaster.notifyStreamSwitchComplete) ");
-
-		try {
-			assert streamManagerGatewayFuture != null;
-			StreamManagerGateway gateway = streamManagerGatewayFuture.get();
-			gateway.streamSwitchComplete(targetVertexID);
-
-		} catch (InterruptedException | ExecutionException e) {
-			log.info("can not get stream manager gateway currently");
-			e.printStackTrace();
-		}
-
-	}
+//	@Override
+//	public void \notifyStreamSwitchComplete(JobVertexID targetVertexID) {
+//		checkNotNull(targetVertexID, "The targetVertexID is null. (jobMaster.notifyStreamSwitchComplete) ");
+//
+//		try {
+//			assert streamManagerGatewayFuture != null;
+//			StreamManagerGateway gateway = streamManagerGatewayFuture.get();
+//			gateway.streamSwitchCompleted(targetVertexID);
+//
+//		} catch (InterruptedException | ExecutionException e) {
+//			log.info("can not get stream manager gateway currently");
+//			e.printStackTrace();
+//		}
+//
+//	}
 
 	@Override
 	public CompletableFuture<KvStateLocation> requestKvStateLocation(final JobID jobId, final String registrationName) {
@@ -905,7 +905,6 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		// register self as job status change listener
 		jobStatusListener = new JobManagerJobStatusListener();
 		schedulerNG.registerJobStatusListener(jobStatusListener);
-
 		schedulerNG.startScheduling();
 	}
 
@@ -961,7 +960,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		//todo notify upper stream manager or make sm periodly check job status?
 		checkState(streamManagerGatewayFuture != null);
 		streamManagerGatewayFuture.thenAccept(
-			streamManagerGateway -> streamManagerGateway.jobStatusChanges(jobGraph.getJobID(), newJobStatus, timestamp, error)
+			streamManagerGateway -> streamManagerGateway.jobStatusChanged(jobGraph.getJobID(), newJobStatus, timestamp, error)
 		);
 	}
 
@@ -1155,6 +1154,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 			log.info("a new stream manager gained Leadership:" + streamManagerGateway.getAddress());
 			assert streamManagerGatewayFuture != null;
 			streamManagerGatewayFuture.complete(streamManagerGateway);
+			schedulerNG.getJobRescaleCoordinator().setStreamManagerGateway(streamManagerGateway);
 		}
 
 		@Override
