@@ -158,8 +158,8 @@ public class HeapPriorityQueueSet<T extends HeapPriorityQueueElement>
 	}
 
 	private int globalKeyGroupToLocalIndex(int hashedKeyGroup) {
-		checkArgument(keyGroupRange.contains(hashedKeyGroup), "%s does not contain key group %s", keyGroupRange, hashedKeyGroup);
 		int alignedKeyGroup = keyGroupRange.mapFromHashedToAligned(hashedKeyGroup);
+		checkArgument(keyGroupRange.contains(alignedKeyGroup), "%s does not contain key group %s", keyGroupRange, alignedKeyGroup);
 		return alignedKeyGroup - keyGroupRange.getStartKeyGroup();
 	}
 
