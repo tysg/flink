@@ -61,7 +61,10 @@ public class FlinkStreamSwitchAdaptor {
 			} else if (jobVertex.getName().toLowerCase().contains("filter")) {
 				controller = new DummyStreamSwitch("filter");
 			} else {
-				continue;
+				controller = ConfigurableDummyStreamSwitch.createFromJobVertex(jobVertex.getName());
+				if (controller == null) {
+					continue;
+				}
 			}
 			config.setString("vertex_id", vertexID.toString());
 //			FlinkOperatorController controller = new LatencyGuarantor(config);
