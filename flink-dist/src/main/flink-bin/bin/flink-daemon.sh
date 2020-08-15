@@ -43,7 +43,8 @@ case $DAEMON in
     ;;
 
     (standalonesession)
-        CLASS_TO_RUN=org.apache.flink.runtime.entrypoint.StandaloneSessionClusterEntrypoint
+#        CLASS_TO_RUN=org.apache.flink.runtime.entrypoint.StandaloneSessionClusterEntrypoint
+        CLASS_TO_RUN=org.apache.flink.streaming.controlplane.entrypoint.StandaloneSessionClusterControllerEntrypoint
     ;;
 
     (standalonejob)

@@ -50,19 +50,25 @@ public class FlinkStreamSwitchAdaptor {
 			int parallelism = jobVertex.getParallelism();
 			int maxParallelism = getMaxParallelism(jobVertex);
 
-			// TODO scaling: using DummyStreamSwitch for test purpose
-//			if (!entry.getValue().getName().toLowerCase().contains("join") && !entry.getValue().getName().toLowerCase().contains("window")) {
-//				continue;
-//			}
+
 			FlinkOperatorController controller;
 
 			if (jobVertex.getName().toLowerCase().contains("map")) {
-				controller = new DummyStreamSwitch("map");
+//				controller = new DummyStreamSwitch("map");
+				continue;
 			} else if (jobVertex.getName().toLowerCase().contains("filter")) {
 				controller = new DummyStreamSwitch("filter");
 			} else {
 				continue;
 			}
+
+//			// TODO scaling: using DummyStreamSwitch for test purpose
+//			if (jobVertex.getName().toLowerCase().contains("join") || jobVertex.getName().toLowerCase().contains("window")) {
+//				controller = new DummyStreamSwitch(jobVertex.getName().toLowerCase());
+//			} else {
+//				continue;
+//			}
+
 			config.setString("vertex_id", vertexID.toString());
 //			FlinkOperatorController controller = new LatencyGuarantor(config);
 			OperatorControllerListener listener = new OperatorControllerListenerImpl(vertexID, parallelism, maxParallelism);
