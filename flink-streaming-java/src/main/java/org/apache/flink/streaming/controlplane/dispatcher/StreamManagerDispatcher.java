@@ -19,6 +19,7 @@
 package org.apache.flink.streaming.controlplane.dispatcher;
 
 import org.apache.flink.api.common.JobID;
+import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.api.common.operators.ResourceSpec;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.configuration.Configuration;
@@ -37,18 +38,21 @@ import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobmanager.JobGraphWriter;
 import org.apache.flink.runtime.jobmaster.JobManagerSharedServices;
+import org.apache.flink.runtime.jobmaster.JobResult;
 import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalService;
 import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.messages.FlinkJobNotFoundException;
 import org.apache.flink.runtime.rpc.FatalErrorHandler;
 import org.apache.flink.runtime.rpc.PermanentlyFencedRpcEndpoint;
 import org.apache.flink.runtime.rpc.RpcService;
+import org.apache.flink.runtime.rpc.RpcTimeout;
 import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
 import org.apache.flink.runtime.webmonitor.retriever.impl.RpcGatewayRetriever;
 import org.apache.flink.streaming.controlplane.streammanager.StreamManagerRunner;
 import org.apache.flink.streaming.controlplane.streammanager.StreamManagerRunnerImpl;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkException;
+import org.apache.flink.util.OptionalConsumer;
 import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.function.BiConsumerWithException;
 import org.apache.flink.util.function.CheckedSupplier;
@@ -244,7 +248,7 @@ public abstract class StreamManagerDispatcher extends PermanentlyFencedRpcEndpoi
 			} else if (isPartialResourceConfigured(jobGraph)) {
 				return FutureUtils.completedExceptionally(
 					new JobSubmissionException(jobGraph.getJobID(), "Currently jobs is not supported if parts of the vertices have " +
-							"resources configured. The limitation will be removed in future versions."));
+						"resources configured. The limitation will be removed in future versions."));
 			} else {
 				return internalSubmitJob(jobGraph);
 			}
@@ -280,7 +284,7 @@ public abstract class StreamManagerDispatcher extends PermanentlyFencedRpcEndpoi
 				final Throwable strippedThrowable = ExceptionUtils.stripCompletionException(throwable);
 
 				log.error("Failed to run stream manager.", strippedThrowable);
-			 	jobGraphWriter.removeJobGraph(jobGraph.getJobID());
+				jobGraphWriter.removeJobGraph(jobGraph.getJobID());
 			}
 		}));
 	}
@@ -371,7 +375,7 @@ public abstract class StreamManagerDispatcher extends PermanentlyFencedRpcEndpoi
 	 * Cleans up the job related data from the dispatcher. If cleanupHA is true, then
 	 * the data will also be removed from HA.
 	 *
-	 * @param jobId JobID identifying the job to clean up
+	 * @param jobId     JobID identifying the job to clean up
 	 * @param cleanupHA True iff HA data shall also be cleaned up
 	 */
 	private void removeJobAndRegisterTerminationFuture(JobID jobId, boolean cleanupHA) {
@@ -534,5 +538,25 @@ public abstract class StreamManagerDispatcher extends PermanentlyFencedRpcEndpoi
 		} else {
 			return streamManagerTerminationFutures.getOrDefault(jobId, CompletableFuture.completedFuture(null));
 		}
+	}
+
+	/**
+	 * Requests the {@link JobResult} of a job specified by the given jobId.
+	 *
+	 * @param jobId   identifying the job for which to retrieve the {@link JobResult}.
+	 * @param timeout for the asynchronous operation
+	 * @return Future which is completed with the job's {@link JobResult} once the job has finished
+	 */
+	public CompletableFuture<JobResult> requestJobResult(JobID jobId, @RpcTimeout Time timeout) {
+		Optional<DispatcherGateway> dispatcherGateway = dispatcherGatewayRetriever.getNow();
+		return dispatcherGateway.map(gateway -> gateway.requestJobResult(jobId, timeout)).orElse(null);
+	}
+
+
+	public CompletableFuture<JobStatus> requestJobStatus(
+		JobID jobId,
+		@RpcTimeout Time timeout) {
+		Optional<DispatcherGateway> dispatcherGateway = dispatcherGatewayRetriever.getNow();
+		return dispatcherGateway.map(gateway -> gateway.requestJobStatus(jobId, timeout)).orElse(null);
 	}
 }

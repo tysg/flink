@@ -111,6 +111,7 @@ public class StreamManagerDispatcherRestEndpoint extends StreamManagerWebMonitor
 //			log.info("Web-based job submission is not enabled.");
 //		}
 
+
 		handlers.add(Tuple2.of(jobSubmitHandler.getMessageHeaders(), jobSubmitHandler));
 
 		return handlers;

@@ -56,9 +56,9 @@ public class FlinkStreamSwitchAdaptor {
 //			}
 			FlinkOperatorController controller;
 
-			if (jobVertex.getName().toLowerCase().contains("map")) {
+			if (jobVertex.getName().toLowerCase().startsWith("map")) {
 				controller = new DummyStreamSwitch("map");
-			} else if (jobVertex.getName().toLowerCase().contains("filter")) {
+			} else if (jobVertex.getName().toLowerCase().startsWith("filter")) {
 				controller = new DummyStreamSwitch("filter");
 			} else {
 				controller = ConfigurableDummyStreamSwitch.createFromJobVertex(jobVertex.getName());

@@ -11,7 +11,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
-public class ConfigurableDummyStreamSwitch extends Thread implements FlinkOperatorController {
+public class ConfigurableDummyStreamSwitch implements FlinkOperatorController, Runnable {
 
 	private static final Logger LOG = LoggerFactory.getLogger(ConfigurableDummyStreamSwitch.class);
 
@@ -39,6 +39,11 @@ public class ConfigurableDummyStreamSwitch extends Thread implements FlinkOperat
 
 	private void setRescaleAction(List<RescaleActionDescriptor.BaseRescaleAction> actionList) {
 		this.actionList = actionList;
+	}
+
+	@Override
+	public synchronized void start() {
+		new Thread(this).start();
 	}
 
 	/**
@@ -135,8 +140,8 @@ public class ConfigurableDummyStreamSwitch extends Thread implements FlinkOperat
 			Thread.sleep(5 * 1000);
 
 			for (RescaleActionDescriptor.BaseRescaleAction action : this.actionList) {
-				if(action instanceof RescaleActionDescriptor.SimpleRescaleAction){
-					RescaleActionDescriptor.SimpleRescaleAction simpleRescaleAction = (RescaleActionDescriptor.SimpleRescaleAction)action;
+				if (action instanceof RescaleActionDescriptor.SimpleRescaleAction) {
+					RescaleActionDescriptor.SimpleRescaleAction simpleRescaleAction = (RescaleActionDescriptor.SimpleRescaleAction) action;
 					switch (action.actionType) {
 						case REPARTITION:
 							testRepartition();
