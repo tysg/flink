@@ -196,6 +196,7 @@ public class TaskRescaleManager {
 
 		createChannels(inputGate, shuffleDescriptors);
 
+		inputGate.assignExclusiveSegments();
 		inputGate.requestPartitions();
 	}
 
