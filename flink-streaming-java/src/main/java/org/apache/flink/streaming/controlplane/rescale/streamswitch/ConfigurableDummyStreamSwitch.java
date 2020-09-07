@@ -172,14 +172,59 @@ public class ConfigurableDummyStreamSwitch implements FlinkOperatorController, R
 	}
 
 
-	private void preparePartitionAssignment(String... executorIds) {
-		executorMapping.clear();
+//	private void preparePartitionAssignment(String... executorIds) {
+//		executorMapping.clear();
+//
+//		for (String executorId : executorIds) {
+//			executorMapping.put(executorId, new ArrayList<>());
+//		}
+//	}
 
-		for (String executorId : executorIds) {
-			executorMapping.put(executorId, new ArrayList<>());
+	/**
+	 * This method can only be called once.
+	 * If new parallelism == old parallelism, it is repartition,
+	 *	 will move half target sub task partition to destination sub task
+	 * if new parallelism > old parallelism, it is scale out,
+	 *   will move half target sub task partition to new added sub task
+	 * if new parallelism < old parallelism, it is scale in,
+	 *   will move all target sub task partition to destination sub task,
+	 *
+	 * NOTICE: we suppose that the different between old and new parallelism is not more than one if wanting scale out
+	 *
+	 * @param newParallelism
+	 */
+	private void preparePartitionAssignment(int newParallelism) {
+		int oldParallelism = executorMapping.size();
+		for (int i = 0; i < newParallelism; i++) {
+			executorMapping.putIfAbsent(String.valueOf(i), new ArrayList<>());
+		}
+		final int rangeSize = 128 / oldParallelism;
+		if(newParallelism >= oldParallelism){
+			// scale out & repartition
+			List<String> firstSubTask =  executorMapping.get("0");
+			List<String> originKeys = new ArrayList<>(firstSubTask.size());
+			List<String> otherKeys = new ArrayList<>(firstSubTask.size());
+			for(int i=0;i<firstSubTask.size();i++){
+				if(i%2==0){
+					originKeys.add(firstSubTask.get(i));
+				}else {
+					otherKeys.add(firstSubTask.get(i));
+				}
+			}
+			executorMapping.get("0").clear();
+			executorMapping.get("0").addAll(originKeys);
+			executorMapping.get(String.valueOf(newParallelism-1)).addAll(otherKeys);
+		}else {
+			// scale in
+			List<String> originKeys = new ArrayList<>(rangeSize * (oldParallelism-newParallelism));
+			for(int i=newParallelism;i<oldParallelism;i++){
+				List<String> lastSubTask =  executorMapping.get(String.valueOf(i));
+				originKeys.addAll(lastSubTask);
+				lastSubTask.clear();
+			}
+			executorMapping.get("0").addAll(originKeys);
 		}
 	}
-
 
 	private void testRepartition() throws InterruptedException {
 		/*
@@ -189,23 +234,8 @@ public class ConfigurableDummyStreamSwitch implements FlinkOperatorController, R
 		 *  2: [64, 95]
 		 *  3: [96, 127]
 		 */
-		// todo, the mapping information belongs to runtime level, should we put executorMapping in StreamSwitch?
-		// As we assumed, the StreamManager should only manage logical state as much as possible.
 
-		preparePartitionAssignment("0", "1", "2", "3");
-		for (int i = 0; i < 128; i++) {
-			if (i <= 31) {
-				if (i % 2 == 0)
-					executorMapping.get("0").add(i + "");
-				else
-					executorMapping.get("2").add(i + "");
-			} else if (i <= 63)
-				executorMapping.get("1").add(i + "");
-			else if (i <= 95)
-				executorMapping.get("2").add(i + "");
-			else
-				executorMapping.get("3").add(i + "");
-		}
+		preparePartitionAssignment(executorMapping.size());
 		triggerAction(
 			"trigger 1 repartition",
 			() -> listener.remap(executorMapping),
@@ -213,28 +243,10 @@ public class ConfigurableDummyStreamSwitch implements FlinkOperatorController, R
 	}
 
 	private void testScaleOut(int newParallelism) throws InterruptedException {
-		/*
-		 * init: parallelism 3
-		 * 	0: [0, 42]
-		 * 	1: [43, 85]
-		 *  2: [86, 127]
-		 */
-
-		preparePartitionAssignment("0", "1", "2", "3");
-		for (int i = 0; i < 128; i++) {
-			if (i <= 42) {
-				if (i % 2 == 0)
-					executorMapping.get("0").add(i + "");
-				else
-					executorMapping.get("3").add(i + "");
-			} else if (i <= 85)
-				executorMapping.get("1").add(i + "");
-			else
-				executorMapping.get("2").add(i + "");
-		}
+		preparePartitionAssignment(newParallelism);
 		triggerAction(
 			"trigger 1 scale out",
-			() -> listener.scale(4, executorMapping),
+			() -> listener.scale(newParallelism, executorMapping),
 			executorMapping);
 	}
 
@@ -253,17 +265,7 @@ public class ConfigurableDummyStreamSwitch implements FlinkOperatorController, R
 		 *   1: [32, 63]
 		 *   3: [96, 127]
 		 */
-		preparePartitionAssignment("0", "1", "3");
-		for (int i = 0; i < 128; i++) {
-			if (i <= 31)
-				executorMapping.get("0").add(i + "");
-			else if (i <= 63)
-				executorMapping.get("1").add(i + "");
-			else if (i <= 95)
-				executorMapping.get("0").add(i + "");
-			else
-				executorMapping.get("3").add(i + "");
-		}
+		preparePartitionAssignment(newParallelism);
 		triggerAction(
 			"trigger 1 scale in",
 			() -> listener.scale(3, executorMapping),
@@ -277,19 +279,7 @@ public class ConfigurableDummyStreamSwitch implements FlinkOperatorController, R
 		 *   3: even of [96, 127]
 		 *   4: odd of [96, 127]
 		 */
-		preparePartitionAssignment("0", "1", "3", "4");
-		for (int i = 0; i < 128; i++) {
-			if (i <= 31)
-				executorMapping.get("0").add(i + "");
-			else if (i <= 63)
-				executorMapping.get("1").add(i + "");
-			else if (i <= 95)
-				executorMapping.get("0").add(i + "");
-			else if (i % 2 == 0)
-				executorMapping.get("3").add(i + "");
-			else
-				executorMapping.get("4").add(i + "");
-		}
+		preparePartitionAssignment(4);
 		triggerAction(
 			"trigger 2 scale out",
 			() -> listener.scale(3, executorMapping),
