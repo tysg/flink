@@ -1,17 +1,18 @@
 package org.apache.flink.streaming.controlplane.reconfigure;
 
-import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.OperatorID;
+import org.apache.flink.streaming.controlplane.reconfigure.operator.UpdatedOperator;
 import org.apache.flink.streaming.controlplane.reconfigure.type.FunctionTypeStorage;
 import org.apache.flink.streaming.controlplane.reconfigure.type.InMemoryFunctionStorge;
+import org.apache.flink.streaming.controlplane.streammanager.StreamManagerService;
 
 public class ControlFunctionManager implements ControlFunctionManagerService {
 
 	private FunctionTypeStorage functionTypeStorage;
-	protected JobGraph jobGraph;
+	protected final StreamManagerService streamManagerService;
 
-	public ControlFunctionManager(JobGraph jobGraph){
-		this.jobGraph = jobGraph;
+	public ControlFunctionManager(StreamManagerService streamManagerService){
+		this.streamManagerService = streamManagerService;
 		functionTypeStorage = new InMemoryFunctionStorge();
 	}
 
@@ -30,8 +31,8 @@ public class ControlFunctionManager implements ControlFunctionManagerService {
 	}
 
 	@Override
-	public void reconfigureFunction(OperatorID  operatorID, Class<? extends ControlFunction> type) {
-		ControlFunction targetFunction = functionTypeStorage.getTargetFunction(type);
+	public void reconfigure(OperatorID operatorID, UpdatedOperator operator) {
 		System.out.println("Substitute `Control` Function...");
 	}
+
 }

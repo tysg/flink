@@ -141,7 +141,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 		this.streamSwitchAdaptor = new FlinkStreamSwitchAdaptor(this, jobGraph);
 		this.jobGraphRescaler = new StreamJobGraphRescaler(jobGraph, userCodeLoader);
-		this.controlFunctionManager = new ControlFunctionManager(jobGraph);
+		this.controlFunctionManager = new ControlFunctionManager(this);
 	}
 
 	/**
@@ -432,6 +432,12 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	@Override
 	public StreamManager getGateway() {
 		return getSelfGateway(StreamManager.class);
+	}
+
+	@Override
+	public JobGraph getJobGraph() {
+		checkNotNull(jobGraph, "current job graph is null");
+		return jobGraph;
 	}
 
 	// ------------------------------------------------------------------------
