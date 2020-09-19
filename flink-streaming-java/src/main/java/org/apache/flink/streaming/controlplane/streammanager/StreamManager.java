@@ -43,6 +43,7 @@ import org.apache.flink.runtime.resourcemanager.registration.JobManagerRegistrat
 import org.apache.flink.runtime.rpc.*;
 import org.apache.flink.runtime.rpc.akka.AkkaRpcServiceUtils;
 import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
+import org.apache.flink.streaming.controlplane.reconfigure.ControlFunctionManager;
 import org.apache.flink.streaming.controlplane.rescale.StreamJobGraphRescaler;
 import org.apache.flink.streaming.controlplane.rescale.streamswitch.FlinkStreamSwitchAdaptor;
 import org.apache.flink.streaming.controlplane.streammanager.exceptions.StreamManagerException;
@@ -91,6 +92,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 	private final FlinkStreamSwitchAdaptor streamSwitchAdaptor;
 
+	private final ControlFunctionManager controlFunctionManager;
+
 	private CompletableFuture<Acknowledge> rescalePartitionFuture;
 
     /*
@@ -138,6 +141,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 		this.streamSwitchAdaptor = new FlinkStreamSwitchAdaptor(this, jobGraph);
 		this.jobGraphRescaler = new StreamJobGraphRescaler(jobGraph, userCodeLoader);
+		this.controlFunctionManager = new ControlFunctionManager(jobGraph);
 	}
 
 	/**
@@ -478,6 +482,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	public void jobStatusChanged(JobID jobId, JobStatus newJobStatus, long timestamp, Throwable error) {
 		if (newJobStatus == JobStatus.RUNNING) {
 			this.streamSwitchAdaptor.startControllers();
+			this.controlFunctionManager.onJobStart();
 		} else {
 			this.streamSwitchAdaptor.stopControllers();
 		}
