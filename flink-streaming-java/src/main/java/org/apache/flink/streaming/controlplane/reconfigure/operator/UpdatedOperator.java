@@ -2,7 +2,6 @@ package org.apache.flink.streaming.controlplane.reconfigure.operator;
 
 import org.apache.flink.streaming.api.operators.AbstractUdfStreamOperator;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
-import org.apache.flink.streaming.controlplane.reconfigure.ControlFunction;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
 public class UpdatedOperator<IN, OUT> extends AbstractUdfStreamOperator<OUT, ControlFunction>

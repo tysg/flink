@@ -1,6 +1,6 @@
 package org.apache.flink.streaming.controlplane.reconfigure.type;
 
-import org.apache.flink.streaming.controlplane.reconfigure.ControlFunction;
+import org.apache.flink.streaming.controlplane.reconfigure.operator.ControlFunction;
 
 public class InMemoryFunctionStorge implements FunctionTypeStorage{
 	@Override

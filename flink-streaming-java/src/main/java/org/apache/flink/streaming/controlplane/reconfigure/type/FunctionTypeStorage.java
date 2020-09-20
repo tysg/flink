@@ -1,6 +1,6 @@
 package org.apache.flink.streaming.controlplane.reconfigure.type;
 
-import org.apache.flink.streaming.controlplane.reconfigure.ControlFunction;
+import org.apache.flink.streaming.controlplane.reconfigure.operator.ControlFunction;
 
 /**
  * Only the JVM could found the corresponding function type coudl we update operator logic with this function.

@@ -3,6 +3,8 @@ package org.apache.flink.streaming.controlplane.reconfigure;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobgraph.OperatorID;
+import org.apache.flink.streaming.controlplane.reconfigure.operator.ControlContext;
+import org.apache.flink.streaming.controlplane.reconfigure.operator.ControlFunction;
 import org.apache.flink.streaming.controlplane.reconfigure.operator.UpdatedOperator;
 import org.apache.flink.streaming.controlplane.reconfigure.operator.UpdatedOperatorFactory;
 import org.apache.flink.streaming.controlplane.streammanager.StreamManagerService;

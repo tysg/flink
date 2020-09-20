@@ -476,7 +476,6 @@ public class StreamingLeaderService {
 				jobMasterInfo.jobManagerResourceID,
 				jobMasterInfo.jobMasterRpcAddress,
 				jobMasterInfo.jobID,
-				jobMasterInfo.userCodeClassLoader,
 				Time.milliseconds(timeoutMillis)
 			);
 		}
@@ -487,18 +486,15 @@ public class StreamingLeaderService {
 		final ResourceID jobManagerResourceID;
 		final String jobMasterRpcAddress;
 		final JobID jobID;
-		final ClassLoader userCodeClassLoader;
 
 		public JobMasterInfo(JobMasterId jobMasterId,
 							 ResourceID jobManagerResourceID,
 							 String jobMasterRpcAddress,
-							 JobID jobID,
-							 ClassLoader userCodeClassLoader) {
+							 JobID jobID) {
 			this.jobMasterId = jobMasterId;
 			this.jobManagerResourceID = jobManagerResourceID;
 			this.jobMasterRpcAddress = jobMasterRpcAddress;
 			this.jobID = jobID;
-			this.userCodeClassLoader = userCodeClassLoader;
 		}
 	}
 

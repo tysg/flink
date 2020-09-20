@@ -54,7 +54,6 @@ public interface StreamManagerGateway extends FencedRpcGateway<StreamManagerId> 
 		ResourceID jobMasterResourceId,
 		String jobMasterAddress,
 		JobID jobId,
-		ClassLoader userLoader,
 		@RpcTimeout Time timeout);
 
 	/**

@@ -1,4 +1,4 @@
-package org.apache.flink.streaming.controlplane.reconfigure;
+package org.apache.flink.streaming.controlplane.reconfigure.operator;
 
 import org.apache.flink.api.common.functions.Function;
 

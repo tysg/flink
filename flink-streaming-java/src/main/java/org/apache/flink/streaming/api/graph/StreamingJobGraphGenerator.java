@@ -152,8 +152,6 @@ public class StreamingJobGraphGenerator {
 		// make sure that all vertices start immediately
 		jobGraph.setScheduleMode(streamGraph.getScheduleMode());
 
-		jobGraph.setJobRescalerClass(StreamJobGraphRescaler.class);
-
 		// Generate deterministic hashes for the nodes in order to identify them across
 		// submission iff they didn't change.
 		Map<Integer, byte[]> hashes = defaultStreamGraphHasher.traverseStreamGraphAndGenerateHashes(streamGraph);

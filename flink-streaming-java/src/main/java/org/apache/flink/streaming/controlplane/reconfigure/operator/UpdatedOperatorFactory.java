@@ -4,7 +4,6 @@ import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.streaming.api.operators.SimpleOperatorFactory;
 import org.apache.flink.streaming.api.operators.StreamOperator;
-import org.apache.flink.streaming.controlplane.reconfigure.ControlFunction;
 
 public abstract class UpdatedOperatorFactory extends SimpleOperatorFactory<Object> {
 

@@ -35,7 +35,7 @@ import org.apache.flink.runtime.jobmaster.JobMasterId;
 import org.apache.flink.runtime.jobmaster.JobMasterRegistrationSuccess;
 import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.registration.RegistrationResponse;
-import org.apache.flink.runtime.rescale.JobGraphRescaler;
+import org.apache.flink.streaming.controlplane.jobgraph.JobGraphRescaler;
 import org.apache.flink.runtime.rescale.JobRescaleAction;
 import org.apache.flink.runtime.resourcemanager.JobLeaderIdActions;
 import org.apache.flink.runtime.resourcemanager.JobLeaderIdService;
@@ -186,7 +186,6 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		final ResourceID jobManagerResourceId,
 		final String jobManagerAddress,
 		final JobID jobId,
-		final ClassLoader userLoader,
 		final Time timeout) {
 
 		checkNotNull(jobMasterId);
@@ -260,8 +259,6 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 					return new RegistrationResponse.Decline(throwable.getMessage());
 				} else {
-					// save passed userCode ClassLoader to current JobGraphRescaler
-					this.jobGraphRescaler.setUserCodeLoader(userLoader);
 					return registrationResponse;
 				}
 			},

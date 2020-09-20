@@ -1021,8 +1021,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 			new StreamingLeaderService.JobMasterInfo(getFencingToken(),
 				resourceId,
 				getAddress(),
-				jobGraph.getJobID(),
-				this.userCodeLoader),
+				jobGraph.getJobID()),
 			getRpcService(),
 			highAvailabilityServices,
 			new StreamingLeaderListenerImpl(jobGraph.getJobID(), resourceId, getAddress(), getFencingToken())
