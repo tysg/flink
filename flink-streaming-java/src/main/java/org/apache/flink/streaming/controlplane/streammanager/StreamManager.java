@@ -44,6 +44,7 @@ import org.apache.flink.runtime.rpc.*;
 import org.apache.flink.runtime.rpc.akka.AkkaRpcServiceUtils;
 import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
 import org.apache.flink.streaming.controlplane.reconfigure.ControlFunctionManager;
+import org.apache.flink.streaming.controlplane.reconfigure.TestingCFManager;
 import org.apache.flink.streaming.controlplane.rescale.StreamJobGraphRescaler;
 import org.apache.flink.streaming.controlplane.rescale.streamswitch.FlinkStreamSwitchAdaptor;
 import org.apache.flink.streaming.controlplane.streammanager.exceptions.StreamManagerException;
@@ -141,7 +142,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 		this.streamSwitchAdaptor = new FlinkStreamSwitchAdaptor(this, jobGraph);
 		this.jobGraphRescaler = new StreamJobGraphRescaler(jobGraph, userCodeLoader);
-		this.controlFunctionManager = new ControlFunctionManager(this);
+		this.controlFunctionManager = new TestingCFManager(this, jobGraphRescaler);
 	}
 
 	/**
