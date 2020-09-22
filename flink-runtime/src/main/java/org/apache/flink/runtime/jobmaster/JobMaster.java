@@ -498,10 +498,9 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 
 	@Override
 	public void triggerOperatorUpdate(JobGraph jobGraph, JobVertexID targetVertexID, OperatorID operatorID){
-		System.out.println("some one want to triggerOperatorUpdate??? Tell me how!!?");
 		validateRunsInMainThread();
 		JobRescaleCoordinator rescaleCoordinator = schedulerNG.getJobRescaleCoordinator();
-//		rescaleCoordinator.
+		rescaleCoordinator.getOperatorUpdateCoordinator().triggerUpdate(jobGraph, targetVertexID, operatorID);
 	}
 
 

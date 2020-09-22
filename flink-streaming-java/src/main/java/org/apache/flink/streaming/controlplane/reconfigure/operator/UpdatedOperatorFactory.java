@@ -17,6 +17,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  */
 public class UpdatedOperatorFactory<IN, OUT> implements StreamOperatorFactory<OUT> {
 
+	// use to check whether this operator update is valid
 	OperatorDescriptor descriptor;
 
 	private UpdatedOperator<IN, OUT> operator = null;

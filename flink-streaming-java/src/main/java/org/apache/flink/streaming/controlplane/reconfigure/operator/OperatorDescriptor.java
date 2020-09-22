@@ -6,6 +6,10 @@ import org.apache.flink.runtime.jobgraph.OperatorID;
 
 import java.io.Serializable;
 
+/**
+ * contains the information about input, output, Stream Task type that could
+ * help to check if one operator substitution is valid
+ */
 public class OperatorDescriptor implements Serializable {
 	TypeInformation inputType;
 	TypeInformation outputType;

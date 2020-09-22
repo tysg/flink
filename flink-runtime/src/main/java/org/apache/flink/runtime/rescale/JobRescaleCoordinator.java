@@ -34,6 +34,7 @@ import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobgraph.jsonplan.JsonPlanGenerator;
 import org.apache.flink.runtime.jobmaster.JobMasterGateway;
+import org.apache.flink.runtime.rescale.reconfigure.OperatorUpdateCoordinator;
 import org.apache.flink.runtime.state.KeyGroupRange;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -84,6 +85,7 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 
 	private volatile Collection<Execution> allocatedExecutions;
 
+	private final OperatorUpdateCoordinator operatorUpdateCoordinator;
 
 	public JobRescaleCoordinator(
 			JobGraph jobGraph,
@@ -93,9 +95,7 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 		this.executionGraph = executionGraph;
 
 		this.notYetAcknowledgedTasks = new ArrayList<>();
-
-//		this.streamSwitchAdaptor = new FlinkStreamSwitchAdaptor(this, executionGraph, rescaleActionListener);
-//		this.jobGraphRescaler = JobGraphRescaler.instantiate(jobGraph, userCodeLoader);
+		this.operatorUpdateCoordinator = new OperatorUpdateCoordinator(jobGraph, executionGraph);
 	}
 
 	public void init(ComponentMainThreadExecutor mainThreadExecutor) {
@@ -782,25 +782,7 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 		this.checkpointId = checkpointId;
 	}
 
-//	public JobStatusListener createActivatorDeactivator() {
-//		if (jobStatusListener == null) {
-//			jobStatusListener = new JobRescaleCoordinatorDeActivator(this);
-//		}
-//
-//		return jobStatusListener;
-//	}
-//
-//	private static class JobRescaleCoordinatorDeActivator implements JobStatusListener {
-//
-//		private final JobRescaleCoordinator coordinator;
-//
-//		public JobRescaleCoordinatorDeActivator(JobRescaleCoordinator coordinator) {
-//			this.coordinator = checkNotNull(coordinator);
-//		}
-//
-//		@Override
-//		public void jobStatusChanges(JobID jobId, JobStatus newJobStatus, long timestamp, Throwable error) {
-//
-//		}
-//	}
+	public OperatorUpdateCoordinator getOperatorUpdateCoordinator() {
+		return operatorUpdateCoordinator;
+	}
 }
