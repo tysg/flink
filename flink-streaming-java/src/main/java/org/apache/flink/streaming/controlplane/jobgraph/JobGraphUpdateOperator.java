@@ -5,6 +5,6 @@ import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
 
 public interface JobGraphUpdateOperator {
 
-	void updateOperator(OperatorID operatorID,  StreamOperatorFactory operatorFactory) throws Exception;
+	<OUT> void updateOperator(OperatorID operatorID, StreamOperatorFactory<OUT> operatorFactory) throws Exception;
 
 }

@@ -434,8 +434,12 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 	@Override
 	public JobGraph getJobGraph() {
-		checkNotNull(jobGraph, "current job graph is null");
-		return jobGraph;
+		return checkNotNull(jobGraph, "current job graph is null");
+	}
+
+	@Override
+	public ClassLoader getUserClassLoader() {
+		return checkNotNull(userCodeLoader, "the class loader of user code is null");
 	}
 
 	// ------------------------------------------------------------------------

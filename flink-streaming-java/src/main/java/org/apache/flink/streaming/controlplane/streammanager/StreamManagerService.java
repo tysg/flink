@@ -69,4 +69,10 @@ public interface StreamManagerService extends AutoCloseableAsync {
 	 * @return current job graph of stream manager
 	 */
 	JobGraph getJobGraph();
+
+	/**
+	 * get user class loader of job graph (the state of stream manager)
+	 * @return current user class loader of job graph
+	 */
+	ClassLoader getUserClassLoader();
 }

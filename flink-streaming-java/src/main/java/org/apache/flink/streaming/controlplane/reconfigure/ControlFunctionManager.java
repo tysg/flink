@@ -20,7 +20,7 @@ public class ControlFunctionManager implements ControlFunctionManagerService {
 	public ControlFunctionManager(StreamManagerService streamManagerService, JobGraphRescaler jobGraphRescaler) {
 		this.streamManagerService = streamManagerService;
 		this.functionTypeStorage = new InMemoryFunctionStorge();
-		this.jobGraphUpdater = new JobGraphUpdater(jobGraphRescaler, streamManagerService.getJobGraph());
+		this.jobGraphUpdater = new JobGraphUpdater(jobGraphRescaler, streamManagerService);
 	}
 
 	public void onJobStart() {
@@ -41,16 +41,16 @@ public class ControlFunctionManager implements ControlFunctionManagerService {
 	@Override
 	public void reconfigure(OperatorID operatorID, ControlFunction function) {
 		System.out.println("Substitute `Control` Function...");
-		UpdatedOperatorFactory operatorFactory = new UpdatedOperatorFactory(
+		UpdatedOperatorFactory<?, ?> operatorFactory = new UpdatedOperatorFactory<>(
 			operatorID,
 			streamManagerService.getJobGraph(),
 			function);
 		try {
 			jobGraphUpdater.updateOperator(operatorID, operatorFactory);
+			System.out.println("Substitute `Control` Function finished!");
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		System.out.println("Substitute `Control` Function finished!");
 	}
 
 }

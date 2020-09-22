@@ -15,11 +15,11 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 /**
  * Simple factory for the Update Operator
  */
-public class UpdatedOperatorFactory<OUT> implements StreamOperatorFactory<Object> {
+public class UpdatedOperatorFactory<IN, OUT> implements StreamOperatorFactory<OUT> {
 
 	OperatorDescriptor descriptor;
 
-	private UpdatedOperator<Object, OUT> operator = null;
+	private UpdatedOperator<IN, OUT> operator = null;
 	private final ControlFunction function;
 
 	public UpdatedOperatorFactory(OperatorID operatorID, JobGraph jobGraph, ControlFunction function) {
@@ -28,7 +28,7 @@ public class UpdatedOperatorFactory<OUT> implements StreamOperatorFactory<Object
 		this.function = function;
 	}
 
-	protected UpdatedOperator<Object, OUT> create(ControlFunction function) {
+	protected UpdatedOperator<IN, OUT> create(ControlFunction function) {
 		return new UpdatedOperator<>(function);
 	}
 
@@ -41,10 +41,10 @@ public class UpdatedOperatorFactory<OUT> implements StreamOperatorFactory<Object
 	}
 
 	@Override
-	public <T extends StreamOperator<Object>> T createStreamOperator(
+	public <T extends StreamOperator<OUT>> T createStreamOperator(
 		StreamTask<?, ?> containingTask,
 		StreamConfig config,
-		Output<StreamRecord<Object>> output) {
+		Output<StreamRecord<OUT>> output) {
 		return null;
 	}
 
