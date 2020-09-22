@@ -23,7 +23,9 @@ import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.executiongraph.JobStatusListener;
+import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
+import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobmaster.JobMaster;
 import org.apache.flink.runtime.jobmaster.JobMasterId;
 import org.apache.flink.runtime.registration.RegistrationResponse;
@@ -32,6 +34,7 @@ import org.apache.flink.runtime.rescale.JobRescalePartitionAssignment;
 import org.apache.flink.runtime.rpc.FencedRpcGateway;
 import org.apache.flink.runtime.rpc.RpcTimeout;
 
+import javax.annotation.Nullable;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -86,5 +89,12 @@ public interface StreamManagerGateway extends FencedRpcGateway<StreamManagerId> 
 	 */
 	void jobStatusChanged(JobID jobId, JobStatus newJobStatus, long timestamp, Throwable error);
 
-//	void notifyStreamSwitchComplete(JobVertexID jobVertexId);
+	/**
+	 * Use to notify job master that some operator inside job vertex changed,
+	 * Thus the corresponding executor could substitute new operator from the original one
+	 * @param jobGraph the changed job graph
+	 * @param jobVertexId the id of vertex whose operators has been changed
+	 * @param operatorID the id of changed operator
+	 */
+	void notifyJobGraphOperatorChanged(@Nullable JobGraph jobGraph, JobVertexID jobVertexId, OperatorID operatorID);
 }

@@ -30,6 +30,7 @@ import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
+import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobmaster.JobMasterGateway;
 import org.apache.flink.runtime.jobmaster.JobMasterId;
 import org.apache.flink.runtime.jobmaster.JobMasterRegistrationSuccess;
@@ -489,11 +490,17 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	@Override
 	public void jobStatusChanged(JobID jobId, JobStatus newJobStatus, long timestamp, Throwable error) {
 		if (newJobStatus == JobStatus.RUNNING) {
-			this.streamSwitchAdaptor.startControllers();
 			this.controlFunctionManager.onJobStart();
+			this.streamSwitchAdaptor.startControllers();
 		} else {
 			this.streamSwitchAdaptor.stopControllers();
 		}
+	}
+
+	@Override
+	public void notifyJobGraphOperatorChanged(JobGraph jobGraph, JobVertexID jobVertexId, OperatorID operatorID) {
+		JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
+		runAsync(() -> jobMasterGateway.triggerOperatorUpdate(this.jobGraph, jobVertexId, operatorID));
 	}
 
 	private class JobLeaderIdActionsImpl implements JobLeaderIdActions {

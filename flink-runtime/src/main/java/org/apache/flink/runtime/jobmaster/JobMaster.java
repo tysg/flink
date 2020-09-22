@@ -49,6 +49,7 @@ import org.apache.flink.runtime.io.network.partition.ResultPartitionID;
 import org.apache.flink.runtime.jobgraph.IntermediateDataSetID;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
+import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobmanager.OnCompletionActions;
 import org.apache.flink.runtime.jobmanager.PartitionProducerDisposedException;
 import org.apache.flink.runtime.jobmaster.factories.JobManagerJobMetricGroupFactory;
@@ -495,21 +496,14 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		}
 	}
 
-//	@Override
-//	public void \notifyStreamSwitchComplete(JobVertexID targetVertexID) {
-//		checkNotNull(targetVertexID, "The targetVertexID is null. (jobMaster.notifyStreamSwitchComplete) ");
-//
-//		try {
-//			assert streamManagerGatewayFuture != null;
-//			StreamManagerGateway gateway = streamManagerGatewayFuture.get();
-//			gateway.streamSwitchCompleted(targetVertexID);
-//
-//		} catch (InterruptedException | ExecutionException e) {
-//			log.info("can not get stream manager gateway currently");
-//			e.printStackTrace();
-//		}
-//
-//	}
+	@Override
+	public void triggerOperatorUpdate(JobGraph jobGraph, JobVertexID targetVertexID, OperatorID operatorID){
+		System.out.println("some one want to triggerOperatorUpdate??? Tell me how!!?");
+		validateRunsInMainThread();
+		JobRescaleCoordinator rescaleCoordinator = schedulerNG.getJobRescaleCoordinator();
+//		rescaleCoordinator.
+	}
+
 
 	@Override
 	public CompletableFuture<KvStateLocation> requestKvStateLocation(final JobID jobId, final String registrationName) {

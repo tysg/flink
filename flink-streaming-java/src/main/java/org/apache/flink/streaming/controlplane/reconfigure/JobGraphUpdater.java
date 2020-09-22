@@ -7,6 +7,7 @@ import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
+import org.apache.flink.runtime.topology.VertexID;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
 import org.apache.flink.streaming.controlplane.jobgraph.JobGraphRescaler;
@@ -44,11 +45,8 @@ public class JobGraphUpdater implements JobGraphRescaler, JobGraphUpdateOperator
 	}
 
 	@Override
-	public <OUT> void updateOperator(OperatorID operatorID, StreamOperatorFactory<OUT> operatorFactory) throws Exception {
-		boolean chained = updateOperatorConfiguration(operatorID, config -> config.setStreamOperatorFactory(operatorFactory));
-		if (chained) {
-			System.out.println("updated in chained operator");
-		}
+	public <OUT> JobVertexID updateOperator(OperatorID operatorID, StreamOperatorFactory<OUT> operatorFactory) throws Exception {
+		return updateOperatorConfiguration(operatorID, config -> config.setStreamOperatorFactory(operatorFactory));
 	}
 
 	/**
@@ -59,31 +57,31 @@ public class JobGraphUpdater implements JobGraphRescaler, JobGraphUpdateOperator
 	 * @return true if updated in chained operator otherwise false
 	 * @throws Exception if do not found corresponding operator
 	 */
-	private boolean updateOperatorConfiguration(OperatorID operatorID, UpdateCallBack callBack) throws Exception {
+	private JobVertexID updateOperatorConfiguration(OperatorID operatorID, UpdateCallBack callBack) throws Exception {
 		for (JobVertex vertex : jobGraph.getVertices()) {
 			for (OperatorID id : vertex.getOperatorIDs()) {
 				if (id.equals(operatorID)) {
 					if (vertex.getOperatorIDs().size() > 1) {
 						// there exists chained operators in this job vertex
-						return updateConfigInChainedOperators(vertex.getConfiguration(), operatorID, callBack);
+						updateConfigInChainedOperators(vertex.getConfiguration(), operatorID, callBack);
 					} else {
 						callBack.write(new StreamConfig(vertex.getConfiguration()));
-						return false;
 					}
+					return vertex.getID();
 				}
 			}
 		}
 		throw new Exception("do not found target job vertex has this operator id");
 	}
 
-	private boolean updateConfigInChainedOperators(Configuration configuration, OperatorID operatorID, UpdateCallBack callBack) throws Exception {
+	private void updateConfigInChainedOperators(Configuration configuration, OperatorID operatorID, UpdateCallBack callBack) throws Exception {
 		StreamConfig streamConfig = new StreamConfig(configuration);
 		Map<Integer, StreamConfig> configMap = streamConfig.getTransitiveChainedTaskConfigs(userClassLoader);
 		for (StreamConfig config : configMap.values()) {
 			if (operatorID.equals(config.getOperatorID())) {
 				callBack.write(config);
 				streamConfig.setTransitiveChainedTaskConfigs(configMap);
-				return true;
+				return;
 			}
 		}
 		throw new Exception("do not found target stream config with this operator id");

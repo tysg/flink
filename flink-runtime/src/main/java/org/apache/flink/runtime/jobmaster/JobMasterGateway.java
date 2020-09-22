@@ -34,6 +34,7 @@ import org.apache.flink.runtime.io.network.partition.ResultPartitionID;
 import org.apache.flink.runtime.jobgraph.IntermediateDataSetID;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
+import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.messages.webmonitor.JobDetails;
 import org.apache.flink.runtime.registration.RegistrationResponse;
@@ -284,5 +285,5 @@ public interface JobMasterGateway extends
 	 * Maybe 1. Assign states for repartition, 2. Rescale and assign states
 	 * @param targetVertexID the JobVertexID of target vertex
 	 */
-//	void notifyStreamSwitchComplete(JobVertexID targetVertexID);
+	void triggerOperatorUpdate(JobGraph jobGraph, JobVertexID targetVertexID, OperatorID operatorID);
 }

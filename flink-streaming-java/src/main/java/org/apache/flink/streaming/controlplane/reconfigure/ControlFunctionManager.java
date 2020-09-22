@@ -1,5 +1,7 @@
 package org.apache.flink.streaming.controlplane.reconfigure;
 
+import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
+import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.streaming.controlplane.jobgraph.JobGraphRescaler;
 import org.apache.flink.streaming.controlplane.reconfigure.operator.ControlFunction;
@@ -46,11 +48,14 @@ public class ControlFunctionManager implements ControlFunctionManagerService {
 			streamManagerService.getJobGraph(),
 			function);
 		try {
-			jobGraphUpdater.updateOperator(operatorID, operatorFactory);
+			JobVertexID jobVertexID = jobGraphUpdater.updateOperator(operatorID, operatorFactory);
 			System.out.println("Substitute `Control` Function finished!");
+			// since job graph is shared in stream manager and among its services, we don't need to pass it
+			((StreamManagerGateway) streamManagerService).notifyJobGraphOperatorChanged(null, jobVertexID, operatorID);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+
 	}
 
 }
