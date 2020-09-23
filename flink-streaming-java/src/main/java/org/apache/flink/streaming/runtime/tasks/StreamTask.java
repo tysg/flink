@@ -21,6 +21,7 @@ import org.apache.flink.annotation.Internal;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.TaskInfo;
 import org.apache.flink.api.common.accumulators.Accumulator;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.TaskManagerOptions;
 import org.apache.flink.core.fs.CloseableRegistry;
 import org.apache.flink.core.fs.FileSystemSafetyNet;
@@ -601,6 +602,10 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 			mailboxProcessor.allActionsCompleted();
 			cancelables.close();
 		}
+	}
+
+	public void updateOperator(Configuration updatedConfig, OperatorID operatorID){
+
 	}
 
 	public MailboxExecutorFactory getMailboxExecutorFactory() {

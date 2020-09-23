@@ -54,14 +54,17 @@ import org.apache.flink.runtime.io.network.partition.ResultPartitionID;
 import org.apache.flink.runtime.io.network.partition.consumer.InputGate;
 import org.apache.flink.runtime.jobgraph.IntermediateDataSetID;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
+import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobgraph.tasks.AbstractInvokable;
 import org.apache.flink.runtime.jobgraph.tasks.InputSplitProvider;
 import org.apache.flink.runtime.memory.MemoryManager;
 import org.apache.flink.runtime.metrics.groups.TaskMetricGroup;
+import org.apache.flink.runtime.operators.util.TaskConfig;
 import org.apache.flink.runtime.query.TaskKvStateRegistry;
 import org.apache.flink.runtime.rescale.RescaleID;
 import org.apache.flink.runtime.rescale.RescaleOptions;
 import org.apache.flink.runtime.rescale.TaskRescaleManager;
+import org.apache.flink.runtime.rescale.reconfigure.TaskConfigUpdater;
 import org.apache.flink.runtime.shuffle.ShuffleEnvironment;
 import org.apache.flink.runtime.shuffle.ShuffleIOOwnerContext;
 import org.apache.flink.runtime.state.CheckpointListener;
@@ -273,6 +276,8 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 
 	private TaskRescaleManager taskRescaleManager = null;
 
+	private TaskConfigUpdater taskConfigUpdater;
+
 	/** The begin KeyGroupRange used to initialize streamtask */
 	@Nullable
 	private KeyGroupRange keyGroupRange;
@@ -421,6 +426,8 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 		executingThread = new Thread(TASK_THREADS_GROUP, this, taskNameWithSubtask);
 
 		this.keyGroupRange = keyGroupRange;
+
+		this.taskConfigUpdater = new TaskConfigUpdater(this) {};
 	}
 
 	// ------------------------------------------------------------------------
@@ -1268,6 +1275,11 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 
 	public void createNewResultPartitions() throws IOException {
 		taskRescaleManager.createNewResultPartitions();
+	}
+
+	public boolean updateOperatorConfig(Configuration updatedConfig, OperatorID operatorID){
+		taskConfigUpdater.update(updatedConfig, operatorID);
+		return true;
 	}
 
 	// ------------------------------------------------------------------------

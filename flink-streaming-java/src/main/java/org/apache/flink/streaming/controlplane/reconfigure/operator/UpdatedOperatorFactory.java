@@ -33,8 +33,7 @@ public class UpdatedOperatorFactory<IN, OUT> implements StreamOperatorFactory<OU
 		return new UpdatedOperator<>(function);
 	}
 
-
-	public StreamOperator<OUT> getOperator() {
+	private StreamOperator<OUT> getOperator() {
 		if(operator==null){
 			operator = create(this.function);
 		}
@@ -46,7 +45,7 @@ public class UpdatedOperatorFactory<IN, OUT> implements StreamOperatorFactory<OU
 		StreamTask<?, ?> containingTask,
 		StreamConfig config,
 		Output<StreamRecord<OUT>> output) {
-		return null;
+		return (T) getOperator();
 	}
 
 	@Override

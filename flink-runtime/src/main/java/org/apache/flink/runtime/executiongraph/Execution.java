@@ -23,6 +23,7 @@ import org.apache.flink.api.common.Archiveable;
 import org.apache.flink.api.common.InputDependencyConstraint;
 import org.apache.flink.api.common.accumulators.Accumulator;
 import org.apache.flink.api.common.time.Time;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.io.InputSplit;
 import org.apache.flink.runtime.JobException;
 import org.apache.flink.runtime.accumulators.StringifiedAccumulatorResult;
@@ -43,6 +44,7 @@ import org.apache.flink.runtime.io.network.partition.JobMasterPartitionTracker;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionID;
 import org.apache.flink.runtime.jobgraph.IntermediateDataSetID;
 import org.apache.flink.runtime.jobgraph.IntermediateResultPartitionID;
+import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobmanager.scheduler.CoLocationConstraint;
 import org.apache.flink.runtime.jobmanager.scheduler.LocationPreferenceConstraint;
 import org.apache.flink.runtime.jobmanager.scheduler.NoResourceAvailableException;
@@ -984,6 +986,47 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 			IntermediateResultPartition intermediateResultPartition = vertex.getProducedPartitions().get(intermediateResultPartitionID);
 			resultPartitionDeploymentDescriptor.setNumberOfSubpartitions(intermediateResultPartition.getConsumers().get(0).size());
 		}
+	}
+
+	public CompletableFuture<Void> scheduleOperatorUpdate(OperatorID operatorID) {
+
+		assertRunningInJobMasterMainThread();
+
+		final LogicalSlot slot = assignedResource;
+		checkNotNull(slot, "Try to rescale a vertex which isn't assigned slot.");
+
+		if(this.state != RUNNING) {
+			throw new IllegalStateException("The vertex must be in RUNNING state to be rescaled. Found state " + this.state);
+		}
+		try {
+			LOG.info(String.format("Update operator in this execution attempt: %s (attempt #%d) to %s",
+					vertex.getTaskNameWithSubtaskIndex(), attemptNumber, getAssignedResourceLocation()));
+
+			final TaskManagerGateway taskManagerGateway = slot.getTaskManagerGateway();
+
+			final ComponentMainThreadExecutor jobMasterMainThreadExecutor =
+				vertex.getExecutionGraph().getJobMasterMainThreadExecutor();
+
+			final Configuration updatedConfig = this.vertex.getJobVertex().getJobVertex().getConfiguration();
+
+			return CompletableFuture
+				.supplyAsync(() -> taskManagerGateway.updateOperator(attemptId, updatedConfig, operatorID, rpcTimeout), executor)
+				.thenCompose(Function.identity())
+				.handleAsync((ack, failure) -> {
+					if (failure != null) {
+						LOG.error("++++++ scheduleOperatorUpdate err: ", failure);
+						throw new CompletionException(failure);
+					}
+					return null;
+				}, jobMasterMainThreadExecutor);
+		}
+		catch (Throwable t) {
+			markFailed(t);
+			if (isLegacyScheduling()) {
+				ExceptionUtils.rethrow(t);
+			}
+		}
+		return FutureUtils.completedVoidFuture();
 	}
 
 	public CompletableFuture<Void> scheduleRescale(

@@ -21,6 +21,7 @@ package org.apache.flink.runtime.taskexecutor;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Time;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.accumulators.AccumulatorSnapshot;
 import org.apache.flink.runtime.blob.BlobCacheService;
 import org.apache.flink.runtime.blob.TransientBlobCache;
@@ -57,6 +58,7 @@ import org.apache.flink.runtime.io.network.partition.ResultPartitionConsumableNo
 import org.apache.flink.runtime.io.network.partition.ResultPartitionID;
 import org.apache.flink.runtime.io.network.partition.TaskExecutorPartitionInfo;
 import org.apache.flink.runtime.io.network.partition.TaskExecutorPartitionTracker;
+import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobgraph.tasks.InputSplitProvider;
 import org.apache.flink.runtime.jobmaster.AllocatedSlotInfo;
 import org.apache.flink.runtime.jobmaster.AllocatedSlotReport;
@@ -684,6 +686,38 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 
 			log.debug(message);
 			return FutureUtils.completedExceptionally(new TaskException(message));
+		}
+	}
+
+	@Override
+	public CompletableFuture<Acknowledge> updateOperator(
+		ExecutionAttemptID executionAttemptID,
+		Configuration updatedConfig,
+		OperatorID operatorID,
+		@RpcTimeout Time timeout){
+		final Task task = taskSlotTable.getTask(executionAttemptID);
+		if (task != null) {
+				// Run asynchronously because it might be blocking
+				FutureUtils.assertNoException(
+					CompletableFuture.runAsync(
+						() -> {
+							try {
+								if (!task.updateOperatorConfig(updatedConfig, operatorID)) {
+									log.debug("Discard update for operator {} in {}", operatorID, executionAttemptID);
+								}
+							} catch (Exception e) {
+								log.error(
+									"Could not update operator for task {}. Trying to fail task.",
+									task.getTaskInfo().getTaskName(),
+									e);
+								task.failExternally(e);
+							}
+						},
+						getRpcService().getExecutor()));
+			return CompletableFuture.completedFuture(Acknowledge.get());
+		} else {
+			log.debug("Discard update for input partitions of task {}. Task is no longer running.", executionAttemptID);
+			return CompletableFuture.completedFuture(Acknowledge.get());
 		}
 	}
 

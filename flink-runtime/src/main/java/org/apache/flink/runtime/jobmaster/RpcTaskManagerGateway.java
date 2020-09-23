@@ -20,12 +20,14 @@ package org.apache.flink.runtime.jobmaster;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Time;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.checkpoint.CheckpointOptions;
 import org.apache.flink.runtime.clusterframework.types.AllocationID;
 import org.apache.flink.runtime.deployment.TaskDeploymentDescriptor;
 import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
 import org.apache.flink.runtime.executiongraph.PartitionInfo;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionID;
+import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobmanager.slots.TaskManagerGateway;
 import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.messages.TaskBackPressureResponse;
@@ -73,6 +75,11 @@ public class RpcTaskManagerGateway implements TaskManagerGateway {
 	@Override
 	public CompletableFuture<Acknowledge> rescaleTask(ExecutionAttemptID executionAttemptID, TaskDeploymentDescriptor tdd, RescaleOptions rescaleOptions, Time timeout) {
 		return taskExecutorGateway.rescaleTask(executionAttemptID, tdd, jobMasterId, rescaleOptions, timeout);
+	}
+
+	@Override
+	public CompletableFuture<Acknowledge> updateOperator(ExecutionAttemptID executionAttemptID, Configuration updatedConfig, OperatorID operatorID, Time timeout){
+		return taskExecutorGateway.updateOperator(executionAttemptID, updatedConfig, operatorID, timeout);
 	}
 
 	@Override

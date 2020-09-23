@@ -6,7 +6,6 @@ import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.streaming.controlplane.jobgraph.JobGraphRescaler;
 import org.apache.flink.streaming.controlplane.reconfigure.operator.ControlContext;
 import org.apache.flink.streaming.controlplane.reconfigure.operator.ControlFunction;
-import org.apache.flink.streaming.controlplane.reconfigure.operator.UpdatedOperatorFactory;
 import org.apache.flink.streaming.controlplane.streammanager.StreamManagerService;
 
 import java.util.Iterator;
@@ -25,8 +24,20 @@ public class TestingCFManager extends ControlFunctionManager {
 
 		JobGraph currentJobGraph = this.streamManagerService.getJobGraph();
 		OperatorID secondOperatorId = getSecondOperator(currentJobGraph);
-		this.reconfigure(secondOperatorId, new TestingControlFunction());
+		asyncRunAfter(10, () -> this.reconfigure(secondOperatorId, new TestingControlFunction()));
 	}
+
+	private void asyncRunAfter(int seconds, Runnable runnable) {
+		new Thread(() -> {
+			try {
+				Thread.sleep(seconds * 1000);
+				runnable.run();
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+		}).start();
+	}
+
 
 	private OperatorID getSecondOperator(JobGraph jobGraph) {
 		Iterator<JobVertex> vertices = jobGraph.getVertices().iterator();
@@ -49,7 +60,7 @@ public class TestingCFManager extends ControlFunctionManager {
 	private static class TestingControlFunction implements ControlFunction {
 		@Override
 		public void invokeControl(ControlContext ctx, Object input) {
-
+			System.out.println("I am in Control function, get input type:" + input.getClass());
 		}
 	}
 
