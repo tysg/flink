@@ -24,6 +24,7 @@ import org.apache.flink.runtime.checkpoint.CheckpointMetaData;
 import org.apache.flink.runtime.checkpoint.CheckpointMetrics;
 import org.apache.flink.runtime.checkpoint.CheckpointOptions;
 import org.apache.flink.runtime.execution.Environment;
+import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.state.KeyGroupRange;
 
 import java.util.concurrent.Future;
@@ -265,4 +266,9 @@ public abstract class AbstractInvokable {
 	public void updateKeyGroupRange(KeyGroupRange keyGroupRange) {
 		throw new UnsupportedOperationException(String.format("updateKeyGroupRange not supported by %s", this.getClass().getName()));
 	}
+
+	public void updateOperator(Configuration updatedConfig, OperatorID operatorID) throws Exception {
+		throw new UnsupportedOperationException(String.format("updateOperatorConfig not supported by %s", this.getClass().getName()));
+	}
+
 }

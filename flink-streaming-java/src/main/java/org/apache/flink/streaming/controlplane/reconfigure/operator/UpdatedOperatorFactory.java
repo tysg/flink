@@ -3,10 +3,7 @@ package org.apache.flink.streaming.controlplane.reconfigure.operator;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.streaming.api.graph.StreamConfig;
-import org.apache.flink.streaming.api.operators.ChainingStrategy;
-import org.apache.flink.streaming.api.operators.Output;
-import org.apache.flink.streaming.api.operators.StreamOperator;
-import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
+import org.apache.flink.streaming.api.operators.*;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
 
@@ -34,7 +31,7 @@ public class UpdatedOperatorFactory<IN, OUT> implements StreamOperatorFactory<OU
 	}
 
 	private StreamOperator<OUT> getOperator() {
-		if(operator==null){
+		if (operator == null) {
 			operator = create(this.function);
 		}
 		return checkNotNull(operator, "operator not set...");
@@ -45,7 +42,11 @@ public class UpdatedOperatorFactory<IN, OUT> implements StreamOperatorFactory<OU
 		StreamTask<?, ?> containingTask,
 		StreamConfig config,
 		Output<StreamRecord<OUT>> output) {
-		return (T) getOperator();
+		T operator = (T) getOperator();
+		if (operator instanceof AbstractStreamOperator) {
+			((AbstractStreamOperator) operator).setup(containingTask, config, output);
+		}
+		return operator;
 	}
 
 	@Override

@@ -604,8 +604,50 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 		}
 	}
 
-	public void updateOperator(Configuration updatedConfig, OperatorID operatorID){
+	public void updateOperator(Configuration updatedConfig, OperatorID operatorID) throws Exception {
+		operatorChain = new OperatorChain<>(this, recordWriter);
+		headOperator = operatorChain.getHeadOperator();
 
+		// task specific initialization
+		// todo will we really need to re init all the things?
+		// Need to understand deeply the operator chain mechanism and then decide
+		if(this.inputProcessor != null) {
+			// todo, close input process may not ensure "at least once"
+			this.inputProcessor.close();
+			this.inputProcessor = null;
+		}
+		init();
+
+		// save the work of reloading state, etc, if the task is already canceled
+		if (canceled) {
+			throw new CancelTaskException();
+		}
+
+		// -------- Invoke --------
+		LOG.debug("Invoking {}", getName());
+
+		// we need to make sure that any triggers scheduled in open() cannot be
+		// executed before all operators are opened
+		actionExecutor.runThrowing(() -> {
+			// both the following operations are protected by the lock
+			// so that we avoid race conditions in the case that initializeState()
+			// registers a timer, that fires before the open() is called.
+
+			initializeStateAndOpen();
+		});
+//		if(this.headOperator.getOperatorID().equals(operatorID)){
+//			operatorChain.getHeadOperator();
+//
+//		}else {
+//			// the target operator has been chained
+//
+//			Map<Integer, StreamConfig> streamConfigMap = new StreamConfig(updatedConfig).getTransitiveChainedTaskConfigs(this.getUserCodeClassLoader());
+//			for (StreamConfig streamConfig : streamConfigMap.values()) {
+//				if (operatorID.equals(streamConfig.getOperatorID())) {
+//
+//				}
+//			}
+//		}
 	}
 
 	public MailboxExecutorFactory getMailboxExecutorFactory() {

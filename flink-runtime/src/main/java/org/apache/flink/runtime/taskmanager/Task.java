@@ -59,12 +59,11 @@ import org.apache.flink.runtime.jobgraph.tasks.AbstractInvokable;
 import org.apache.flink.runtime.jobgraph.tasks.InputSplitProvider;
 import org.apache.flink.runtime.memory.MemoryManager;
 import org.apache.flink.runtime.metrics.groups.TaskMetricGroup;
-import org.apache.flink.runtime.operators.util.TaskConfig;
 import org.apache.flink.runtime.query.TaskKvStateRegistry;
 import org.apache.flink.runtime.rescale.RescaleID;
 import org.apache.flink.runtime.rescale.RescaleOptions;
 import org.apache.flink.runtime.rescale.TaskRescaleManager;
-import org.apache.flink.runtime.rescale.reconfigure.TaskConfigUpdater;
+import org.apache.flink.runtime.rescale.reconfigure.TaskOperatorManager;
 import org.apache.flink.runtime.shuffle.ShuffleEnvironment;
 import org.apache.flink.runtime.shuffle.ShuffleIOOwnerContext;
 import org.apache.flink.runtime.state.CheckpointListener;
@@ -276,7 +275,8 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 
 	private TaskRescaleManager taskRescaleManager = null;
 
-	private TaskConfigUpdater taskConfigUpdater;
+	/** Used to manager this task's operator, for example, the logic function inside the operator */
+	private TaskOperatorManager taskOperatorManager;
 
 	/** The begin KeyGroupRange used to initialize streamtask */
 	@Nullable
@@ -426,8 +426,6 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 		executingThread = new Thread(TASK_THREADS_GROUP, this, taskNameWithSubtask);
 
 		this.keyGroupRange = keyGroupRange;
-
-		this.taskConfigUpdater = new TaskConfigUpdater(this) {};
 	}
 
 	// ------------------------------------------------------------------------
@@ -735,6 +733,9 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 
 			// make sure the user code classloader is accessible thread-locally
 			executingThread.setContextClassLoader(userCodeClassLoader);
+
+			taskOperatorManager = new TaskOperatorManager(invokable) {
+			};
 
 			// run the invokable
 			invokable.invoke();
@@ -1278,7 +1279,10 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 	}
 
 	public boolean updateOperatorConfig(Configuration updatedConfig, OperatorID operatorID){
-		taskConfigUpdater.update(updatedConfig, operatorID);
+		// since one java process share the same address space, so we only need to update configuration here,
+		// then all other task configuration referenced here will be updated
+		this.taskConfiguration.addAll(updatedConfig);
+		taskOperatorManager.update(updatedConfig, operatorID);
 		return true;
 	}
 
