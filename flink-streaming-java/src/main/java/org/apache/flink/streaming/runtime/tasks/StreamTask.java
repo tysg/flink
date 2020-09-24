@@ -607,14 +607,18 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 	}
 
 	public void updateOperator(Configuration updatedConfig, OperatorID operatorID) throws Exception {
-		// todo to be decide:
-		// implement option 1: re-create the whole operator chain as well as head operator,
+		// There are two implementation options:
+		// Option 1:
+		//  re-create the whole operator chain as well as head operator,
 		//  should reinitialize all the state in this task, some state snapshot needed if any
-		// implement option 2: substitute the target operator inside the operator chain,
-		// need to be considered to synchronize all the associated reference
+		// Option 2:
+		//  substitute the target operator inside the operator chain,
+		//  need to be considered to synchronize all the associated reference
 
-		// now turn to option 1: re-create the whole operator chain and head operator,
-		/*
+		// I choose to use option 1. Since options 2 have too many dependencies which makes change very complex and messy.
+		// Besides, the state consistency are remain required in future development
+		// For example, user want to change the logic of one Operator while keeps the original state
+
 		// todo this implementation will lost state
 		// todo, check number of tuples that sink received
 		operatorChain = new OperatorChain<>(this, recordWriter);
@@ -644,29 +648,6 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 		// so that we avoid race conditions in the case that initializeState()
 		// registers a timer, that fires before the open() is called.
 		actionExecutor.runThrowing(this::initializeStateAndOpen);
-		*/
-
-		// now turn to option 2: substitute the target operator inside the operator chain
-
-		StreamOperatorFactory<?> factory = null;
-		StreamConfig operatorConfig = null;
-		if(operatorID.equals(configuration.getOperatorID())){
-			// dut to shared address space, the configuration in invokable still got updated
-			factory = this.configuration.getStreamOperatorFactory(getUserCodeClassLoader());
-			operatorConfig = this.configuration;
-		}else {
-			Map<Integer, StreamConfig> streamConfigMap =this.configuration.getTransitiveChainedTaskConfigs(getUserCodeClassLoader());
-			for (StreamConfig streamConfig : streamConfigMap.values()) {
-				if (operatorID.equals(streamConfig.getOperatorID())) {
-					factory = streamConfig.getStreamOperatorFactory(getUserCodeClassLoader());
-					operatorConfig = streamConfig;
-					break;
-				}
-			}
-		}
-		if(factory != null) {
-			operatorChain.updateOperator(factory, operatorConfig, operatorID);
-		}
 	}
 
 	public MailboxExecutorFactory getMailboxExecutorFactory() {

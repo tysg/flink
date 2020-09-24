@@ -515,21 +515,6 @@ public class OperatorChain<OUT, OP extends StreamOperator<OUT>> implements Strea
 		return new RecordWriterOutput<>(recordWriter, outSerializer, sideOutputTag, this);
 	}
 
-	public void updateOperator(StreamOperatorFactory<?> factory, StreamConfig operatorConfig, OperatorID operatorID) {
-//		for(int i=0;i<allOperators.length;i++){
-//			if(operatorID.equals(allOperators[i].getOperatorID())){
-//				// now create the operator and give it the output collector to write its output to
-//				AbstractStreamOperator<?> oldOperator = (AbstractStreamOperator<?>) allOperators[i];
-//				StreamOperator<?> chainedOperator = StreamOperatorFactoryUtil.createOperator(
-//					factory,
-//					oldOperator.getContainingTask(),
-//					operatorConfig,
-//					null);
-//			}
-//		}
-
-	}
-
 	// ------------------------------------------------------------------------
 	//  Collectors for output chaining
 	// ------------------------------------------------------------------------
