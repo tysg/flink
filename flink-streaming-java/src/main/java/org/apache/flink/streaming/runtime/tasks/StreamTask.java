@@ -55,12 +55,7 @@ import org.apache.flink.runtime.util.FatalExitExceptionHandler;
 import org.apache.flink.streaming.api.TimeCharacteristic;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.graph.StreamEdge;
-import org.apache.flink.streaming.api.operators.MailboxExecutor;
-import org.apache.flink.streaming.api.operators.OperatorSnapshotFinalizer;
-import org.apache.flink.streaming.api.operators.OperatorSnapshotFutures;
-import org.apache.flink.streaming.api.operators.StreamOperator;
-import org.apache.flink.streaming.api.operators.StreamTaskStateInitializer;
-import org.apache.flink.streaming.api.operators.StreamTaskStateInitializerImpl;
+import org.apache.flink.streaming.api.operators.*;
 import org.apache.flink.streaming.runtime.io.InputStatus;
 import org.apache.flink.streaming.runtime.io.RecordWriterOutput;
 import org.apache.flink.streaming.runtime.io.StreamInputProcessor;
@@ -612,7 +607,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 	}
 
 	public void updateOperator(Configuration updatedConfig, OperatorID operatorID) throws Exception {
-		// todo being decide:
+		// todo to be decide:
 		// implement option 1: re-create the whole operator chain as well as head operator,
 		//  should reinitialize all the state in this task, some state snapshot needed if any
 		// implement option 2: substitute the target operator inside the operator chain,
@@ -626,7 +621,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 		headOperator = operatorChain.getHeadOperator();
 
 		// task specific initialization
-		// todo will we really need to reinitilize everything?
+		// todo will we really need to reinitialize everything?
 		// Need to understand deeply the operator chain mechanism and then decide
 		if(this.inputProcessor != null) {
 			// todo, close input process may not ensure "at least once"
@@ -652,19 +647,26 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 		*/
 
 		// now turn to option 2: substitute the target operator inside the operator chain
-//		if(this.headOperator.getOperatorID().equals(operatorID)){
-//			operatorChain.getHeadOperator();
-//
-//		}else {
-//			// the target operator has been chained
-//
-//			Map<Integer, StreamConfig> streamConfigMap = new StreamConfig(updatedConfig).getTransitiveChainedTaskConfigs(this.getUserCodeClassLoader());
-//			for (StreamConfig streamConfig : streamConfigMap.values()) {
-//				if (operatorID.equals(streamConfig.getOperatorID())) {
-//
-//				}
-//			}
-//		}
+
+		StreamOperatorFactory<?> factory = null;
+		StreamConfig operatorConfig = null;
+		if(operatorID.equals(configuration.getOperatorID())){
+			// dut to shared address space, the configuration in invokable still got updated
+			factory = this.configuration.getStreamOperatorFactory(getUserCodeClassLoader());
+			operatorConfig = this.configuration;
+		}else {
+			Map<Integer, StreamConfig> streamConfigMap =this.configuration.getTransitiveChainedTaskConfigs(getUserCodeClassLoader());
+			for (StreamConfig streamConfig : streamConfigMap.values()) {
+				if (operatorID.equals(streamConfig.getOperatorID())) {
+					factory = streamConfig.getStreamOperatorFactory(getUserCodeClassLoader());
+					operatorConfig = streamConfig;
+					break;
+				}
+			}
+		}
+		if(factory != null) {
+			operatorChain.updateOperator(factory, operatorConfig, operatorID);
+		}
 	}
 
 	public MailboxExecutorFactory getMailboxExecutorFactory() {

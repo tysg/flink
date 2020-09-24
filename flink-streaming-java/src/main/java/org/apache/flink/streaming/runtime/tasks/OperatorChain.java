@@ -21,6 +21,7 @@ import org.apache.flink.annotation.Internal;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.metrics.Counter;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.SimpleCounter;
@@ -512,6 +513,21 @@ public class OperatorChain<OUT, OP extends StreamOperator<OUT>> implements Strea
 		}
 
 		return new RecordWriterOutput<>(recordWriter, outSerializer, sideOutputTag, this);
+	}
+
+	public void updateOperator(StreamOperatorFactory<?> factory, StreamConfig operatorConfig, OperatorID operatorID) {
+//		for(int i=0;i<allOperators.length;i++){
+//			if(operatorID.equals(allOperators[i].getOperatorID())){
+//				// now create the operator and give it the output collector to write its output to
+//				AbstractStreamOperator<?> oldOperator = (AbstractStreamOperator<?>) allOperators[i];
+//				StreamOperator<?> chainedOperator = StreamOperatorFactoryUtil.createOperator(
+//					factory,
+//					oldOperator.getContainingTask(),
+//					operatorConfig,
+//					null);
+//			}
+//		}
+
 	}
 
 	// ------------------------------------------------------------------------
