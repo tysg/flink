@@ -60,7 +60,8 @@ public class TestingCFManager extends ControlFunctionManager {
 	private static class TestingControlFunction implements ControlFunction {
 		@Override
 		public void invokeControl(ControlContext ctx, Object input) {
-			System.out.println("I am in Control function, get input type:" + input.getClass());
+			System.out.println("In Control function, forward getting input type:" + input.getClass());
+			ctx.setCurrentRes(input);
 		}
 	}
 

@@ -329,6 +329,13 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 			controller.allActionsCompleted();
 			return;
 		}
+		// may use this to implement consistent
+		if(status == InputStatus.PAUSE){
+			CompletableFuture<?> jointFuture = new CompletableFuture<>();
+			MailboxDefaultAction.Suspension suspendedDefaultAction = controller.suspendDefaultAction();
+			jointFuture.thenRun(suspendedDefaultAction::resume);
+			return;
+		}
 		CompletableFuture<?> jointFuture = getInputOutputJointFuture(status);
 		MailboxDefaultAction.Suspension suspendedDefaultAction = controller.suspendDefaultAction();
 		jointFuture.thenRun(suspendedDefaultAction::resume);
@@ -605,13 +612,21 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 	}
 
 	public void updateOperator(Configuration updatedConfig, OperatorID operatorID) throws Exception {
+		// todo being decide:
+		// implement option 1: re-create the whole operator chain as well as head operator,
+		//  should reinitialize all the state in this task, some state snapshot needed if any
+		// implement option 2: substitute the target operator inside the operator chain,
+		// need to be considered to synchronize all the associated reference
+
+		// now turn to option 1: re-create the whole operator chain and head operator,
+		/*
 		// todo this implementation will lost state
 		// todo, check number of tuples that sink received
 		operatorChain = new OperatorChain<>(this, recordWriter);
 		headOperator = operatorChain.getHeadOperator();
 
 		// task specific initialization
-		// todo will we really need to re init all the things?
+		// todo will we really need to reinitilize everything?
 		// Need to understand deeply the operator chain mechanism and then decide
 		if(this.inputProcessor != null) {
 			// todo, close input process may not ensure "at least once"
@@ -634,6 +649,9 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 		// so that we avoid race conditions in the case that initializeState()
 		// registers a timer, that fires before the open() is called.
 		actionExecutor.runThrowing(this::initializeStateAndOpen);
+		*/
+
+		// now turn to option 2: substitute the target operator inside the operator chain
 //		if(this.headOperator.getOperatorID().equals(operatorID)){
 //			operatorChain.getHeadOperator();
 //
