@@ -605,6 +605,8 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 	}
 
 	public void updateOperator(Configuration updatedConfig, OperatorID operatorID) throws Exception {
+		// todo this implementation will lost state
+		// todo, check number of tuples that sink received
 		operatorChain = new OperatorChain<>(this, recordWriter);
 		headOperator = operatorChain.getHeadOperator();
 
@@ -628,13 +630,10 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 
 		// we need to make sure that any triggers scheduled in open() cannot be
 		// executed before all operators are opened
-		actionExecutor.runThrowing(() -> {
-			// both the following operations are protected by the lock
-			// so that we avoid race conditions in the case that initializeState()
-			// registers a timer, that fires before the open() is called.
-
-			initializeStateAndOpen();
-		});
+		// both the following operations are protected by the lock
+		// so that we avoid race conditions in the case that initializeState()
+		// registers a timer, that fires before the open() is called.
+		actionExecutor.runThrowing(this::initializeStateAndOpen);
 //		if(this.headOperator.getOperatorID().equals(operatorID)){
 //			operatorChain.getHeadOperator();
 //
