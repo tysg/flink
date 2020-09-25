@@ -619,8 +619,15 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 		// Besides, the state consistency are remain required in future development
 		// For example, user want to change the logic of one Operator while keeps the original state
 
+		// todo, some synchronization effort is required
+		// one possible solution that:
+		// - send a signal to each tasks of the target operator,
+		// - all tasks of this operator suspend and wait a future to resume then
+		// - the future is return to OperatorUpdateCoordinator and the Coordinator will start to substitute the operator
+		//   logic inside each tasks, reinitialize the state and open each tasks
+		// - future is done and then all task get resumed
+
 		// todo this implementation will lost state
-		// todo, check number of tuples that sink received
 		operatorChain = new OperatorChain<>(this, recordWriter);
 		headOperator = operatorChain.getHeadOperator();
 
