@@ -77,6 +77,7 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 
 import java.io.Closeable;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -618,6 +619,26 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 		// I choose to use option 1. Since options 2 have too many dependencies which makes change very complex and messy.
 		// Besides, the state consistency are remain required in future development
 		// For example, user want to change the logic of one Operator while keeps the original state
+		CheckpointingOperation checkpointingOperation = new CheckpointingOperation(
+			this,
+			null,
+			null,
+			null,
+			null);
+		checkpointingOperation.executeLocalCheckpoint().thenAccept(
+			stateSnapshot ->{
+				try {
+					recreateOperatorChain(stateSnapshot);
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+			}
+		);
+	}
+
+	public void recreateOperatorChain(TaskStateSnapshot stateSnapshot) throws Exception {
+		JobManagerTaskRestore jobManagerTaskRestore = new JobManagerTaskRestore(0, stateSnapshot);
+		getEnvironment().getTaskStateManager().updateTaskRestore(jobManagerTaskRestore);
 
 		// todo this implementation will lost state
 		// todo, check number of tuples that sink received
@@ -1580,6 +1601,90 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 			}
 		}
 
+		/**
+		 * Snapshot state of all the operators which will be used to reinitialize state of this task.
+		 * This is required by update logic inside operator in this StreamTask
+		 *
+		 * @throws Exception
+		 */
+		public CompletableFuture<TaskStateSnapshot>  executeLocalCheckpoint() throws Exception {
+
+			startSyncPartNano = System.nanoTime();
+
+			try {
+				for (StreamOperator<?> op : allOperators) {
+					checkpointStreamOperator(op);
+				}
+
+				if (LOG.isDebugEnabled()) {
+					LOG.debug("Finished synchronous checkpoints for checkpoint {} on task {}",
+						checkpointMetaData.getCheckpointId(), owner.getName());
+				}
+
+				startAsyncPartNano = System.nanoTime();
+
+				checkpointMetrics.setSyncDurationMillis((startAsyncPartNano - startSyncPartNano) / 1_000_000);
+
+				CompletableFuture<TaskStateSnapshot> snapshotCompletableFuture = new CompletableFuture<>();
+
+				// we are transferring ownership over snapshotInProgressList for cleanup to the thread, active on submit
+				SnapshotRunnable snapshotRunnable = new SnapshotRunnable() {
+
+					@Override
+					public void close() throws IOException {
+						closeRunSnapshot();
+					}
+
+					@Override
+					public void run() {
+						runSnapshot(this, snapshotCompletableFuture);
+					}
+				};
+
+				owner.cancelables.registerCloseable(snapshotRunnable);
+				owner.asyncOperationsThreadPool.execute(snapshotRunnable);
+
+				if (LOG.isDebugEnabled()) {
+					LOG.debug("{} - finished synchronous part of checkpoint {}. " +
+							"Alignment duration: {} ms, snapshot duration {} ms",
+						owner.getName(), checkpointMetaData.getCheckpointId(),
+						checkpointMetrics.getAlignmentDurationNanos() / 1_000_000,
+						checkpointMetrics.getSyncDurationMillis());
+				}
+				return snapshotCompletableFuture;
+			} catch (Exception ex) {
+				// Cleanup to release resources
+				for (OperatorSnapshotFutures operatorSnapshotResult : operatorSnapshotsInProgress.values()) {
+					if (null != operatorSnapshotResult) {
+						try {
+							operatorSnapshotResult.cancel();
+						} catch (Exception e) {
+							LOG.warn("Could not properly cancel an operator snapshot result.", e);
+						}
+					}
+				}
+
+				if (LOG.isDebugEnabled()) {
+					LOG.debug("{} - did NOT finish synchronous part of checkpoint {}. " +
+							"Alignment duration: {} ms, snapshot duration {} ms",
+						owner.getName(), checkpointMetaData.getCheckpointId(),
+						checkpointMetrics.getAlignmentDurationNanos() / 1_000_000,
+						checkpointMetrics.getSyncDurationMillis());
+				}
+
+				if (checkpointOptions.getCheckpointType().isSynchronous()) {
+					// in the case of a synchronous checkpoint, we always rethrow the exception,
+					// so that the task fails.
+					// this is because the intention is always to stop the job after this checkpointing
+					// operation, and without the failure, the task would go back to normal execution.
+					throw ex;
+				} else {
+					owner.getEnvironment().declineCheckpoint(checkpointMetaData.getCheckpointId(), ex);
+				}
+			}
+			return CompletableFuture.completedFuture(null);
+		}
+
 		@SuppressWarnings("deprecation")
 		private void checkpointStreamOperator(StreamOperator<?> op) throws Exception {
 			if (null != op) {
@@ -1598,6 +1703,156 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 			DISCARDED,
 			COMPLETED
 		}
+
+		//---------------------------use to update logic of operator------------------------
+		private interface SnapshotRunnable extends Runnable, Closeable{}
+
+		private void runSnapshot(Closeable closeHandle, CompletableFuture<TaskStateSnapshot> snapshotCompletableFuture) {
+			FileSystemSafetyNet.initializeSafetyNetForThread();
+			try {
+
+				TaskStateSnapshot jobManagerTaskOperatorSubtaskStates =
+					new TaskStateSnapshot(operatorSnapshotsInProgress.size());
+
+				TaskStateSnapshot localTaskOperatorSubtaskStates =
+					new TaskStateSnapshot(operatorSnapshotsInProgress.size());
+
+				for (Map.Entry<OperatorID, OperatorSnapshotFutures> entry : operatorSnapshotsInProgress.entrySet()) {
+
+					OperatorID operatorID = entry.getKey();
+					OperatorSnapshotFutures snapshotInProgress = entry.getValue();
+
+					// finalize the async part of all by executing all snapshot runnables
+					OperatorSnapshotFinalizer finalizedSnapshots =
+						new OperatorSnapshotFinalizer(snapshotInProgress);
+
+					jobManagerTaskOperatorSubtaskStates.putSubtaskStateByOperatorID(
+						operatorID,
+						finalizedSnapshots.getJobManagerOwnedState());
+
+					localTaskOperatorSubtaskStates.putSubtaskStateByOperatorID(
+						operatorID,
+						finalizedSnapshots.getTaskLocalState());
+				}
+
+				final long asyncEndNanos = System.nanoTime();
+				final long asyncDurationMillis = (asyncEndNanos - startAsyncPartNano) / 1_000_000L;
+
+				checkpointMetrics.setAsyncDurationMillis(asyncDurationMillis);
+
+				//something report to caller here
+				// ...
+				snapshotCompletableFuture.complete(jobManagerTaskOperatorSubtaskStates);
+			} catch (Exception e) {
+				if (LOG.isDebugEnabled()) {
+					LOG.debug("{} - asynchronous part of checkpoint {} could not be completed.",
+						owner.getName(),
+						checkpointMetaData.getCheckpointId(),
+						e);
+				}
+				handleExecutionException(e);
+			} finally {
+				if(!snapshotCompletableFuture.isDone()){
+					snapshotCompletableFuture.complete(null);
+				}
+				owner.cancelables.unregisterCloseable(closeHandle);
+				FileSystemSafetyNet.closeSafetyNetAndGuardedResourcesForThread();
+			}
+		}
+
+		private final AtomicReference<CheckpointingOperation.AsyncCheckpointState> asyncCheckpointState = new AtomicReference<>(
+			CheckpointingOperation.AsyncCheckpointState.RUNNING);
+
+		private void handleExecutionException(Exception e) {
+
+			boolean didCleanup = false;
+			CheckpointingOperation.AsyncCheckpointState currentState = asyncCheckpointState.get();
+
+			while (CheckpointingOperation.AsyncCheckpointState.DISCARDED != currentState) {
+
+				if (asyncCheckpointState.compareAndSet(
+					currentState,
+					CheckpointingOperation.AsyncCheckpointState.DISCARDED)) {
+
+					didCleanup = true;
+
+					try {
+						cleanup();
+					} catch (Exception cleanupException) {
+						e.addSuppressed(cleanupException);
+					}
+
+					Exception checkpointException = new Exception(
+						"Could not materialize checkpoint " + checkpointMetaData.getCheckpointId() + " for operator " +
+							owner.getName() + '.',
+						e);
+
+					// We only report the exception for the original cause of fail and cleanup.
+					// Otherwise this followup exception could race the original exception in failing the task.
+					try {
+						owner.getEnvironment().declineCheckpoint(checkpointMetaData.getCheckpointId(), checkpointException);
+					} catch (Exception unhandled) {
+						AsynchronousException asyncException = new AsynchronousException(unhandled);
+						owner.handleAsyncException("Failure in asynchronous checkpoint materialization", asyncException);
+					}
+
+					currentState = CheckpointingOperation.AsyncCheckpointState.DISCARDED;
+				} else {
+					currentState = asyncCheckpointState.get();
+				}
+			}
+
+			if (!didCleanup) {
+				LOG.trace("Caught followup exception from a failed checkpoint thread. This can be ignored.", e);
+			}
+		}
+
+		public void closeRunSnapshot() {
+			if (asyncCheckpointState.compareAndSet(
+				CheckpointingOperation.AsyncCheckpointState.RUNNING,
+				CheckpointingOperation.AsyncCheckpointState.DISCARDED)) {
+
+				try {
+					cleanup();
+				} catch (Exception cleanupException) {
+					LOG.warn("Could not properly clean up the async checkpoint runnable.", cleanupException);
+				}
+			} else {
+				logFailedCleanupAttempt();
+			}
+		}
+
+		private void cleanup() throws Exception {
+			LOG.debug(
+				"Cleanup AsyncCheckpointRunnable for checkpoint {} of {}.",
+				checkpointMetaData.getCheckpointId(),
+				owner.getName());
+
+			Exception exception = null;
+
+			// clean up ongoing operator snapshot results and non partitioned state handles
+			for (OperatorSnapshotFutures operatorSnapshotResult : operatorSnapshotsInProgress.values()) {
+				if (operatorSnapshotResult != null) {
+					try {
+						operatorSnapshotResult.cancel();
+					} catch (Exception cancelException) {
+						exception = ExceptionUtils.firstOrSuppressed(cancelException, exception);
+					}
+				}
+			}
+
+			if (null != exception) {
+				throw exception;
+			}
+		}
+
+		private void logFailedCleanupAttempt() {
+			LOG.debug("{} - asynchronous checkpointing operation for checkpoint {} has " +
+					"already been completed. Thus, the state handles are not cleaned up.",
+				owner.getName(),
+				checkpointMetaData.getCheckpointId());
+		}
+		// -----------------------------end logic updating checkpoint---------------------------
 	}
 
 	@VisibleForTesting

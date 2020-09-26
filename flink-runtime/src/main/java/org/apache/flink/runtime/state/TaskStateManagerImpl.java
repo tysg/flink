@@ -29,6 +29,7 @@ import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.taskmanager.CheckpointResponder;
 
+import org.apache.flink.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -161,7 +162,9 @@ public class TaskStateManagerImpl implements TaskStateManager {
 		localStateStore.confirmCheckpoint(checkpointId);
 	}
 
-	public void updateTaskRestore(JobManagerTaskRestore jobManagerTaskRestore) {
+	@Override
+	public void updateTaskRestore(@Nonnull JobManagerTaskRestore jobManagerTaskRestore) {
+		Preconditions.checkNotNull(jobManagerTaskRestore, "passed jobManagerTaskRestore is null");
 		this.jobManagerTaskRestore = jobManagerTaskRestore;
 	}
 }
