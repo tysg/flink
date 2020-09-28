@@ -22,7 +22,7 @@ public interface ControlFunction extends Function {
 	 * 			public boolean filter(String s) throws Exception {
 	 * 				return s.length() > 10;
 	 * 			}
-	 * 	});
+	 * 		});
 	 * 	// other code
 	 * }</pre>
 	 * <p>
@@ -32,15 +32,16 @@ public interface ControlFunction extends Function {
 	 * 	ControlFunctionManager cf = ... // something getting ControlFunctionManager object here
 	 * 	OperatorId filterOpID = ...	// something getting id of filter operator here
 	 *
-	 * 	cf.reconfigure(secondOperatorId, new ControlFunction(){
-	 * 		@Override
-	 * 		public void invokeControl(ControlContext ctx, Object input) {
-	 * 			String inputWord = (String)input;
-	 * 			if(inputWord.length() > 100){
-	 * 				ctx.setCurrentRes(inputWord);
+	 * 	cf.reconfigure(filterOpID,
+	 * 		new ControlFunction(){
+	 * 			@Override
+	 * 			public void invokeControl(ControlContext ctx, Object input) {
+	 * 				String inputWord = (String)input;
+	 * 				if(inputWord.length() > 100){
+	 * 					ctx.setCurrentRes(inputWord);
+	 * 				}
 	 * 			}
-	 * 		}
-	 * 	});
+	 * 		});
 	 * }</pre>
 	 * <p>
 	 * Then {@link ControlFunctionManager} will use the new ControlFunction embedded in the {@link ControlOperator}
