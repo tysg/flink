@@ -25,16 +25,20 @@ public class TestingCFManager extends ControlFunctionManager {
 		JobGraph currentJobGraph = this.streamManagerService.getJobGraph();
 		OperatorID secondOperatorId = getSecondOperator(currentJobGraph);
 		asyncRunAfter(10, () -> this.reconfigure(secondOperatorId, new TestingControlFunction()));
-		asyncRunAfter(10, () -> this.reconfigure(secondOperatorId, new ControlFunction(){
-			@Override
-			public void invokeControl(ControlContext ctx, Object input) {
-				String inputWord = (String)input;
-				if(inputWord.length() > 100){
-					ctx.setCurrentRes(inputWord);
-				}
-			}
-		}));
+		asyncRunAfter(15, () -> this.reconfigure(secondOperatorId, getFilterFunction(10)));
+		asyncRunAfter(25, () -> this.reconfigure(secondOperatorId, getFilterFunction(100)));
 	}
+
+	private static ControlFunction getFilterFunction(int k) {
+		return (ControlFunction) (ctx, input) -> {
+			String inputWord = (String) input;
+			System.out.println("now filter the words that has length smaller than " + k);
+			if (inputWord.length() > k) {
+				ctx.setCurrentRes(inputWord);
+			}
+		};
+	}
+
 
 	private void asyncRunAfter(int seconds, Runnable runnable) {
 		new Thread(() -> {
