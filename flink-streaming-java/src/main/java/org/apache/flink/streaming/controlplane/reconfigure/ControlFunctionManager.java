@@ -5,7 +5,7 @@ import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.streaming.controlplane.jobgraph.JobGraphRescaler;
 import org.apache.flink.streaming.controlplane.reconfigure.operator.ControlFunction;
-import org.apache.flink.streaming.controlplane.reconfigure.operator.UpdatedOperatorFactory;
+import org.apache.flink.streaming.controlplane.reconfigure.operator.ControlOperatorFactory;
 import org.apache.flink.streaming.controlplane.reconfigure.type.FunctionTypeStorage;
 import org.apache.flink.streaming.controlplane.reconfigure.type.InMemoryFunctionStorge;
 import org.apache.flink.streaming.controlplane.streammanager.StreamManagerService;
@@ -43,7 +43,7 @@ public class ControlFunctionManager implements ControlFunctionManagerService {
 	@Override
 	public void reconfigure(OperatorID operatorID, ControlFunction function) {
 		System.out.println("Substitute `Control` Function...");
-		UpdatedOperatorFactory<?, ?> operatorFactory = new UpdatedOperatorFactory<>(
+		ControlOperatorFactory<?, ?> operatorFactory = new ControlOperatorFactory<>(
 			operatorID,
 			streamManagerService.getJobGraph(),
 			function);

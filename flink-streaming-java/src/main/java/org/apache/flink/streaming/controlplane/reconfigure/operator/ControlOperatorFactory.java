@@ -12,22 +12,22 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 /**
  * Simple factory for the Update Operator
  */
-public class UpdatedOperatorFactory<IN, OUT> implements StreamOperatorFactory<OUT> {
+public class ControlOperatorFactory<IN, OUT> implements StreamOperatorFactory<OUT> {
 
 	// use to check whether this operator update is valid
 	OperatorDescriptor descriptor;
 
-	private UpdatedOperator<IN, OUT> operator = null;
+	private ControlOperator<IN, OUT> operator = null;
 	private final ControlFunction function;
 
-	public UpdatedOperatorFactory(OperatorID operatorID, JobGraph jobGraph, ControlFunction function) {
+	public ControlOperatorFactory(OperatorID operatorID, JobGraph jobGraph, ControlFunction function) {
 		// using default control function
 		descriptor = new OperatorDescriptor(operatorID, jobGraph);
 		this.function = function;
 	}
 
-	protected UpdatedOperator<IN, OUT> create(ControlFunction function) {
-		return new UpdatedOperator<>(function);
+	protected ControlOperator<IN, OUT> create(ControlFunction function) {
+		return new ControlOperator<>(function);
 	}
 
 	private StreamOperator<OUT> getOperator() {

@@ -7,12 +7,12 @@ import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
 
-public class UpdatedOperator<IN, OUT> extends AbstractUdfStreamOperator<OUT, ControlFunction>
+public class ControlOperator<IN, OUT> extends AbstractUdfStreamOperator<OUT, ControlFunction>
 	implements OneInputStreamOperator<IN, OUT> {
 
 	private transient ControlContext controlContext;
 
-	public UpdatedOperator(ControlFunction userFunction) {
+	public ControlOperator(ControlFunction userFunction) {
 		super(userFunction);
 	}
 

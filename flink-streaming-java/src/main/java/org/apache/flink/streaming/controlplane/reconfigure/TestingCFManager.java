@@ -25,6 +25,15 @@ public class TestingCFManager extends ControlFunctionManager {
 		JobGraph currentJobGraph = this.streamManagerService.getJobGraph();
 		OperatorID secondOperatorId = getSecondOperator(currentJobGraph);
 		asyncRunAfter(10, () -> this.reconfigure(secondOperatorId, new TestingControlFunction()));
+		asyncRunAfter(10, () -> this.reconfigure(secondOperatorId, new ControlFunction(){
+			@Override
+			public void invokeControl(ControlContext ctx, Object input) {
+				String inputWord = (String)input;
+				if(inputWord.length() > 100){
+					ctx.setCurrentRes(inputWord);
+				}
+			}
+		}));
 	}
 
 	private void asyncRunAfter(int seconds, Runnable runnable) {
