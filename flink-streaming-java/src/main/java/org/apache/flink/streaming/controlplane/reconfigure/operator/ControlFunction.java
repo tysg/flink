@@ -14,16 +14,16 @@ public interface ControlFunction extends Function {
 	 * length is smaller than k1 (e.g. 10).
 	 * In user's application, it may be defined by such code:
 	 * <pre>{@code
-	 *     DataStream<String> wordStream = ... // something up data stream define here
+	 * 	DataStream<String> wordStream = ... // something up data stream define here
 	 *
-	 *     DataStream<String> filteredStream = wordStream.filter(
-	 *       new FilterFunction<String>() {
-	 *            @Override
-	 *            public boolean filter(String s) throws Exception {
-	 *                 return s.length() > 10 ;
-	 *            }
-	 *     });
-	 *     // other code
+	 * 	DataStream<String> filteredStream = wordStream.filter(
+	 * 		new FilterFunction<String>() {
+	 * 			@Override
+	 * 			public boolean filter(String s) throws Exception {
+	 * 				return s.length() > 10;
+	 * 			}
+	 * 	});
+	 * 	// other code
 	 * }</pre>
 	 * <p>
 	 * If we want to change to remove those words whose length is smaller than k2 (e.g. 100), we could invoke
@@ -33,14 +33,14 @@ public interface ControlFunction extends Function {
 	 * 	OperatorId filterOpID = ...	// something getting id of filter operator here
 	 *
 	 * 	cf.reconfigure(secondOperatorId, new ControlFunction(){
-	 *           @Override
-	 *           public void invokeControl(ControlContext ctx, Object input) {
-	 * 				String inputWord = (String)input;
-	 * 				if(inputWord.length() > 100){
-	 * 					ctx.setCurrentRes(inputWord);
-	 *            }
-	 *          }
-	 *      });
+	 * 		@Override
+	 * 		public void invokeControl(ControlContext ctx, Object input) {
+	 * 			String inputWord = (String)input;
+	 * 			if(inputWord.length() > 100){
+	 * 				ctx.setCurrentRes(inputWord);
+	 * 			}
+	 * 		}
+	 * 	});
 	 * }</pre>
 	 * <p>
 	 * Then {@link ControlFunctionManager} will use the new ControlFunction embedded in the {@link ControlOperator}
