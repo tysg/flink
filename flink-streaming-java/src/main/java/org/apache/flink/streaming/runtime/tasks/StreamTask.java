@@ -323,6 +323,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 			controller.allActionsCompleted();
 			return;
 		}
+		System.out.println("how frequently when I get here:"+getName());
 		// may use this to implement consistent
 		if(status == InputStatus.PAUSE){
 			CompletableFuture<?> jointFuture = new CompletableFuture<>();

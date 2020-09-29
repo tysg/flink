@@ -3,13 +3,15 @@ package org.apache.flink.streaming.controlplane.reconfigure;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobgraph.OperatorID;
+import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.controlplane.jobgraph.JobGraphRescaler;
-import org.apache.flink.streaming.controlplane.reconfigure.operator.ControlContext;
 import org.apache.flink.streaming.controlplane.reconfigure.operator.ControlFunction;
 import org.apache.flink.streaming.controlplane.streammanager.StreamManagerService;
 
+import javax.annotation.Nonnull;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 public class TestingCFManager extends ControlFunctionManager {
 
@@ -23,17 +25,19 @@ public class TestingCFManager extends ControlFunctionManager {
 		super.onJobStart();
 
 		JobGraph currentJobGraph = this.streamManagerService.getJobGraph();
-		OperatorID secondOperatorId = getSecondOperator(currentJobGraph);
-		asyncRunAfter(10, () -> this.reconfigure(secondOperatorId, new TestingControlFunction()));
-		asyncRunAfter(15, () -> this.reconfigure(secondOperatorId, getFilterFunction(10)));
-		asyncRunAfter(25, () -> this.reconfigure(secondOperatorId, getFilterFunction(100)));
+		OperatorID secondOperatorId = findOperatorByName(currentJobGraph, "filter");
+		if(secondOperatorId != null) {
+			asyncRunAfter(10, () -> this.reconfigure(secondOperatorId, getFilterFunction(10)));
+			asyncRunAfter(15, () -> this.reconfigure(secondOperatorId, getFilterFunction(20)));
+			asyncRunAfter(25, () -> this.reconfigure(secondOperatorId, getFilterFunction(2)));
+		}
 	}
 
 	private static ControlFunction getFilterFunction(int k) {
 		return (ControlFunction) (ctx, input) -> {
 			String inputWord = (String) input;
 			System.out.println("now filter the words that has length smaller than " + k);
-			if (inputWord.length() > k) {
+			if (inputWord.length() >= k) {
 				ctx.setCurrentRes(inputWord);
 			}
 		};
@@ -52,30 +56,20 @@ public class TestingCFManager extends ControlFunctionManager {
 	}
 
 
-	private OperatorID getSecondOperator(JobGraph jobGraph) {
+	private OperatorID findOperatorByName(JobGraph jobGraph, @Nonnull String name) {
 		Iterator<JobVertex> vertices = jobGraph.getVertices().iterator();
-		boolean first = false;
+		final ClassLoader classLoader = streamManagerService.getUserClassLoader();
 		while (vertices.hasNext()) {
 			JobVertex vertex = vertices.next();
-			List<OperatorID> ops = vertex.getOperatorIDs();
-			if (first) {
-				return ops.get(0);
-			}
-			if (ops.size() > 1) {
-				return ops.get(1);
-			} else {
-				first = true;
+			StreamConfig streamConfig = new StreamConfig(vertex.getConfiguration());
+			Map<Integer, StreamConfig> configMap = streamConfig.getTransitiveChainedTaskConfigsWithSelf(classLoader);
+			for(StreamConfig config: configMap.values()){
+				if(name.equals(config.getOperatorName())){
+					return config.getOperatorID();
+				}
 			}
 		}
 		return null;
-	}
-
-	private static class TestingControlFunction implements ControlFunction {
-		@Override
-		public void invokeControl(ControlContext ctx, Object input) {
-			System.out.println("In Control function, forward getting input type:" + input.getClass());
-			ctx.setCurrentRes(input);
-		}
 	}
 
 }

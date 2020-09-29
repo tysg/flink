@@ -90,20 +90,11 @@ public class JobGraphUpdater implements JobGraphRescaler, JobGraphUpdateOperator
 	@VisibleForTesting
 	private StreamConfig findStreamConfig(OperatorID operatorID) throws Exception {
 		for (JobVertex vertex : jobGraph.getVertices()) {
-			for (OperatorID id : vertex.getOperatorIDs()) {
-				if (id.equals(operatorID)) {
-					if (vertex.getOperatorIDs().size() > 1) {
-						// there exists chained operators in this job vertex
-						StreamConfig streamConfig = new StreamConfig(vertex.getConfiguration());
-						Map<Integer, StreamConfig> configMap = streamConfig.getTransitiveChainedTaskConfigs(userClassLoader);
-						for (StreamConfig config : configMap.values()) {
-							if (operatorID.equals(config.getOperatorID())) {
-								return config;
-							}
-						}
-					} else {
-						return new StreamConfig(vertex.getConfiguration());
-					}
+			StreamConfig streamConfig = new StreamConfig(vertex.getConfiguration());
+			Map<Integer, StreamConfig> configMap = streamConfig.getTransitiveChainedTaskConfigsWithSelf(userClassLoader);
+			for (StreamConfig config : configMap.values()) {
+				if (operatorID.equals(config.getOperatorID())) {
+					return config;
 				}
 			}
 		}
