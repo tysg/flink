@@ -70,13 +70,12 @@ import org.apache.flink.streaming.runtime.tasks.mailbox.TaskMailbox;
 import org.apache.flink.streaming.runtime.tasks.mailbox.TaskMailboxImpl;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.Preconditions;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
-
 import java.io.Closeable;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -650,7 +649,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 	}
 
 	public void recreateOperatorChain(TaskStateSnapshot stateSnapshot) throws Exception {
-		JobManagerTaskRestore jobManagerTaskRestore = new JobManagerTaskRestore(0, stateSnapshot);
+		JobManagerTaskRestore jobManagerTaskRestore = new JobManagerTaskRestore(LocalSnapshotOperation.LOCAL_CHECKPOINT_ID, stateSnapshot);
 		getEnvironment().getTaskStateManager().updateTaskRestore(jobManagerTaskRestore);
 
 		// todo this implementation will lost state
