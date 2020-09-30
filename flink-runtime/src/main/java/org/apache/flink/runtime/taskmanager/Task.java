@@ -426,6 +426,8 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 		executingThread = new Thread(TASK_THREADS_GROUP, this, taskNameWithSubtask);
 
 		this.keyGroupRange = keyGroupRange;
+
+		taskOperatorManager = new TaskOperatorManager(this);
 	}
 
 	// ------------------------------------------------------------------------
@@ -703,6 +705,7 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 				checkpointResponder,
 				taskManagerConfig,
 				taskRescaleManager,
+				taskOperatorManager,
 				keyGroupRange,
 				metrics,
 				this);
@@ -733,9 +736,6 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 
 			// make sure the user code classloader is accessible thread-locally
 			executingThread.setContextClassLoader(userCodeClassLoader);
-
-			taskOperatorManager = new TaskOperatorManager(invokable) {
-			};
 
 			// run the invokable
 			invokable.invoke();
@@ -1278,12 +1278,12 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 		taskRescaleManager.createNewResultPartitions();
 	}
 
-	public boolean updateOperatorConfig(Configuration updatedConfig, OperatorID operatorID){
+	public boolean updateOperatorConfig(Configuration updatedConfig, OperatorID operatorID) throws Exception {
 		// since one java process share the same address space, so we only need to update configuration here,
 		// then all other task configuration referenced here will be updated
+		System.out.println("time to update operator config");
 		this.taskConfiguration.addAll(updatedConfig);
-		taskOperatorManager.update(updatedConfig, operatorID);
-		return true;
+		return checkNotNull(invokable).updateOperator(updatedConfig, operatorID);
 	}
 
 	// ------------------------------------------------------------------------

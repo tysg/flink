@@ -28,8 +28,8 @@ public class TestingCFManager extends ControlFunctionManager {
 		OperatorID secondOperatorId = findOperatorByName(currentJobGraph, "filter");
 		if(secondOperatorId != null) {
 			asyncRunAfter(10, () -> this.reconfigure(secondOperatorId, getFilterFunction(10)));
-			asyncRunAfter(15, () -> this.reconfigure(secondOperatorId, getFilterFunction(20)));
-			asyncRunAfter(25, () -> this.reconfigure(secondOperatorId, getFilterFunction(2)));
+//			asyncRunAfter(15, () -> this.reconfigure(secondOperatorId, getFilterFunction(20)));
+//			asyncRunAfter(25, () -> this.reconfigure(secondOperatorId, getFilterFunction(2)));
 		}
 	}
 

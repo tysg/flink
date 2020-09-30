@@ -43,10 +43,5 @@ public enum InputStatus {
 	/**
 	 * Indicator that the input has reached the end of data.
 	 */
-	END_OF_INPUT,
-
-	/**
-	 * Indicator that the processor suspend processing input temporally and wait a special event to wake it.
-	 */
-	PAUSE
+	END_OF_INPUT;
 }

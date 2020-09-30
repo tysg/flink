@@ -38,7 +38,6 @@ import org.apache.flink.runtime.io.network.api.writer.RecordWriterBuilder;
 import org.apache.flink.runtime.io.network.api.writer.RecordWriterDelegate;
 import org.apache.flink.runtime.io.network.api.writer.ResultPartitionWriter;
 import org.apache.flink.runtime.io.network.api.writer.SingleRecordWriter;
-import org.apache.flink.runtime.io.network.partition.ResultPartition;
 import org.apache.flink.runtime.io.network.partition.consumer.InputGate;
 import org.apache.flink.runtime.io.network.partition.consumer.SingleInputGate;
 import org.apache.flink.runtime.jobgraph.OperatorID;
@@ -46,6 +45,7 @@ import org.apache.flink.runtime.jobgraph.tasks.AbstractInvokable;
 import org.apache.flink.runtime.metrics.groups.OperatorMetricGroup;
 import org.apache.flink.runtime.plugable.SerializationDelegate;
 import org.apache.flink.runtime.rescale.TaskRescaleManager;
+import org.apache.flink.runtime.rescale.reconfigure.TaskOperatorManager;
 import org.apache.flink.runtime.state.*;
 import org.apache.flink.runtime.taskmanager.DispatcherThreadFactory;
 import org.apache.flink.runtime.taskmanager.InputGateWithMetrics;
@@ -212,6 +212,8 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 
 	private final KeyGroupRange assignedKeyGroupRange;
 
+	private final TaskOperatorManager.PauseActionController pauseActionController;
+
 	private volatile int idInModel;
 
 	// ------------------------------------------------------------------------
@@ -290,6 +292,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 				taskInfo.getIndexOfThisSubtask());
 
 		this.idInModel = getEnvironment().getTaskInfo().getIndexOfThisSubtask();
+		this.pauseActionController = ((RuntimeEnvironment)getEnvironment()).taskOperatorManager.getPauseActionController();
 	}
 
 	// ------------------------------------------------------------------------
@@ -316,19 +319,22 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 	 */
 	protected void processInput(MailboxDefaultAction.Controller controller) throws Exception {
 		InputStatus status = inputProcessor.processInput();
+		// may use this to implement consistent
+		if(pauseActionController.isPausedThenAck()){
+			CompletableFuture<?> jointFuture = CompletableFuture.allOf(
+				getInputOutputJointFuture(status),
+				pauseActionController.getResumeFuture()
+			);
+			MailboxDefaultAction.Suspension suspendedDefaultAction = controller.suspendDefaultAction();
+			jointFuture.thenRun(suspendedDefaultAction::resume).thenRun(()->System.out.println("pauseActionController get resumed"));
+			System.out.println("suspend process to wait for pauseActionController ready:" + getName());
+			return;
+		}
 		if (status == InputStatus.MORE_AVAILABLE && recordWriter.isAvailable()) {
 			return;
 		}
 		if (status == InputStatus.END_OF_INPUT) {
 			controller.allActionsCompleted();
-			return;
-		}
-		System.out.println("how frequently when I get here:"+getName());
-		// may use this to implement consistent
-		if(status == InputStatus.PAUSE){
-			CompletableFuture<?> jointFuture = new CompletableFuture<>();
-			MailboxDefaultAction.Suspension suspendedDefaultAction = controller.suspendDefaultAction();
-			jointFuture.thenRun(suspendedDefaultAction::resume);
 			return;
 		}
 		CompletableFuture<?> jointFuture = getInputOutputJointFuture(status);
@@ -606,7 +612,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 		}
 	}
 
-	public void updateOperator(Configuration updatedConfig, OperatorID operatorID) throws Exception {
+	public boolean updateOperator(Configuration updatedConfig, OperatorID operatorID) throws Exception {
 		// There are two implementation options:
 		// Option 1:
 		//  re-create the whole operator chain as well as head operator,
@@ -627,26 +633,52 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 		//   logic inside each tasks, reinitialize the state and open each tasks
 		// - future is done and then all task get resumed
 
-		final CheckpointMetaData checkpointMetaData = new CheckpointMetaData(LocalSnapshotOperation.LOCAL_CHECKPOINT_ID, System.currentTimeMillis());
-		final CheckpointOptions checkpointOptions = CheckpointOptions.forCheckpointWithDefaultLocation();
-		final CheckpointStreamFactory storage = checkpointStorage.resolveCheckpointStorageLocation(
-			checkpointMetaData.getCheckpointId(),
-			checkpointOptions.getTargetLocation());
-
-		LocalSnapshotOperation localSnapshotOperation = new LocalSnapshotOperation(
-			this,
-			checkpointMetaData,
-			checkpointOptions,
-			storage);
-		localSnapshotOperation.executeLocalSnapshot().thenAccept(
-			stateSnapshot ->{
+		this.pauseActionController.setPausedAndGetAckFuture().thenRunAsync(
+			() -> {
+				boolean exception = false;
 				try {
-					recreateOperatorChain(stateSnapshot);
-				} catch (Exception e) {
+					System.out.println("task ack pause, now start state snapshot:" + getName());
+					final CheckpointMetaData checkpointMetaData = new CheckpointMetaData(LocalSnapshotOperation.LOCAL_CHECKPOINT_ID, System.currentTimeMillis());
+					final CheckpointOptions checkpointOptions = CheckpointOptions.forCheckpointWithDefaultLocation();
+					final CheckpointStreamFactory storage = checkpointStorage.resolveCheckpointStorageLocation(
+						checkpointMetaData.getCheckpointId(),
+						checkpointOptions.getTargetLocation());
+
+					LocalSnapshotOperation localSnapshotOperation = new LocalSnapshotOperation(
+						this,
+						checkpointMetaData,
+						checkpointOptions,
+						storage);
+					localSnapshotOperation.executeLocalSnapshot().thenAccept(
+						stateSnapshot ->{
+							try {
+								System.out.println("Start busy: " + getName());
+								long start = System.currentTimeMillis();
+								while (System.currentTimeMillis()-start < 3000);
+								System.out.println("Stop busy: " + getName());
+								recreateOperatorChain(stateSnapshot);
+								pauseActionController.resume();
+							} catch (Exception e) {
+								e.printStackTrace();
+							}
+						}
+					);
+				}catch (Exception e){
+					exception = true;
 					e.printStackTrace();
+				}finally {
+					if(exception){
+						try {
+							pauseActionController.resume();
+						} catch (Exception e) {
+							e.printStackTrace();
+						}
+					}
 				}
-			}
+			},
+			this.asyncOperationsThreadPool
 		);
+		return true;
 	}
 
 	public void recreateOperatorChain(TaskStateSnapshot stateSnapshot) throws Exception {
@@ -1646,6 +1678,8 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 
 		private long startAsyncPartNano;
 
+		private final AtomicReference<CheckpointingOperation.AsyncCheckpointState> asyncCheckpointState = new AtomicReference<>(
+			CheckpointingOperation.AsyncCheckpointState.RUNNING);
 		// ------------------------
 
 		private final Map<OperatorID, OperatorSnapshotFutures> operatorSnapshotsInProgress;
@@ -1814,9 +1848,6 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 				FileSystemSafetyNet.closeSafetyNetAndGuardedResourcesForThread();
 			}
 		}
-
-		private final AtomicReference<CheckpointingOperation.AsyncCheckpointState> asyncCheckpointState = new AtomicReference<>(
-			CheckpointingOperation.AsyncCheckpointState.RUNNING);
 
 		void closeRunSnapshot() {
 			if (asyncCheckpointState.compareAndSet(
