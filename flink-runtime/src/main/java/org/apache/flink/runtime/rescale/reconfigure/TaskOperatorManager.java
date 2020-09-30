@@ -1,5 +1,6 @@
 package org.apache.flink.runtime.rescale.reconfigure;
 
+import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.taskmanager.Task;
 
@@ -26,11 +27,12 @@ public class TaskOperatorManager {
 
 		/**
 		 * This method should be thread safe.
-		 * called by task process thread
+		 * called by task process thread, should avoid acquire lock as possible as we can
+		 * since task will check this method each time process an input.
 		 *
 		 * @return true if task should be paused
 		 */
-		boolean isPausedThenAck();
+		boolean ackIfPause();
 
 		CompletableFuture<Acknowledge> getResumeFuture();
 
@@ -55,14 +57,15 @@ public class TaskOperatorManager {
 		private final Object lock = new Object();
 
 		@Override
-		public boolean isPausedThenAck() {
-			synchronized (lock) {
-				if (state.get() == TaskStatus.PAUSE) {
+		public boolean ackIfPause() {
+			if (state.get() == TaskStatus.PAUSE) {
+				// only the state become pause should we acquire the lock
+				synchronized (lock) {
 					ackPausedFuture.complete(Acknowledge.get());
 					return true;
 				}
-				return false;
 			}
+			return false;
 		}
 
 		@Override
@@ -92,9 +95,33 @@ public class TaskOperatorManager {
 			return resumeFuture;
 		}
 
-		enum TaskStatus {
+		private enum TaskStatus {
 			PAUSE,
 			READY
+		}
+	}
+
+	@VisibleForTesting
+	public static class NoControlImpl implements PauseActionController {
+
+		@Override
+		public boolean ackIfPause() {
+			return false;
+		}
+
+		@Override
+		public CompletableFuture<Acknowledge> getResumeFuture() {
+			return CompletableFuture.completedFuture(Acknowledge.get());
+		}
+
+		@Override
+		public CompletableFuture<Acknowledge> setPausedAndGetAckFuture() throws Exception {
+			return CompletableFuture.completedFuture(Acknowledge.get());
+		}
+
+		@Override
+		public void resume() throws Exception {
+
 		}
 	}
 

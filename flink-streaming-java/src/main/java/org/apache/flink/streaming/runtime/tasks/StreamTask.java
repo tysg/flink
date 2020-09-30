@@ -320,7 +320,11 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 	protected void processInput(MailboxDefaultAction.Controller controller) throws Exception {
 		InputStatus status = inputProcessor.processInput();
 		// may use this to implement consistent
-		if(pauseActionController.isPausedThenAck()){
+		if(pauseActionController.ackIfPause()){
+			if (status == InputStatus.END_OF_INPUT) {
+				controller.allActionsCompleted();
+				return;
+			}
 			CompletableFuture<?> jointFuture = CompletableFuture.allOf(
 				getInputOutputJointFuture(status),
 				pauseActionController.getResumeFuture()
