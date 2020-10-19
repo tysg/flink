@@ -331,7 +331,6 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 			);
 			MailboxDefaultAction.Suspension suspendedDefaultAction = controller.suspendDefaultAction();
 			jointFuture.thenRun(suspendedDefaultAction::resume).thenRun(()->System.out.println("pauseActionController get resumed"));
-			System.out.println("suspend process to wait for pauseActionController ready:" + getName());
 			return;
 		}
 		if (status == InputStatus.MORE_AVAILABLE && recordWriter.isAvailable()) {

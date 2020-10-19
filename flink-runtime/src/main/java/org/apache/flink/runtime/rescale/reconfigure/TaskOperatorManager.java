@@ -60,6 +60,7 @@ public class TaskOperatorManager {
 		public boolean ackIfPause() {
 			if (state.get() == TaskStatus.PAUSE) {
 				// only the state become pause should we acquire the lock
+				System.out.println("suspend process to wait for pauseActionController ready");
 				synchronized (lock) {
 					ackPausedFuture.complete(Acknowledge.get());
 					return true;
