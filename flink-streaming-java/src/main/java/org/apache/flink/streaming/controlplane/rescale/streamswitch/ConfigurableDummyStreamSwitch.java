@@ -211,8 +211,7 @@ public class ConfigurableDummyStreamSwitch implements FlinkOperatorController, R
 					otherKeys.add(firstSubTask.get(i));
 				}
 			}
-			executorMapping.get("0").clear();
-			executorMapping.get("0").addAll(originKeys);
+			executorMapping.put("0", originKeys);
 			executorMapping.get(String.valueOf(newParallelism-1)).addAll(otherKeys);
 		}else {
 			// scale in
