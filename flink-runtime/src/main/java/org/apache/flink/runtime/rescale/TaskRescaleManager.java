@@ -43,8 +43,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 
 import static org.apache.flink.runtime.shuffle.ShuffleUtils.applyWithShuffleTypeCheck;
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -103,10 +105,10 @@ public class TaskRescaleManager {
 	}
 
 	public void prepareRescaleMeta(
-			RescaleID rescaleId,
-			RescaleOptions rescaleOptions,
-			Collection<ResultPartitionDeploymentDescriptor> resultPartitionDeploymentDescriptors,
-			Collection<InputGateDeploymentDescriptor> inputGateDeploymentDescriptors) {
+		RescaleID rescaleId,
+		RescaleOptions rescaleOptions,
+		Collection<ResultPartitionDeploymentDescriptor> resultPartitionDeploymentDescriptors,
+		Collection<InputGateDeploymentDescriptor> inputGateDeploymentDescriptors) {
 
 		TaskRescaleMeta meta = new TaskRescaleMeta(
 			rescaleId,
@@ -141,7 +143,7 @@ public class TaskRescaleManager {
 		// produced intermediate result partitions
 		final ResultPartitionWriter[] newResultPartitionWriters = shuffleEnvironment.createResultPartitionWriters(
 			taskShuffleContext,
-			rescaleMeta.getResultPartitionDeploymentDescriptors()).toArray(new ResultPartitionWriter[] {});
+			rescaleMeta.getResultPartitionDeploymentDescriptors()).toArray(new ResultPartitionWriter[]{});
 
 		ResultPartitionWriter[] newPartitions = ConsumableNotifyingResultPartitionWriterDecorator.decorate(
 			rescaleMeta.getResultPartitionDeploymentDescriptors(),
@@ -271,10 +273,10 @@ public class TaskRescaleManager {
 		private final ResultPartitionWriter[] newConsumableNotifyingPartitionWriters;
 
 		TaskRescaleMeta(
-				RescaleID rescaleId,
-				RescaleOptions rescaleOptions,
-				Collection<ResultPartitionDeploymentDescriptor> resultPartitionDeploymentDescriptors,
-				Collection<InputGateDeploymentDescriptor> inputGateDeploymentDescriptors) {
+			RescaleID rescaleId,
+			RescaleOptions rescaleOptions,
+			Collection<ResultPartitionDeploymentDescriptor> resultPartitionDeploymentDescriptors,
+			Collection<InputGateDeploymentDescriptor> inputGateDeploymentDescriptors) {
 
 			this.rescaleId = checkNotNull(rescaleId);
 			this.rescaleOptions = checkNotNull(rescaleOptions);
@@ -312,14 +314,34 @@ public class TaskRescaleManager {
 			newConsumableNotifyingPartitionWriters[index] = partition;
 		}
 
+		/**
+		 * Get matched InputGateDescriptor of the input gate
+		 * <p>
+		 * It just need to compare the `comsumedResultId`. There will be never two InputGateDeploymentDescriptor with
+		 * the same `consumedResultId` which will actually be sent to different parallel operator instance.
+		 * <p>
+		 * We should not compare the `consumedSubPartitionIndex` here since the original partition type
+		 * between previous operator and current may be `FORWARD`.
+		 * <p>
+		 * In that case, all its parallel operator instances has `consumedSubpartitionIndex` zero.
+		 * However, the new deployment descriptor may set the new `consumedSubpartitionIndex` greater than zero
+		 * which will cause gate would never find its new InputGateDeploymentDescriptor.
+		 *
+		 * @param gate
+		 * @return
+		 */
 		public InputGateDeploymentDescriptor getMatchedInputGateDescriptor(SingleInputGate gate) {
+			List<InputGateDeploymentDescriptor> igdds = new ArrayList<>();
 			for (InputGateDeploymentDescriptor igdd : inputGateDeploymentDescriptors) {
-				if (gate.getConsumedResultId().equals(igdd.getConsumedResultId())
-					&& gate.getConsumedSubpartitionIndex() == igdd.getConsumedSubpartitionIndex()) {
-					return igdd;
+				if (gate.getConsumedResultId().equals(igdd.getConsumedResultId())) {
+					igdds.add(igdd);
 				}
 			}
-			throw new IllegalStateException("Cannot find matched InputGateDeploymentDescriptor");
+			if (igdds.size() != 1) {
+				throw new IllegalStateException("Cannot find matched InputGateDeploymentDescriptor");
+			}
+			gate.setConsumedSubpartitionIndex(igdds.get(0).getConsumedSubpartitionIndex());
+			return igdds.get(0);
 		}
 	}
 }
