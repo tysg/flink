@@ -21,6 +21,7 @@ package org.apache.flink.streaming.controlplane.streammanager.insts;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.rescale.JobRescaleAction;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
+import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 
 /**
  * This interface defined some instruction which could be called by several control policy user defined model
@@ -44,5 +45,5 @@ public interface PrimitiveInstruction extends Instruction {
 	 * @param operatorID the id of changed operator
 	 * @param operatorFactory the new operator factory to create new operator
 	 */
-	void changeOperator(OperatorID operatorID, StreamOperatorFactory<?> operatorFactory);
+	void changeOperator(OperatorID operatorID, StreamOperatorFactory<?> operatorFactory, ControlPolicy waitingController);
 }

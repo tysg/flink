@@ -24,6 +24,7 @@ import org.apache.flink.runtime.jobgraph.OperatorID;
 
 import javax.annotation.Nullable;
 import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * General enforcements
@@ -38,7 +39,7 @@ public interface Enforcement {
 
 	void prepareExecutionPlan();
 
-	void synchronizeTasks(Collection<JobVertexID> jobVertexIDS);
+	CompletableFuture<Void> synchronizeTasks(Collection<JobVertexID> jobVertexIDS);
 
 	void deployTasks();
 
@@ -49,8 +50,8 @@ public interface Enforcement {
 	void updateFunction(@Nullable JobGraph jobGraph, JobVertexID targetVertexID, OperatorID operatorID);
 
 	@FunctionalInterface
-	interface EnforcementCall{
-		void callEnforcements(Enforcement enforcement);
+	interface EnforcementCaller {
+		void call(Enforcement enforcement);
 	}
 
 }

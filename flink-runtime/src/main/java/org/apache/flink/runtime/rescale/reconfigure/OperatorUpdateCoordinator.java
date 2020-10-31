@@ -54,8 +54,8 @@ public class OperatorUpdateCoordinator implements Enforcement {
 	}
 
 	@Override
-	public void synchronizeTasks(Collection<JobVertexID> jobVertexIDS) {
-
+	public CompletableFuture<Void> synchronizeTasks(Collection<JobVertexID> jobVertexIDS) {
+		return CompletableFuture.completedFuture(null);
 	}
 
 	@Override

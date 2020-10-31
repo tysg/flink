@@ -7,6 +7,7 @@ import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.controlplane.jobgraph.JobGraphRescaler;
 import org.apache.flink.streaming.controlplane.reconfigure.operator.ControlFunction;
+import org.apache.flink.streaming.controlplane.reconfigure.operator.ControlOperatorFactory;
 import org.apache.flink.streaming.controlplane.streammanager.insts.PrimitiveInstruction;
 import org.apache.flink.streaming.controlplane.streammanager.insts.StreamJobState;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
@@ -23,7 +24,7 @@ public class TestingCFManager extends ControlFunctionManager implements ControlP
 
 	@Override
 	public void startControllerInternal() {
-		super.startControllerInternal();
+		System.out.println("Testing Control Function Manager starting...");
 
 		StreamJobState jobState = primitiveInstruction.getStreamJobState();
 
@@ -35,6 +36,22 @@ public class TestingCFManager extends ControlFunctionManager implements ControlP
 			asyncRunAfter(15, () -> this.reconfigure(secondOperatorId, getFilterFunction(20)));
 			asyncRunAfter(25, () -> this.reconfigure(secondOperatorId, getFilterFunction(2)));
 		}
+	}
+
+	@Override
+	public void reconfigure(OperatorID operatorID, ControlFunction function) {
+		System.out.println("Substitute `Control` Function...");
+		ControlOperatorFactory<?, ?> operatorFactory = new ControlOperatorFactory<>(
+			operatorID,
+			primitiveInstruction.getStreamJobState().getJobGraph(),
+			function);
+		try {
+			// since job graph is shared in stream manager and among its services, we don't need to pass it
+			primitiveInstruction.changeOperator(operatorID, operatorFactory, this);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
 	}
 
 	private static ControlFunction getFilterFunction(int k) {
@@ -84,7 +101,7 @@ public class TestingCFManager extends ControlFunctionManager implements ControlP
 	}
 
 	@Override
-	public void onChangeImplemented(JobVertexID jobVertexID) {
-
+	public void onChangeCompleted(JobVertexID jobVertexID) {
+		System.out.println("one operator function update is finished:"+jobVertexID);
 	}
 }

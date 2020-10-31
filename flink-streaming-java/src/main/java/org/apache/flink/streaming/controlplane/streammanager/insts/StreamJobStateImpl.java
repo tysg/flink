@@ -28,6 +28,7 @@ import org.apache.flink.streaming.api.operators.SimpleUdfStreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
 import org.apache.flink.streaming.controlplane.reconfigure.JobGraphUpdater;
 import org.apache.flink.streaming.controlplane.rescale.StreamJobGraphRescaler;
+import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 import org.apache.flink.util.Preconditions;
 
 import java.util.List;
@@ -47,6 +48,8 @@ public final class StreamJobStateImpl implements StreamJobState {
 	private ClassLoader userCodeLoader;
 
 	private final AtomicInteger stateOfUpdate = new AtomicInteger(COMMITTED);
+
+	private ControlPolicy currentWaitingController;
 
 
 	private StreamJobStateImpl(OperatorGraph operatorGraph, DeploymentGraph deploymentGraph, ClassLoader userLoader) {
@@ -79,13 +82,29 @@ public final class StreamJobStateImpl implements StreamJobState {
 	}
 
 	@Override
-	public <OUT> JobVertexID updateOperator(OperatorID operatorID, StreamOperatorFactory<OUT> operatorFactory) throws Exception {
+	public <OUT> JobVertexID updateOperator(OperatorID operatorID,
+											StreamOperatorFactory<OUT> operatorFactory,
+											ControlPolicy waitingController) throws Exception {
 		// some strategy needed here to ensure there is only one update at one time
-		if(stateOfUpdate.compareAndSet(COMMITTED, STAGED)){
+		if (stateOfUpdate.compareAndSet(COMMITTED, STAGED)) {
+			// the caller may want to wait the completion of this update.
+			currentWaitingController = waitingController;
 			return jobGraphUpdater.updateOperator(operatorID, operatorFactory);
 		}
 		throw new Exception("There is another state update not finished");
 	}
+
+	@Override
+	public void notifyUpdateFinished(JobVertexID jobVertexID) throws Exception {
+		if (stateOfUpdate.compareAndSet(STAGED, COMMITTED)) {
+			if(currentWaitingController != null) {
+				currentWaitingController.onChangeCompleted(jobVertexID);
+			}
+			return;
+		}
+		throw new Exception("There is not any state updating");
+	}
+
 
 	@Override
 	public void getKeyStateAllocation(OperatorID operatorID) {

@@ -24,7 +24,9 @@ import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
+import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 
+import javax.annotation.Nullable;
 import java.util.List;
 
 /**
@@ -71,12 +73,24 @@ public interface StreamJobState {
 	/**
 	 * @param operatorID      the id of target operarir
 	 * @param operatorFactory the new stream operator factory
-	 * @param <OUT> Output type of StreamOperatorFactory
+	 * @param <OUT>           Output type of StreamOperatorFactory
 	 * @return the id of updated job vertex
 	 * @throws Exception
 	 */
 	@Internal
-	<OUT> JobVertexID updateOperator(OperatorID operatorID, StreamOperatorFactory<OUT> operatorFactory) throws Exception;
+	<OUT> JobVertexID updateOperator(OperatorID operatorID,
+									 StreamOperatorFactory<OUT> operatorFactory,
+									 @Nullable ControlPolicy waitingController) throws Exception;
+
+	/**
+	 * Notify that current state update is finished.
+	 * This could only be invoke once
+	 *
+	 * @param jobVertexID
+	 * @throws Exception
+	 */
+	@Internal
+	void notifyUpdateFinished(JobVertexID jobVertexID) throws Exception;
 
 	/**
 	 * To get how the input key state was allocated in this operator vertex.

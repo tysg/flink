@@ -501,13 +501,14 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 	public void triggerOperatorUpdate(JobGraph jobGraph, JobVertexID targetVertexID, OperatorID operatorID){
 		validateRunsInMainThread();
 		JobRescaleCoordinator rescaleCoordinator = schedulerNG.getJobRescaleCoordinator();
-		rescaleCoordinator.getOperatorUpdateCoordinator().triggerUpdate(jobGraph, targetVertexID, operatorID);
+		rescaleCoordinator.getOperatorUpdateCoordinator().updateFunction(jobGraph, targetVertexID, operatorID);
 	}
 
-	public void callEnforcements(Enforcement.EnforcementCall enforcementCall){
+	@Override
+	public void callEnforcements(Enforcement.EnforcementCaller caller){
 		validateRunsInMainThread();
 		JobRescaleCoordinator rescaleCoordinator = schedulerNG.getJobRescaleCoordinator();
-		enforcementCall.callEnforcements(rescaleCoordinator.getOperatorUpdateCoordinator());
+		caller.call(rescaleCoordinator.getOperatorUpdateCoordinator());
 	}
 
 

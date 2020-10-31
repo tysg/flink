@@ -24,7 +24,6 @@ import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
-import org.apache.flink.runtime.controlplane.streammanager.Enforcement;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerId;
 import org.apache.flink.runtime.dispatcher.DispatcherGateway;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
@@ -316,7 +315,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	@Override
 	public void streamSwitchCompleted(JobVertexID targetVertexID) {
 		for(ControlPolicy policy: controlPolicyList){
-			policy.onChangeImplemented(targetVertexID);
+			policy.onChangeCompleted(targetVertexID);
 		}
 	}
 
@@ -506,18 +505,27 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	}
 
 	@Override
-	public void changeOperator(OperatorID operatorID, StreamOperatorFactory<?> operatorFactory) {
+	public void changeOperator(OperatorID operatorID, StreamOperatorFactory<?> operatorFactory, ControlPolicy waitingController) {
 		try {
-			JobVertexID jobVertexId = this.streamJobState.updateOperator(operatorID, operatorFactory);
-			System.out.println("Substitute `Control` Function finished!");
+			JobVertexID jobVertexId = this.streamJobState.updateOperator(operatorID, operatorFactory, waitingController);
 
 			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
 //			runAsync(() -> jobMasterGateway.triggerOperatorUpdate(this.jobGraph, jobVertexId, operatorID));
 			runAsync(() -> jobMasterGateway.callEnforcements(
 				enforcement -> {
 					enforcement.prepareExecutionPlan();
-					enforcement.synchronizeTasks(null);
-					enforcement.updateFunction(jobGraph, jobVertexId, operatorID);
+					// sync will take a lot of time, should be used async
+					// a nature way is to make it return a future
+					enforcement.synchronizeTasks(null).thenAccept(
+						o -> {
+							enforcement.updateFunction(jobGraph, jobVertexId, operatorID);
+							try {
+								this.streamJobState.notifyUpdateFinished(jobVertexId);
+							} catch (Exception e) {
+								e.printStackTrace();
+							}
+						}
+					);
 				}
 			));
 		} catch (Exception e) {

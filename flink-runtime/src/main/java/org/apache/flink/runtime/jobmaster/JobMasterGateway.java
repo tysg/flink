@@ -288,5 +288,6 @@ public interface JobMasterGateway extends
 	 */
 	void triggerOperatorUpdate(JobGraph jobGraph, JobVertexID targetVertexID, OperatorID operatorID);
 
-	void callEnforcements(Enforcement.EnforcementCall enforcementCall);
+	default void callEnforcements(Enforcement.EnforcementCaller enforcementCall){
+	}
 }
