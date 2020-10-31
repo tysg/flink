@@ -5,7 +5,7 @@ import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.topology.VertexID;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
 
-public interface JobGraphUpdateOperator {
+public interface JobGraphOperatorUpdate {
 
 	/**
 	 *

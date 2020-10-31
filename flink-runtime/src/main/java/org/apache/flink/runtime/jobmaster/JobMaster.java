@@ -31,6 +31,7 @@ import org.apache.flink.runtime.checkpoint.TaskStateSnapshot;
 import org.apache.flink.runtime.clusterframework.types.AllocationID;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
+import org.apache.flink.runtime.controlplane.streammanager.Enforcement;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerId;
 import org.apache.flink.runtime.execution.ExecutionState;
@@ -501,6 +502,12 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		validateRunsInMainThread();
 		JobRescaleCoordinator rescaleCoordinator = schedulerNG.getJobRescaleCoordinator();
 		rescaleCoordinator.getOperatorUpdateCoordinator().triggerUpdate(jobGraph, targetVertexID, operatorID);
+	}
+
+	public void callEnforcements(Enforcement.EnforcementCall enforcementCall){
+		validateRunsInMainThread();
+		JobRescaleCoordinator rescaleCoordinator = schedulerNG.getJobRescaleCoordinator();
+		enforcementCall.callEnforcements(rescaleCoordinator.getOperatorUpdateCoordinator());
 	}
 
 

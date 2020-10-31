@@ -24,6 +24,7 @@ import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
+import org.apache.flink.runtime.controlplane.streammanager.Enforcement;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerId;
 import org.apache.flink.runtime.dispatcher.DispatcherGateway;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
@@ -36,6 +37,7 @@ import org.apache.flink.runtime.jobmaster.JobMasterId;
 import org.apache.flink.runtime.jobmaster.JobMasterRegistrationSuccess;
 import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.registration.RegistrationResponse;
+import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
 import org.apache.flink.streaming.controlplane.jobgraph.JobGraphRescaler;
 import org.apache.flink.runtime.rescale.JobRescaleAction;
 import org.apache.flink.runtime.resourcemanager.JobLeaderIdActions;
@@ -44,13 +46,17 @@ import org.apache.flink.runtime.resourcemanager.registration.JobManagerRegistrat
 import org.apache.flink.runtime.rpc.*;
 import org.apache.flink.runtime.rpc.akka.AkkaRpcServiceUtils;
 import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
-import org.apache.flink.streaming.controlplane.reconfigure.ControlFunctionManager;
 import org.apache.flink.streaming.controlplane.reconfigure.TestingCFManager;
 import org.apache.flink.streaming.controlplane.rescale.StreamJobGraphRescaler;
 import org.apache.flink.streaming.controlplane.rescale.streamswitch.FlinkStreamSwitchAdaptor;
 import org.apache.flink.streaming.controlplane.streammanager.exceptions.StreamManagerException;
+import org.apache.flink.streaming.controlplane.streammanager.insts.PrimitiveInstruction;
+import org.apache.flink.streaming.controlplane.streammanager.insts.StreamJobState;
+import org.apache.flink.streaming.controlplane.streammanager.insts.StreamJobStateImpl;
+import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 import org.apache.flink.util.OptionalConsumer;
 
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -67,7 +73,7 @@ import static org.apache.flink.util.Preconditions.checkState;
  * 1. decide other fields
  * 2. initialize other fields
  */
-public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements StreamManagerGateway, StreamManagerService {
+public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements StreamManagerGateway, StreamManagerService, PrimitiveInstruction {
 
 	/**
 	 * Default names for Flink's distributed components.
@@ -92,9 +98,9 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 	private final JobGraphRescaler jobGraphRescaler;
 
-	private final FlinkStreamSwitchAdaptor streamSwitchAdaptor;
+	private final List<ControlPolicy> controlPolicyList = new LinkedList<>();
 
-	private final ControlFunctionManager controlFunctionManager;
+	private final StreamJobState streamJobState;
 
 	private CompletableFuture<Acknowledge> rescalePartitionFuture;
 
@@ -141,9 +147,12 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		log.debug("Initializing sm for job {} ({})", jobName, jid);
 		log.info("Initializing sm for job {} ({})", jobName, jid);
 
-		this.streamSwitchAdaptor = new FlinkStreamSwitchAdaptor(this, jobGraph);
+		this.streamJobState = StreamJobStateImpl.createFromJobGraph(jobGraph, userCodeLoader);
 		this.jobGraphRescaler = new StreamJobGraphRescaler(jobGraph, userCodeLoader);
-		this.controlFunctionManager = new TestingCFManager(this, jobGraphRescaler);
+
+		/* now the policy is temporary hard coded added */
+		this.controlPolicyList.add(new FlinkStreamSwitchAdaptor(this, jobGraph));
+		this.controlPolicyList.add(new TestingCFManager(this));
 	}
 
 	/**
@@ -306,8 +315,9 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 	@Override
 	public void streamSwitchCompleted(JobVertexID targetVertexID) {
-		streamSwitchAdaptor.onMigrationExecutorsStopped(targetVertexID);
-		streamSwitchAdaptor.onChangeImplemented(targetVertexID);
+		for(ControlPolicy policy: controlPolicyList){
+			policy.onChangeImplemented(targetVertexID);
+		}
 	}
 
 
@@ -434,13 +444,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	}
 
 	@Override
-	public JobGraph getJobGraph() {
-		return checkNotNull(jobGraph, "current job graph is null");
-	}
-
-	@Override
-	public ClassLoader getUserClassLoader() {
-		return checkNotNull(userCodeLoader, "the class loader of user code is null");
+	public StreamJobState getStreamJobState() {
+		return streamJobState;
 	}
 
 	// ------------------------------------------------------------------------
@@ -490,17 +495,34 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	@Override
 	public void jobStatusChanged(JobID jobId, JobStatus newJobStatus, long timestamp, Throwable error) {
 		if (newJobStatus == JobStatus.RUNNING) {
-			this.controlFunctionManager.onJobStart();
-			this.streamSwitchAdaptor.startControllers();
+			for(ControlPolicy policy: controlPolicyList){
+				policy.startControllers();
+			}
 		} else {
-			this.streamSwitchAdaptor.stopControllers();
+			for(ControlPolicy policy: controlPolicyList){
+				policy.stopControllers();
+			}
 		}
 	}
 
 	@Override
-	public void notifyJobGraphOperatorChanged(JobGraph jobGraph, JobVertexID jobVertexId, OperatorID operatorID) {
-		JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
-		runAsync(() -> jobMasterGateway.triggerOperatorUpdate(this.jobGraph, jobVertexId, operatorID));
+	public void changeOperator(OperatorID operatorID, StreamOperatorFactory<?> operatorFactory) {
+		try {
+			JobVertexID jobVertexId = this.streamJobState.updateOperator(operatorID, operatorFactory);
+			System.out.println("Substitute `Control` Function finished!");
+
+			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
+//			runAsync(() -> jobMasterGateway.triggerOperatorUpdate(this.jobGraph, jobVertexId, operatorID));
+			runAsync(() -> jobMasterGateway.callEnforcements(
+				enforcement -> {
+					enforcement.prepareExecutionPlan();
+					enforcement.synchronizeTasks(null);
+					enforcement.updateFunction(jobGraph, jobVertexId, operatorID);
+				}
+			));
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 
 	private class JobLeaderIdActionsImpl implements JobLeaderIdActions {

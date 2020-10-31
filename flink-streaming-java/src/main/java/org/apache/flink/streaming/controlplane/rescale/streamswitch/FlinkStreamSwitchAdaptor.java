@@ -10,6 +10,8 @@ import org.apache.flink.runtime.state.KeyGroupRangeAssignment;
 import org.apache.flink.streaming.controlplane.rescale.RescaleActionConsumer;
 import org.apache.flink.streaming.controlplane.rescale.controller.OperatorController;
 import org.apache.flink.streaming.controlplane.rescale.controller.OperatorControllerListener;
+import org.apache.flink.streaming.controlplane.streammanager.insts.PrimitiveInstruction;
+import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,7 +23,7 @@ import java.util.Map;
 import static org.apache.flink.runtime.rescale.JobRescaleAction.ActionType.REPARTITION;
 import static org.apache.flink.runtime.rescale.JobRescaleAction.ActionType.SCALE_OUT;
 
-public class FlinkStreamSwitchAdaptor {
+public class FlinkStreamSwitchAdaptor implements ControlPolicy {
 
 	private static final Logger LOG = LoggerFactory.getLogger(FlinkStreamSwitchAdaptor.class);
 
@@ -34,10 +36,10 @@ public class FlinkStreamSwitchAdaptor {
 //	private final long migrationInterval;
 
 	public FlinkStreamSwitchAdaptor(
-		StreamManagerGateway localGateway,
+		PrimitiveInstruction primitiveInstruction,
 		JobGraph jobGraph) {
 
-		this.actionConsumer = new RescaleActionConsumer(localGateway);
+		this.actionConsumer = new RescaleActionConsumer(primitiveInstruction);
 
 		this.controllers = new HashMap<>(jobGraph.getNumberOfVertices());
 
@@ -90,6 +92,7 @@ public class FlinkStreamSwitchAdaptor {
 			configuredMaxParallelism : KeyGroupRangeAssignment.computeDefaultMaxParallelism(numTaskVertices);
 	}
 
+	@Override
 	public void startControllers() {
 		new Thread(actionConsumer).start();
 
@@ -98,6 +101,7 @@ public class FlinkStreamSwitchAdaptor {
 		}
 	}
 
+	@Override
 	public void stopControllers() {
 		actionConsumer.stopGracefully();
 
@@ -106,7 +110,10 @@ public class FlinkStreamSwitchAdaptor {
 		}
 	}
 
+	@Override
 	public void onChangeImplemented(JobVertexID jobVertexID) {
+		this.onMigrationExecutorsStopped(jobVertexID);
+
 		LOG.info("++++++ onChangeImplemented triggered for jobVertex " + jobVertexID);
 		this.controllers.get(jobVertexID).onMigrationCompleted();
 

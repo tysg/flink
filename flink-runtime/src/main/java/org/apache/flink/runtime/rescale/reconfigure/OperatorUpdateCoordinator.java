@@ -1,6 +1,7 @@
 package org.apache.flink.runtime.rescale.reconfigure;
 
 import org.apache.flink.runtime.concurrent.FutureUtils;
+import org.apache.flink.runtime.controlplane.streammanager.Enforcement;
 import org.apache.flink.runtime.executiongraph.Execution;
 import org.apache.flink.runtime.executiongraph.ExecutionGraph;
 import org.apache.flink.runtime.executiongraph.ExecutionJobVertex;
@@ -11,10 +12,11 @@ import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.util.Preconditions;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
 
 
-public class OperatorUpdateCoordinator {
+public class OperatorUpdateCoordinator implements Enforcement {
 
 	private JobGraph jobGraph;
 	private ExecutionGraph executionGraph;
@@ -26,9 +28,9 @@ public class OperatorUpdateCoordinator {
 		this.userCodeClassLoader = executionGraph.getUserClassLoader();
 	}
 
-	public void triggerUpdate(JobGraph jobGraph, JobVertexID targetVertexID, OperatorID operatorID){
+	public void updateFunction(JobGraph jobGraph, JobVertexID targetVertexID, OperatorID operatorID){
 		System.out.println("some one want to triggerOperatorUpdate using OperatorUpdateCoordinator?");
-		this.jobGraph = jobGraph;
+//		this.jobGraph = jobGraph;
 		// By evaluating:
 		// "new StreamConfig((executionGraph.tasks.values().toArray()[1]).jobVertex.configuration).getTransitiveChainedTaskConfigs(userCodeClassLoader).get(4).getStreamOperatorFactory(userCodeClassLoader).getOperator()"
 		// The logic in execution Graph has been modified since now they are in same process which sharing the same reference
@@ -46,4 +48,28 @@ public class OperatorUpdateCoordinator {
 		System.out.println("Finished notify tasks to update operator");
 	}
 
+	@Override
+	public void prepareExecutionPlan() {
+
+	}
+
+	@Override
+	public void synchronizeTasks(Collection<JobVertexID> jobVertexIDS) {
+
+	}
+
+	@Override
+	public void deployTasks() {
+
+	}
+
+	@Override
+	public void updateMapping() {
+
+	}
+
+	@Override
+	public void updateState() {
+
+	}
 }

@@ -1,9 +1,9 @@
 package org.apache.flink.streaming.controlplane.rescale;
 
-import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.rescale.JobRescaleAction;
 import org.apache.flink.runtime.rescale.JobRescalePartitionAssignment;
+import org.apache.flink.streaming.controlplane.streammanager.insts.PrimitiveInstruction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,7 +15,7 @@ public class RescaleActionConsumer implements Runnable {
 
 	private static final Logger LOG = LoggerFactory.getLogger(RescaleActionConsumer.class);
 
-	private final StreamManagerGateway localStreamManagerGateway;
+	private final PrimitiveInstruction primitiveInstruction;
 
 	private final Queue<JobRescaleAction.RescaleParamsWrapper> queue;
 
@@ -23,8 +23,8 @@ public class RescaleActionConsumer implements Runnable {
 
 	private volatile boolean isStop;
 
-	public RescaleActionConsumer(StreamManagerGateway localStreamManagerGateway) {
-		this.localStreamManagerGateway = localStreamManagerGateway;
+	public RescaleActionConsumer(PrimitiveInstruction primitiveInstruction) {
+		this.primitiveInstruction = primitiveInstruction;
 		this.queue = new LinkedList<>();
 	}
 
@@ -43,7 +43,7 @@ public class RescaleActionConsumer implements Runnable {
 					if (wrapper != null) {
 						isFinished = false;
 //						rescaleAction.parseParams(wrapper);
-						localStreamManagerGateway.rescaleStreamJob(wrapper);
+						primitiveInstruction.rescaleStreamJob(wrapper);
 
 						while (!isFinished && !isStop) {
 							queue.wait(); // wait for finish

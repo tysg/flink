@@ -69,8 +69,6 @@ public interface StreamManagerGateway extends FencedRpcGateway<StreamManagerId> 
 		final JobID jobId,
 		final Exception cause);
 
-	void rescaleStreamJob(JobRescaleAction.RescaleParamsWrapper wrapper);
-
 	/**
 	 * The notification from the JobManager that changes completed:
 	 * Maybe 1. Assign states for repartition, 2. Rescale and assign states
@@ -89,12 +87,4 @@ public interface StreamManagerGateway extends FencedRpcGateway<StreamManagerId> 
 	 */
 	void jobStatusChanged(JobID jobId, JobStatus newJobStatus, long timestamp, Throwable error);
 
-	/**
-	 * Use to notify job master that some operator inside job vertex changed,
-	 * Thus the corresponding executor could substitute new operator from the original one
-	 * @param jobGraph the changed job graph
-	 * @param jobVertexId the id of vertex whose operators has been changed
-	 * @param operatorID the id of changed operator
-	 */
-	void notifyJobGraphOperatorChanged(@Nullable JobGraph jobGraph, JobVertexID jobVertexId, OperatorID operatorID);
 }

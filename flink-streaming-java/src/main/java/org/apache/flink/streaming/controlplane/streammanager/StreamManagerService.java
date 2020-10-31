@@ -20,7 +20,6 @@ package org.apache.flink.streaming.controlplane.streammanager;
 
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerId;
-import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.util.AutoCloseableAsync;
 
@@ -63,16 +62,4 @@ public interface StreamManagerService extends AutoCloseableAsync {
 	 * @return Address of the StreamManager service
 	 */
 	String getAddress();
-
-	/**
-	 * get job graph from stream manager (the state of stream manager)
-	 * @return current job graph of stream manager
-	 */
-	JobGraph getJobGraph();
-
-	/**
-	 * get user class loader of job graph (the state of stream manager)
-	 * @return current user class loader of job graph
-	 */
-	ClassLoader getUserClassLoader();
 }

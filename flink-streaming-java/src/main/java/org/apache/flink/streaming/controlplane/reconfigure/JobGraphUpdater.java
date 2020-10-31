@@ -7,26 +7,25 @@ import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
-import org.apache.flink.runtime.topology.VertexID;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
 import org.apache.flink.streaming.controlplane.jobgraph.JobGraphRescaler;
-import org.apache.flink.streaming.controlplane.jobgraph.JobGraphUpdateOperator;
-import org.apache.flink.streaming.controlplane.streammanager.StreamManagerService;
+import org.apache.flink.streaming.controlplane.jobgraph.JobGraphOperatorUpdate;
+import org.apache.flink.streaming.controlplane.streammanager.insts.StreamJobState;
 
 import java.util.List;
 import java.util.Map;
 
-public class JobGraphUpdater implements JobGraphRescaler, JobGraphUpdateOperator {
+public class JobGraphUpdater implements JobGraphRescaler, JobGraphOperatorUpdate {
 
 	JobGraphRescaler jobGraphRescaler;
 	private JobGraph jobGraph;
 	private ClassLoader userClassLoader;
 
-	public JobGraphUpdater(JobGraphRescaler jobGraphRescaler, StreamManagerService streamManagerService) {
+	public JobGraphUpdater(JobGraphRescaler jobGraphRescaler, StreamJobState jobState) {
 		this.jobGraphRescaler = jobGraphRescaler;
-		this.jobGraph = streamManagerService.getJobGraph();
-		this.userClassLoader = streamManagerService.getUserClassLoader();
+		this.jobGraph = jobState.getJobGraph();
+		this.userClassLoader = jobState.getUserClassLoader();
 	}
 
 	@Override

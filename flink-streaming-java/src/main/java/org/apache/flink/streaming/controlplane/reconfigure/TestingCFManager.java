@@ -2,34 +2,38 @@ package org.apache.flink.streaming.controlplane.reconfigure;
 
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertex;
+import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.controlplane.jobgraph.JobGraphRescaler;
 import org.apache.flink.streaming.controlplane.reconfigure.operator.ControlFunction;
-import org.apache.flink.streaming.controlplane.streammanager.StreamManagerService;
+import org.apache.flink.streaming.controlplane.streammanager.insts.PrimitiveInstruction;
+import org.apache.flink.streaming.controlplane.streammanager.insts.StreamJobState;
+import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 
 import javax.annotation.Nonnull;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 
-public class TestingCFManager extends ControlFunctionManager {
+public class TestingCFManager extends ControlFunctionManager implements ControlPolicy {
 
 
-	public TestingCFManager(StreamManagerService streamManagerService, JobGraphRescaler jobGraphRescaler) {
-		super(streamManagerService, jobGraphRescaler);
+	public TestingCFManager(PrimitiveInstruction primitiveInstruction) {
+		super(primitiveInstruction);
 	}
 
 	@Override
-	public void onJobStart() {
-		super.onJobStart();
+	public void startControllerInternal() {
+		super.startControllerInternal();
 
-		JobGraph currentJobGraph = this.streamManagerService.getJobGraph();
-		OperatorID secondOperatorId = findOperatorByName(currentJobGraph, "filter");
+		StreamJobState jobState = primitiveInstruction.getStreamJobState();
+
+		JobGraph currentJobGraph = jobState.getJobGraph();
+		OperatorID secondOperatorId = findOperatorByName(currentJobGraph, jobState.getUserClassLoader(), "filter");
+
 		if(secondOperatorId != null) {
 			asyncRunAfter(10, () -> this.reconfigure(secondOperatorId, getFilterFunction(10)));
-//			asyncRunAfter(15, () -> this.reconfigure(secondOperatorId, getFilterFunction(20)));
-//			asyncRunAfter(25, () -> this.reconfigure(secondOperatorId, getFilterFunction(2)));
+			asyncRunAfter(15, () -> this.reconfigure(secondOperatorId, getFilterFunction(20)));
+			asyncRunAfter(25, () -> this.reconfigure(secondOperatorId, getFilterFunction(2)));
 		}
 	}
 
@@ -56,15 +60,12 @@ public class TestingCFManager extends ControlFunctionManager {
 	}
 
 
-	private OperatorID findOperatorByName(JobGraph jobGraph, @Nonnull String name) {
-		Iterator<JobVertex> vertices = jobGraph.getVertices().iterator();
-		final ClassLoader classLoader = streamManagerService.getUserClassLoader();
-		while (vertices.hasNext()) {
-			JobVertex vertex = vertices.next();
+	private OperatorID findOperatorByName(JobGraph jobGraph,  ClassLoader classLoader, @Nonnull String name) {
+		for (JobVertex vertex : jobGraph.getVertices()) {
 			StreamConfig streamConfig = new StreamConfig(vertex.getConfiguration());
 			Map<Integer, StreamConfig> configMap = streamConfig.getTransitiveChainedTaskConfigsWithSelf(classLoader);
-			for(StreamConfig config: configMap.values()){
-				if(name.equals(config.getOperatorName())){
+			for (StreamConfig config : configMap.values()) {
+				if (name.equals(config.getOperatorName())) {
 					return config.getOperatorID();
 				}
 			}
@@ -72,4 +73,18 @@ public class TestingCFManager extends ControlFunctionManager {
 		return null;
 	}
 
+	@Override
+	public void startControllers() {
+		this.startControllerInternal();
+	}
+
+	@Override
+	public void stopControllers() {
+
+	}
+
+	@Override
+	public void onChangeImplemented(JobVertexID jobVertexID) {
+
+	}
 }
