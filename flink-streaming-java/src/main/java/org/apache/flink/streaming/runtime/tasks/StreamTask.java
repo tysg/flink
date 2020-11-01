@@ -615,7 +615,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 		}
 	}
 
-	public boolean updateOperator(Configuration updatedConfig, OperatorID operatorID) throws Exception {
+	public CompletableFuture<Long> updateOperator(Configuration updatedConfig, OperatorID operatorID) throws Exception {
 		// There are two implementation options:
 		// Option 1:
 		//  re-create the whole operator chain as well as head operator,
@@ -635,6 +635,9 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 		// - the future is return to OperatorUpdateCoordinator and the Coordinator will start to substitute the operator
 		//   logic inside each tasks, reinitialize the state and open each tasks
 		// - future is done and then all task get resumed
+
+		CompletableFuture<Long> future = new CompletableFuture<>();
+		System.out.println("Update Should started at:"+System.currentTimeMillis());
 
 		this.pauseActionController.setPausedAndGetAckFuture().thenRunAsync(
 			() -> {
@@ -661,14 +664,18 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 								System.out.println("Stop busy: " + getName());
 								recreateOperatorChain(stateSnapshot);
 								pauseActionController.resume();
+								future.complete(System.currentTimeMillis());
+								System.out.println("Update Should finished at:"+System.currentTimeMillis());
 							} catch (Exception e) {
 								e.printStackTrace();
+								future.completeExceptionally(e);
 							}
 						}
 					);
 				}catch (Exception e){
 					exception = true;
 					e.printStackTrace();
+					future.completeExceptionally(e);
 				}finally {
 					if(exception){
 						try {
@@ -681,7 +688,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 			},
 			this.asyncOperationsThreadPool
 		);
-		return true;
+		return future;
 	}
 
 	public void recreateOperatorChain(TaskStateSnapshot stateSnapshot) throws Exception {

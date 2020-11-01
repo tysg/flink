@@ -1278,7 +1278,7 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 		taskRescaleManager.createNewResultPartitions();
 	}
 
-	public boolean updateOperatorConfig(Configuration updatedConfig, OperatorID operatorID) throws Exception {
+	public CompletableFuture<Long> updateOperatorConfig(Configuration updatedConfig, OperatorID operatorID) throws Exception {
 		// since one java process share the same address space, so we only need to update configuration here,
 		// then all other task configuration referenced here will be updated
 		System.out.println("time to update operator config");

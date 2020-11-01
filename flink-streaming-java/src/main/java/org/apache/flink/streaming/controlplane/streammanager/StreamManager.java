@@ -24,6 +24,7 @@ import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
+import org.apache.flink.runtime.controlplane.streammanager.Enforcement;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerId;
 import org.apache.flink.runtime.dispatcher.DispatcherGateway;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
@@ -53,12 +54,10 @@ import org.apache.flink.streaming.controlplane.streammanager.insts.PrimitiveInst
 import org.apache.flink.streaming.controlplane.streammanager.insts.StreamJobState;
 import org.apache.flink.streaming.controlplane.streammanager.insts.StreamJobStateImpl;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
+import org.apache.flink.streaming.controlplane.udm.TestingControlPolicy;
 import org.apache.flink.util.OptionalConsumer;
 
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -99,7 +98,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 	private final List<ControlPolicy> controlPolicyList = new LinkedList<>();
 
-	private final StreamJobState streamJobState;
+	private final StreamJobStateImpl streamJobState;
 
 	private CompletableFuture<Acknowledge> rescalePartitionFuture;
 
@@ -152,6 +151,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		/* now the policy is temporary hard coded added */
 		this.controlPolicyList.add(new FlinkStreamSwitchAdaptor(this, jobGraph));
 		this.controlPolicyList.add(new TestingCFManager(this));
+		this.controlPolicyList.add(new TestingControlPolicy(this));
 	}
 
 	/**
@@ -512,22 +512,33 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
 //			runAsync(() -> jobMasterGateway.triggerOperatorUpdate(this.jobGraph, jobVertexId, operatorID));
 			runAsync(() -> jobMasterGateway.callEnforcements(
-				enforcement -> {
-					enforcement.prepareExecutionPlan();
-					// sync will take a lot of time, should be used async
-					// a nature way is to make it return a future
-					enforcement.synchronizeTasks(null).thenAccept(
-						o -> {
-							enforcement.updateFunction(jobGraph, jobVertexId, operatorID);
+				enforcement -> FutureUtils.completedVoidFuture()
+					.thenCompose(
+						o -> enforcement.prepareExecutionPlan())
+					.thenCompose(
+						o -> enforcement.synchronizeTasks(Collections.singleton(jobVertexId)))
+					.thenCompose(
+						o -> enforcement.updateFunction(jobGraph, jobVertexId, operatorID))
+					.thenAccept(
+						(acknowledge) -> {
 							try {
 								this.streamJobState.notifyUpdateFinished(jobVertexId);
 							} catch (Exception e) {
 								e.printStackTrace();
 							}
 						}
-					);
-				}
+					)
 			));
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	public void callCustomizeInstruction(Enforcement.EnforcementCaller caller){
+		try {
+			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
+//			runAsync(() -> jobMasterGateway.triggerOperatorUpdate(this.jobGraph, jobVertexId, operatorID));
+			runAsync(() -> jobMasterGateway.callEnforcements(caller));
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

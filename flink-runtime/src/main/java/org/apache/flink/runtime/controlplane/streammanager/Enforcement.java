@@ -21,6 +21,7 @@ package org.apache.flink.runtime.controlplane.streammanager;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
+import org.apache.flink.runtime.messages.Acknowledge;
 
 import javax.annotation.Nullable;
 import java.util.Collection;
@@ -37,17 +38,17 @@ import java.util.concurrent.CompletableFuture;
  */
 public interface Enforcement {
 
-	void prepareExecutionPlan();
+	CompletableFuture<Void> prepareExecutionPlan();
 
 	CompletableFuture<Void> synchronizeTasks(Collection<JobVertexID> jobVertexIDS);
 
-	void deployTasks();
+	CompletableFuture<Void> deployTasks();
 
-	void updateMapping();
+	CompletableFuture<Void> updateMapping();
 
-	void updateState();
+	CompletableFuture<Void> updateState();
 
-	void updateFunction(@Nullable JobGraph jobGraph, JobVertexID targetVertexID, OperatorID operatorID);
+	CompletableFuture<Acknowledge> updateFunction(@Nullable JobGraph jobGraph, JobVertexID targetVertexID, OperatorID operatorID);
 
 	@FunctionalInterface
 	interface EnforcementCaller {

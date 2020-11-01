@@ -9,6 +9,7 @@ import org.apache.flink.runtime.executiongraph.ExecutionVertex;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
+import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.util.Preconditions;
 
 import java.util.ArrayList;
@@ -28,7 +29,34 @@ public class OperatorUpdateCoordinator implements Enforcement {
 		this.userCodeClassLoader = executionGraph.getUserClassLoader();
 	}
 
-	public void updateFunction(JobGraph jobGraph, JobVertexID targetVertexID, OperatorID operatorID){
+	@Override
+	public CompletableFuture<Void> prepareExecutionPlan() {
+		return FutureUtils.completedVoidFuture();
+	}
+
+	@Override
+	public CompletableFuture<Void> synchronizeTasks(Collection<JobVertexID> jobVertexIDS) {
+		// sync will take a lot of time, should be used async
+		// a nature way is to make it return a future
+		return FutureUtils.completedVoidFuture();
+	}
+
+	@Override
+	public CompletableFuture<Void> deployTasks() {
+		return FutureUtils.completedVoidFuture();
+	}
+
+	@Override
+	public CompletableFuture<Void> updateMapping() {
+		return FutureUtils.completedVoidFuture();
+	}
+
+	@Override
+	public CompletableFuture<Void> updateState() {
+		return FutureUtils.completedVoidFuture();
+	}
+
+	public CompletableFuture<Acknowledge> updateFunction(JobGraph jobGraph, JobVertexID targetVertexID, OperatorID operatorID) {
 		System.out.println("some one want to triggerOperatorUpdate using OperatorUpdateCoordinator?");
 //		this.jobGraph = jobGraph;
 		// By evaluating:
@@ -40,36 +68,11 @@ public class OperatorUpdateCoordinator implements Enforcement {
 		Preconditions.checkNotNull(executionJobVertex, "can not found this execution job vertex");
 
 		ArrayList<CompletableFuture<Void>> futures = new ArrayList<>(executionJobVertex.getTaskVertices().length);
-		for(ExecutionVertex vertex: executionJobVertex.getTaskVertices()){
+		for (ExecutionVertex vertex : executionJobVertex.getTaskVertices()) {
 			Execution execution = vertex.getCurrentExecutionAttempt();
 			futures.add(execution.scheduleOperatorUpdate(operatorID));
 		}
-		FutureUtils.completeAll(futures);
-		System.out.println("Finished notify tasks to update operator");
+		return FutureUtils.completeAll(futures).thenApply(o -> Acknowledge.get());
 	}
 
-	@Override
-	public void prepareExecutionPlan() {
-
-	}
-
-	@Override
-	public CompletableFuture<Void> synchronizeTasks(Collection<JobVertexID> jobVertexIDS) {
-		return CompletableFuture.completedFuture(null);
-	}
-
-	@Override
-	public void deployTasks() {
-
-	}
-
-	@Override
-	public void updateMapping() {
-
-	}
-
-	@Override
-	public void updateState() {
-
-	}
 }

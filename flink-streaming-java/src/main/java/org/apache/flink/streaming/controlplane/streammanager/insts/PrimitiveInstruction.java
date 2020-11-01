@@ -18,6 +18,7 @@
 
 package org.apache.flink.streaming.controlplane.streammanager.insts;
 
+import org.apache.flink.runtime.controlplane.streammanager.Enforcement;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.rescale.JobRescaleAction;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
@@ -46,4 +47,8 @@ public interface PrimitiveInstruction extends Instruction {
 	 * @param operatorFactory the new operator factory to create new operator
 	 */
 	void changeOperator(OperatorID operatorID, StreamOperatorFactory<?> operatorFactory, ControlPolicy waitingController);
+
+	default void callCustomizeInstruction(Enforcement.EnforcementCaller caller){
+
+	}
 }

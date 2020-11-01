@@ -27,6 +27,7 @@ import org.apache.flink.runtime.execution.Environment;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.state.KeyGroupRange;
 
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -267,7 +268,7 @@ public abstract class AbstractInvokable {
 		throw new UnsupportedOperationException(String.format("updateKeyGroupRange not supported by %s", this.getClass().getName()));
 	}
 
-	public boolean updateOperator(Configuration updatedConfig, OperatorID operatorID) throws Exception {
+	public CompletableFuture<Long> updateOperator(Configuration updatedConfig, OperatorID operatorID) throws Exception {
 		throw new UnsupportedOperationException(String.format("updateOperatorConfig not supported by %s", this.getClass().getName()));
 	}
 

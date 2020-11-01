@@ -26,7 +26,7 @@ public class TestingCFManager extends ControlFunctionManager implements ControlP
 	public void startControllerInternal() {
 		System.out.println("Testing Control Function Manager starting...");
 
-		StreamJobState jobState = primitiveInstruction.getStreamJobState();
+		StreamJobState jobState = getInstructionSet().getStreamJobState();
 
 		JobGraph currentJobGraph = jobState.getJobGraph();
 		OperatorID secondOperatorId = findOperatorByName(currentJobGraph, jobState.getUserClassLoader(), "filter");
@@ -36,22 +36,6 @@ public class TestingCFManager extends ControlFunctionManager implements ControlP
 			asyncRunAfter(15, () -> this.reconfigure(secondOperatorId, getFilterFunction(20)));
 			asyncRunAfter(25, () -> this.reconfigure(secondOperatorId, getFilterFunction(2)));
 		}
-	}
-
-	@Override
-	public void reconfigure(OperatorID operatorID, ControlFunction function) {
-		System.out.println("Substitute `Control` Function...");
-		ControlOperatorFactory<?, ?> operatorFactory = new ControlOperatorFactory<>(
-			operatorID,
-			primitiveInstruction.getStreamJobState().getJobGraph(),
-			function);
-		try {
-			// since job graph is shared in stream manager and among its services, we don't need to pass it
-			primitiveInstruction.changeOperator(operatorID, operatorFactory, this);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-
 	}
 
 	private static ControlFunction getFilterFunction(int k) {
@@ -97,11 +81,11 @@ public class TestingCFManager extends ControlFunctionManager implements ControlP
 
 	@Override
 	public void stopControllers() {
-
+		System.out.println("Testing Control Function Manager stopping...");
 	}
 
 	@Override
 	public void onChangeCompleted(JobVertexID jobVertexID) {
-		System.out.println("one operator function update is finished:"+jobVertexID);
+		System.out.println(System.currentTimeMillis() + ":one operator function update is finished:"+jobVertexID);
 	}
 }

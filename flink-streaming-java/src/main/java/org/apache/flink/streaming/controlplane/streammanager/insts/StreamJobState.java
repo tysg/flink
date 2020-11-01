@@ -70,17 +70,20 @@ public interface StreamJobState {
 	 */
 	Function getUserFunction(OperatorID operatorID) throws Exception;
 
-	/**
-	 * @param operatorID      the id of target operarir
-	 * @param operatorFactory the new stream operator factory
-	 * @param <OUT>           Output type of StreamOperatorFactory
-	 * @return the id of updated job vertex
-	 * @throws Exception
-	 */
+//	/**
+//	 * @param operatorID      the id of target operarir
+//	 * @param operatorFactory the new stream operator factory
+//	 * @param <OUT>           Output type of StreamOperatorFactory
+//	 * @return the id of updated job vertex
+//	 * @throws Exception
+//	 */
+//	@Internal
+//	<OUT> JobVertexID updateOperator(OperatorID operatorID,
+//									 StreamOperatorFactory<OUT> operatorFactory,
+//									 @Nullable ControlPolicy waitingController) throws Exception;
+
 	@Internal
-	<OUT> JobVertexID updateOperator(OperatorID operatorID,
-									 StreamOperatorFactory<OUT> operatorFactory,
-									 @Nullable ControlPolicy waitingController) throws Exception;
+	void setStateUpdatingFlag(@Nullable ControlPolicy waitingController) throws Exception;
 
 	/**
 	 * Notify that current state update is finished.

@@ -81,23 +81,28 @@ public final class StreamJobStateImpl implements StreamJobState {
 		return ((SimpleUdfStreamOperatorFactory<?>) config.getStreamOperatorFactory(this.userCodeLoader)).getUserFunction();
 	}
 
-	@Override
 	public <OUT> JobVertexID updateOperator(OperatorID operatorID,
 											StreamOperatorFactory<OUT> operatorFactory,
 											ControlPolicy waitingController) throws Exception {
-		// some strategy needed here to ensure there is only one update at one time
-		if (stateOfUpdate.compareAndSet(COMMITTED, STAGED)) {
-			// the caller may want to wait the completion of this update.
-			currentWaitingController = waitingController;
-			return jobGraphUpdater.updateOperator(operatorID, operatorFactory);
-		}
-		throw new Exception("There is another state update not finished");
+		setStateUpdatingFlag(waitingController);
+		return jobGraphUpdater.updateOperator(operatorID, operatorFactory);
 	}
+
+	@Override
+	public void setStateUpdatingFlag(ControlPolicy waitingController) throws Exception {
+		// some strategy needed here to ensure there is only one update at one time
+		if (!stateOfUpdate.compareAndSet(COMMITTED, STAGED)) {
+			throw new Exception("There is another state update not finished, the waiting controller is:" + currentWaitingController);
+		}
+		// the caller may want to wait the completion of this update.
+		currentWaitingController = waitingController;
+	}
+
 
 	@Override
 	public void notifyUpdateFinished(JobVertexID jobVertexID) throws Exception {
 		if (stateOfUpdate.compareAndSet(STAGED, COMMITTED)) {
-			if(currentWaitingController != null) {
+			if (currentWaitingController != null) {
 				currentWaitingController.onChangeCompleted(jobVertexID);
 			}
 			return;

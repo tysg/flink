@@ -697,24 +697,17 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 		@RpcTimeout Time timeout){
 		final Task task = taskSlotTable.getTask(executionAttemptID);
 		if (task != null) {
+			try {
 				// Run asynchronously because it might be blocking
-				FutureUtils.assertNoException(
-					CompletableFuture.runAsync(
-						() -> {
-							try {
-								if (!task.updateOperatorConfig(updatedConfig, operatorID)) {
-									log.debug("Discard update for operator {} in {}", operatorID, executionAttemptID);
-								}
-							} catch (Exception e) {
-								log.error(
-									"Could not update operator for task {}. Trying to fail task.",
-									task.getTaskInfo().getTaskName(),
-									e);
-								task.failExternally(e);
-							}
-						},
-						getRpcService().getExecutor()));
-			return CompletableFuture.completedFuture(Acknowledge.get());
+				return task.updateOperatorConfig(updatedConfig, operatorID)
+					.whenComplete((l, e) -> {
+						if (e != null)
+							log.debug("Discard update for operator {} in {}", operatorID, executionAttemptID);
+					})
+					.thenApply(l -> Acknowledge.get());
+			} catch (Exception e) {
+				return FutureUtils.completedExceptionally(e);
+			}
 		} else {
 			log.debug("Discard update for input partitions of task {}. Task is no longer running.", executionAttemptID);
 			return CompletableFuture.completedFuture(Acknowledge.get());
