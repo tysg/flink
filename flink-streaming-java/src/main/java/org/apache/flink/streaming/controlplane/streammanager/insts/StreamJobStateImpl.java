@@ -19,6 +19,7 @@
 package org.apache.flink.streaming.controlplane.streammanager.insts;
 
 import org.apache.flink.api.common.functions.Function;
+import org.apache.flink.runtime.executiongraph.ExecutionGraph;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
@@ -62,8 +63,9 @@ public final class StreamJobStateImpl implements StreamJobState {
 			this);
 	}
 
-	public static StreamJobStateImpl createFromJobGraph(JobGraph jobGraph, ClassLoader userLoader) {
-		return new StreamJobStateImpl(new OperatorGraph(jobGraph), new DeploymentGraph(), userLoader);
+	public static StreamJobStateImpl createFromGraph(JobGraph jobGraph, ExecutionGraph executionGraph) {
+		ClassLoader userLoader = executionGraph.getUserClassLoader();
+		return new StreamJobStateImpl(new OperatorGraph(jobGraph), new DeploymentGraph(executionGraph), userLoader);
 	}
 
 	@Override
@@ -73,7 +75,7 @@ public final class StreamJobStateImpl implements StreamJobState {
 
 	@Override
 	public ClassLoader getUserClassLoader() {
-		return null;
+		return userCodeLoader;
 	}
 
 	public Function getUserFunction(OperatorID operatorID) throws Exception {
@@ -159,6 +161,12 @@ public final class StreamJobStateImpl implements StreamJobState {
 	}
 
 	public static class DeploymentGraph {
+		/* contains topology of this stream job */
+		private final ExecutionGraph executionGraph;
+
+		DeploymentGraph(ExecutionGraph executionGraph) {
+			this.executionGraph = Preconditions.checkNotNull(executionGraph);
+		}
 
 	}
 

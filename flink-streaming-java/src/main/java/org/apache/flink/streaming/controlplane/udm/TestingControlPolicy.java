@@ -22,19 +22,17 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 					Thread.sleep(5);
 					getInstructionSet().getStreamJobState().setStateUpdatingFlag(this);
 					getInstructionSet().callCustomizeInstruction(
-						enforcement -> {
-							FutureUtils.completedVoidFuture()
-								.thenCompose(o -> enforcement.prepareExecutionPlan())
-								.thenCompose(o -> enforcement.synchronizeTasks(Collections.emptyList()))
-								.thenCompose(o -> enforcement.updateState())
-								.thenAccept(o -> {
-									try {
-										getInstructionSet().getStreamJobState().notifyUpdateFinished(null);
-									} catch (Exception e) {
-										e.printStackTrace();
-									}
-								});
-						}
+						enforcement -> FutureUtils.completedVoidFuture()
+							.thenCompose(o -> enforcement.prepareExecutionPlan())
+							.thenCompose(o -> enforcement.synchronizeTasks(Collections.emptyList()))
+							.thenCompose(o -> enforcement.updateState())
+							.thenAccept(o -> {
+								try {
+									getInstructionSet().getStreamJobState().notifyUpdateFinished(null);
+								} catch (Exception e) {
+									e.printStackTrace();
+								}
+							})
 					);
 				} catch (Exception e) {
 					e.printStackTrace();

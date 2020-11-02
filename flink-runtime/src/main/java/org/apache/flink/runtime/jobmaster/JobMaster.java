@@ -961,7 +961,9 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		//todo notify upper stream manager or make sm periodly check job status?
 		checkState(streamManagerGatewayFuture != null);
 		streamManagerGatewayFuture.thenAccept(
-			streamManagerGateway -> streamManagerGateway.jobStatusChanged(jobGraph.getJobID(), newJobStatus, timestamp, error)
+			streamManagerGateway -> streamManagerGateway.jobStatusChanged(
+				jobGraph.getJobID(), newJobStatus, timestamp, error,
+				this.schedulerNG.getJobRescaleCoordinator().getOperatorUpdateCoordinator().getExecutionGraph())
 		);
 	}
 

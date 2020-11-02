@@ -29,6 +29,10 @@ public class OperatorUpdateCoordinator implements Enforcement {
 		this.userCodeClassLoader = executionGraph.getUserClassLoader();
 	}
 
+	public ExecutionGraph getExecutionGraph() {
+		return executionGraph;
+	}
+
 	@Override
 	public CompletableFuture<Void> prepareExecutionPlan() {
 		return FutureUtils.completedVoidFuture();

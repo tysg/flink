@@ -28,6 +28,7 @@ import org.apache.flink.runtime.controlplane.streammanager.Enforcement;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerId;
 import org.apache.flink.runtime.dispatcher.DispatcherGateway;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
+import org.apache.flink.runtime.executiongraph.ExecutionGraph;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
@@ -98,7 +99,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 	private final List<ControlPolicy> controlPolicyList = new LinkedList<>();
 
-	private final StreamJobStateImpl streamJobState;
+	private StreamJobStateImpl streamJobState;
 
 	private CompletableFuture<Acknowledge> rescalePartitionFuture;
 
@@ -145,7 +146,6 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		log.debug("Initializing sm for job {} ({})", jobName, jid);
 		log.info("Initializing sm for job {} ({})", jobName, jid);
 
-		this.streamJobState = StreamJobStateImpl.createFromJobGraph(jobGraph, userCodeLoader);
 		this.jobGraphRescaler = new StreamJobGraphRescaler(jobGraph, userCodeLoader);
 
 		/* now the policy is temporary hard coded added */
@@ -444,7 +444,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 	@Override
 	public StreamJobState getStreamJobState() {
-		return streamJobState;
+		return checkNotNull(streamJobState, "stream job state have not been initialized");
 	}
 
 	// ------------------------------------------------------------------------
@@ -492,7 +492,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	}
 
 	@Override
-	public void jobStatusChanged(JobID jobId, JobStatus newJobStatus, long timestamp, Throwable error) {
+	public void jobStatusChanged(JobID jobId, JobStatus newJobStatus, long timestamp, Throwable error, ExecutionGraph executionGraph) {
+		this.streamJobState = StreamJobStateImpl.createFromGraph(jobGraph, executionGraph);
 		if (newJobStatus == JobStatus.RUNNING) {
 			for(ControlPolicy policy: controlPolicyList){
 				policy.startControllers();

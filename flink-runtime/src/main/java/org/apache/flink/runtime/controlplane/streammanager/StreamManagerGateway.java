@@ -22,6 +22,7 @@ import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
+import org.apache.flink.runtime.executiongraph.ExecutionGraph;
 import org.apache.flink.runtime.executiongraph.JobStatusListener;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
@@ -85,6 +86,6 @@ public interface StreamManagerGateway extends FencedRpcGateway<StreamManagerId> 
 	 * @param error         In case the job status switches to a failure state, this is the
 	 *                      exception that caused the failure.
 	 */
-	void jobStatusChanged(JobID jobId, JobStatus newJobStatus, long timestamp, Throwable error);
+	void jobStatusChanged(JobID jobId, JobStatus newJobStatus, long timestamp, Throwable error, ExecutionGraph executionGraph);
 
 }
