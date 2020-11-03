@@ -18,6 +18,7 @@
 
 package org.apache.flink.streaming.controlplane.streammanager.insts;
 
+import org.apache.commons.collections.map.HashedMap;
 import org.apache.flink.api.common.functions.Function;
 import org.apache.flink.runtime.executiongraph.ExecutionGraph;
 import org.apache.flink.runtime.jobgraph.JobGraph;
@@ -25,6 +26,7 @@ import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.streaming.api.graph.StreamConfig;
+import org.apache.flink.streaming.api.graph.StreamEdge;
 import org.apache.flink.streaming.api.operators.SimpleUdfStreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
 import org.apache.flink.streaming.controlplane.reconfigure.JobGraphUpdater;
@@ -32,8 +34,7 @@ import org.apache.flink.streaming.controlplane.rescale.StreamJobGraphRescaler;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 import org.apache.flink.util.Preconditions;
 
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public final class StreamJobStateImpl implements StreamJobState {
@@ -46,7 +47,7 @@ public final class StreamJobStateImpl implements StreamJobState {
 
 	private final JobGraphUpdater jobGraphUpdater;
 
-	private ClassLoader userCodeLoader;
+	private final ClassLoader userCodeLoader;
 
 	private final AtomicInteger stateOfUpdate = new AtomicInteger(COMMITTED);
 
@@ -114,13 +115,40 @@ public final class StreamJobStateImpl implements StreamJobState {
 
 
 	@Override
-	public void getKeyStateAllocation(OperatorID operatorID) {
+	public List<Integer> getKeyStateAllocation(OperatorID operatorID) throws Exception {
+		Map<OperatorID, Integer> map = new HashMap<>();
+		StreamConfig config = findStreamConfig(operatorID);
 
+		List<Integer> res = new ArrayList<>(config.getNumberOfInputs());
+		List<StreamEdge> inEdges = config.getInPhysicalEdges(this.userCodeLoader);
+
+		return res;
 	}
 
 	@Override
-	public void getKeyMapping(OperatorID operatorID) {
+	public List<List<Integer>> getKeyMapping(OperatorID operatorID) throws Exception {
+		Map<OperatorID, Integer> map = new HashMap<>();
+		StreamConfig config = findStreamConfig(operatorID);
 
+		List<List<Integer>> res = new ArrayList<>(config.getNumberOfOutputs());
+		List<StreamEdge> outEdges = config.getOutEdges(this.userCodeLoader);
+		for(StreamEdge edge: outEdges){
+
+		}
+
+		return res;
+	}
+
+	@Override
+	public int getParallelism(OperatorID operatorID) {
+		Map<OperatorID, Integer> map = new HashMap<>();
+		for(JobVertex vertex: this.operatorGraph.jobGraph.getVertices()){
+			int parallelism = vertex.getParallelism();
+			for(OperatorID id: vertex.getOperatorIDs()){
+				map.put(id, parallelism);
+			}
+		}
+		return map.get(operatorID);
 	}
 
 	@Override

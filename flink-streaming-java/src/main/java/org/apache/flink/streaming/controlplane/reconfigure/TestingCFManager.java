@@ -13,6 +13,7 @@ import org.apache.flink.streaming.controlplane.streammanager.insts.StreamJobStat
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 
 import javax.annotation.Nonnull;
+import java.util.List;
 import java.util.Map;
 
 public class TestingCFManager extends ControlFunctionManager implements ControlPolicy {
@@ -32,9 +33,17 @@ public class TestingCFManager extends ControlFunctionManager implements ControlP
 		OperatorID secondOperatorId = findOperatorByName(currentJobGraph, jobState.getUserClassLoader(), "filter");
 
 		if(secondOperatorId != null) {
-			asyncRunAfter(10, () -> this.reconfigure(secondOperatorId, getFilterFunction(10)));
+			asyncRunAfter(10, () -> this.getKeyStateMapping(secondOperatorId));
 			asyncRunAfter(15, () -> this.reconfigure(secondOperatorId, getFilterFunction(20)));
 			asyncRunAfter(25, () -> this.reconfigure(secondOperatorId, getFilterFunction(2)));
+		}
+	}
+
+	private void getKeyStateMapping(OperatorID operatorID){
+		try {
+			List<List<Integer>> res = this.getInstructionSet().getStreamJobState().getKeyMapping(operatorID);
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
 	}
 

@@ -100,14 +100,16 @@ public interface StreamJobState {
 	 *
 	 * @param operatorID the operator id of this operator
 	 */
-	void getKeyStateAllocation(OperatorID operatorID);
+	List<Integer>  getKeyStateAllocation(OperatorID operatorID) throws Exception;
 
 	/**
 	 * To get how the result of this operator mapping to its down stream operator by its key
 	 *
 	 * @param operatorID the operator id of this operator
 	 */
-	void getKeyMapping(OperatorID operatorID);
+	List<List<Integer>> getKeyMapping(OperatorID operatorID) throws Exception;
+
+	int getParallelism(OperatorID operatorID);
 
 	/**
 	 * Get all hosts of current job
