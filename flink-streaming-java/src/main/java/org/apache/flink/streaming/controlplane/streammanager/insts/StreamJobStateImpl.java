@@ -32,6 +32,7 @@ import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
 import org.apache.flink.streaming.controlplane.reconfigure.JobGraphUpdater;
 import org.apache.flink.streaming.controlplane.rescale.StreamJobGraphRescaler;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
+import org.apache.flink.streaming.runtime.partitioner.StreamPartitioner;
 import org.apache.flink.util.Preconditions;
 
 import java.util.*;
@@ -137,6 +138,14 @@ public final class StreamJobStateImpl implements StreamJobState {
 		}
 
 		return res;
+	}
+
+	private void getKeyMessage(StreamEdge streamEdge){
+		StreamPartitioner<?> partitioner = streamEdge.getPartitioner();
+
+
+
+
 	}
 
 	@Override

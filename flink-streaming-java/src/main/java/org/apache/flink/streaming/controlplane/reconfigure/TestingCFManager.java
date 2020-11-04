@@ -30,18 +30,29 @@ public class TestingCFManager extends ControlFunctionManager implements ControlP
 		StreamJobState jobState = getInstructionSet().getStreamJobState();
 
 		JobGraph currentJobGraph = jobState.getJobGraph();
-		OperatorID secondOperatorId = findOperatorByName(currentJobGraph, jobState.getUserClassLoader(), "filter");
+		OperatorID secondOperatorId = findOperatorByName(currentJobGraph, jobState.getUserClassLoader(), "Splitter");
 
 		if(secondOperatorId != null) {
-			asyncRunAfter(10, () -> this.getKeyStateMapping(secondOperatorId));
-			asyncRunAfter(15, () -> this.reconfigure(secondOperatorId, getFilterFunction(20)));
-			asyncRunAfter(25, () -> this.reconfigure(secondOperatorId, getFilterFunction(2)));
+			asyncRunAfter(5, () -> this.getKeyStateMapping(
+				findOperatorByName(currentJobGraph, jobState.getUserClassLoader(), "Splitter")));
+			asyncRunAfter(5, () -> this.getKeyStateAllocation(
+				findOperatorByName(currentJobGraph, jobState.getUserClassLoader(), "filte")));
+			asyncRunAfter(10, () -> this.reconfigure(secondOperatorId, getFilterFunction(2)));
 		}
 	}
 
 	private void getKeyStateMapping(OperatorID operatorID){
 		try {
 			List<List<Integer>> res = this.getInstructionSet().getStreamJobState().getKeyMapping(operatorID);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+
+	private void getKeyStateAllocation(OperatorID operatorID){
+		try {
+			List<Integer> res = this.getInstructionSet().getStreamJobState().getKeyStateAllocation(operatorID);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
