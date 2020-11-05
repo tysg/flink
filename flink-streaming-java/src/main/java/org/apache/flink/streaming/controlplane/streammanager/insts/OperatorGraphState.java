@@ -37,5 +37,10 @@ public interface OperatorGraphState {
 	 */
 	Map<String, List<List<Integer>>> getKeyMapping(OperatorID operatorID) throws Exception;
 
+	/**
+	 * Return the parallilism of operator with given operator id
+	 * @param operatorID
+	 * @return
+	 */
 	int getParallelism(OperatorID operatorID);
 }

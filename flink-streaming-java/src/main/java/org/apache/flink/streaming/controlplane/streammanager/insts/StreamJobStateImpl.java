@@ -232,7 +232,7 @@ public final class StreamJobStateImpl implements StreamJobState {
 				return ((KeyGroupStreamPartitioner<?, ?>) partitioner).getKeyMappingInfo();
 			}
 			// it may be not a key stream operator
-			return List.of();
+			return Collections.emptyList();
 		}
 
 		@Override
