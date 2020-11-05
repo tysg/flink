@@ -261,7 +261,11 @@ public final class StreamJobStateImpl implements StreamJobState {
 				for(ExecutionVertex vertex: jobVertex.getTaskVertices()){
 					LogicalSlot slot = vertex.getCurrentAssignedResource();
 
-					Host host = hosts.putIfAbsent(slot.getTaskManagerLocation().getResourceID(), new Host(slot.getTaskManagerLocation()));
+					Host host = hosts.get(slot.getTaskManagerLocation().getResourceID());
+					if(host == null){
+						host = new Host(slot.getTaskManagerLocation());
+						hosts.put(slot.getTaskManagerLocation().getResourceID(), host);
+					}
 					OperatorTask operatorTask = new OperatorTask(slot, host);
 					operatorTaskList.add(operatorTask);
 				}
