@@ -20,11 +20,15 @@ package org.apache.flink.streaming.controlplane.streammanager.insts;
 
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.functions.Function;
+import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.executiongraph.ExecutionGraph;
+import org.apache.flink.runtime.executiongraph.ExecutionJobVertex;
+import org.apache.flink.runtime.executiongraph.ExecutionVertex;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
+import org.apache.flink.runtime.jobmaster.LogicalSlot;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.graph.StreamEdge;
 import org.apache.flink.streaming.api.operators.SimpleUdfStreamOperatorFactory;
@@ -37,10 +41,7 @@ import org.apache.flink.streaming.runtime.partitioner.KeyGroupStreamPartitioner;
 import org.apache.flink.streaming.runtime.partitioner.StreamPartitioner;
 import org.apache.flink.util.Preconditions;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public final class StreamJobStateImpl implements StreamJobState {
@@ -138,7 +139,7 @@ public final class StreamJobStateImpl implements StreamJobState {
 	}
 
 	@Override
-	public List<Host> getHosts() {
+	public Host[] getHosts() {
 		return deploymentGraph.getHosts();
 	}
 
@@ -167,10 +168,10 @@ public final class StreamJobStateImpl implements StreamJobState {
 
 	public class OperatorGraph implements OperatorGraphState{
 		/* contains topology of this stream job */
-		private Map<OperatorID, OperatorDescriptor> allOperators = new HashMap<>();
+		private Map<OperatorID, OperatorDescriptor> allOperators = new LinkedHashMap<>();
 
 		private OperatorGraph() {
-			Map<Integer, OperatorDescriptor> allOperatorsById = new HashMap<>();
+			Map<Integer, OperatorDescriptor> allOperatorsById = new LinkedHashMap<>();
 			// add all nodes
 			for (JobVertex vertex : jobGraph.getVertices()) {
 				StreamConfig streamConfig = new StreamConfig(vertex.getConfiguration());
@@ -247,18 +248,37 @@ public final class StreamJobStateImpl implements StreamJobState {
 
 	public class DeploymentGraph implements DeployGraphState{
 
-		private DeploymentGraph() {
+		private Map<OperatorID, List<DeployGraphState.OperatorTask>> operatorTaskListMap;
+		private Map<ResourceID, Host> hosts;
 
+		private DeploymentGraph() {
+			operatorTaskListMap = new HashMap<>();
+			hosts = new HashMap<>();
+
+			for(ExecutionJobVertex jobVertex: executionGraph.getAllVertices().values()){
+				// contains all tasks of the same parallel operator instances
+				List<DeployGraphState.OperatorTask> operatorTaskList = new ArrayList<>(jobVertex.getParallelism());
+				for(ExecutionVertex vertex: jobVertex.getTaskVertices()){
+					LogicalSlot slot = vertex.getCurrentAssignedResource();
+
+					Host host = hosts.putIfAbsent(slot.getTaskManagerLocation().getResourceID(), new Host(slot.getTaskManagerLocation()));
+					OperatorTask operatorTask = new OperatorTask(slot, host);
+					operatorTaskList.add(operatorTask);
+				}
+				for(OperatorID operatorID: jobVertex.getOperatorIDs()){
+					operatorTaskListMap.put(operatorID, operatorTaskList);
+				}
+			}
 		}
 
 		@Override
-		public List<Host> getHosts() {
-			return null;
+		public Host[] getHosts() {
+			return hosts.values().toArray(new Host[0]);
 		}
 
 		@Override
 		public OperatorTask getTask(OperatorID operatorID, int offset) {
-			return null;
+			return operatorTaskListMap.get(operatorID).get(offset);
 		}
 	}
 
