@@ -2,10 +2,12 @@ package org.apache.flink.streaming.runtime.partitioner;
 
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.runtime.plugable.SerializationDelegate;
+import org.apache.flink.runtime.state.KeyGroupRange;
 import org.apache.flink.runtime.state.KeyGroupRangeAssignment;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.util.Preconditions;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +44,17 @@ public class AssignedKeyGroupStreamPartitioner<T, K> extends StreamPartitioner<T
 			+ selectedChannel + " / " + numberOfChannels);
 
 		return selectedChannel;
+	}
+
+	public List<List<Integer>> getKeyMappingInfo(){
+		List<List<Integer>> keyInfo = new ArrayList<>(numberOfChannels);
+		for(int channelIndex=0;channelIndex < numberOfChannels;channelIndex++) {
+			keyInfo.add(new ArrayList<>());
+		}
+		for(Integer key: assignKeyToOperator.keySet()){
+			keyInfo.get(assignKeyToOperator.get(key)).add(key);
+		}
+		return keyInfo;
 	}
 
 	@Override

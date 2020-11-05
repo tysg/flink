@@ -19,15 +19,11 @@
 package org.apache.flink.streaming.controlplane.streammanager.insts;
 
 import org.apache.flink.annotation.Internal;
-import org.apache.flink.api.common.functions.Function;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
-import org.apache.flink.runtime.jobgraph.OperatorID;
-import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 
 import javax.annotation.Nullable;
-import java.util.List;
 
 /**
  * The state of stream manager mainly contains the following information:
@@ -47,7 +43,7 @@ import java.util.List;
  * H represents the hosts in the cluster, each host has a certain number of CPU and memory resources.
  * T is the set of tasks, the main information in T is: number of threads owned by each task and task location.
  */
-public interface StreamJobState {
+public interface StreamJobState extends OperatorGraphState, DeployGraphState {
 	/**
 	 * get job graph from stream manager (the state of stream manager)
 	 *
@@ -62,15 +58,7 @@ public interface StreamJobState {
 	 */
 	ClassLoader getUserClassLoader();
 
-	/**
-	 * Return UserFunction, StreamOperator, or StreamOperatorFactory?
-	 *
-	 * @param operatorID the operator id of this operator
-	 * @return
-	 */
-	Function getUserFunction(OperatorID operatorID) throws Exception;
-
-//	/**
+	//	/**
 //	 * @param operatorID      the id of target operarir
 //	 * @param operatorFactory the new stream operator factory
 //	 * @param <OUT>           Output type of StreamOperatorFactory
@@ -94,50 +82,4 @@ public interface StreamJobState {
 	 */
 	@Internal
 	void notifyUpdateFinished(JobVertexID jobVertexID) throws Exception;
-
-	/**
-	 * To get how the input key state was allocated in this operator vertex.
-	 *
-	 * @param operatorID the operator id of this operator
-	 */
-	List<Integer>  getKeyStateAllocation(OperatorID operatorID) throws Exception;
-
-	/**
-	 * To get how the result of this operator mapping to its down stream operator by its key
-	 *
-	 * @param operatorID the operator id of this operator
-	 */
-	List<List<Integer>> getKeyMapping(OperatorID operatorID) throws Exception;
-
-	int getParallelism(OperatorID operatorID);
-
-	/**
-	 * Get all hosts of current job
-	 *
-	 * @return
-	 */
-	List<Host> getHosts();
-
-
-	/**
-	 * Get one of the parallel task of one operator.
-	 *
-	 * @param operatorID the operator id of this operator
-	 * @param offset     represent which parallel instance of this operator
-	 * @return
-	 */
-	OperatorTask getTask(OperatorID operatorID, int offset);
-
-	class OperatorTask {
-		int ownThreads;
-		Host location;
-	}
-
-	class Host {
-		int numCpus;
-		/* in bytes */
-		int memory;
-		List<OperatorTask> containedTasks;
-	}
-
 }

@@ -18,7 +18,7 @@
 
 package org.apache.flink.streaming.controlplane.streammanager.insts;
 
-import org.apache.commons.collections.map.HashedMap;
+import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.functions.Function;
 import org.apache.flink.runtime.executiongraph.ExecutionGraph;
 import org.apache.flink.runtime.jobgraph.JobGraph;
@@ -32,16 +32,24 @@ import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
 import org.apache.flink.streaming.controlplane.reconfigure.JobGraphUpdater;
 import org.apache.flink.streaming.controlplane.rescale.StreamJobGraphRescaler;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
+import org.apache.flink.streaming.runtime.partitioner.AssignedKeyGroupStreamPartitioner;
+import org.apache.flink.streaming.runtime.partitioner.KeyGroupStreamPartitioner;
 import org.apache.flink.streaming.runtime.partitioner.StreamPartitioner;
 import org.apache.flink.util.Preconditions;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public final class StreamJobStateImpl implements StreamJobState {
 
 	private final static int COMMITTED = 1;
 	private final static int STAGED = 0;
+
+	private transient final JobGraph jobGraph;
+	private transient final ExecutionGraph executionGraph;
 
 	private final OperatorGraph operatorGraph;
 	private final DeploymentGraph deploymentGraph;
@@ -55,41 +63,30 @@ public final class StreamJobStateImpl implements StreamJobState {
 	private ControlPolicy currentWaitingController;
 
 
-	private StreamJobStateImpl(OperatorGraph operatorGraph, DeploymentGraph deploymentGraph, ClassLoader userLoader) {
-		this.operatorGraph = operatorGraph;
-		this.deploymentGraph = deploymentGraph;
+	private StreamJobStateImpl(JobGraph jobGraph, ExecutionGraph executionGraph, ClassLoader userLoader) {
+		this.jobGraph = jobGraph;
+		this.executionGraph = executionGraph;
 		this.userCodeLoader = userLoader;
 
 		this.jobGraphUpdater = new JobGraphUpdater(
-			new StreamJobGraphRescaler(operatorGraph.jobGraph, userCodeLoader),
-			this);
+			new StreamJobGraphRescaler(jobGraph, userCodeLoader), this);
+		this.operatorGraph = new OperatorGraph();
+		this.deploymentGraph = new DeploymentGraph();
 	}
 
 	public static StreamJobStateImpl createFromGraph(JobGraph jobGraph, ExecutionGraph executionGraph) {
 		ClassLoader userLoader = executionGraph.getUserClassLoader();
-		return new StreamJobStateImpl(new OperatorGraph(jobGraph), new DeploymentGraph(executionGraph), userLoader);
+		return new StreamJobStateImpl(jobGraph, executionGraph, userLoader);
 	}
 
 	@Override
 	public JobGraph getJobGraph() {
-		return operatorGraph.jobGraph;
+		return jobGraph;
 	}
 
 	@Override
 	public ClassLoader getUserClassLoader() {
 		return userCodeLoader;
-	}
-
-	public Function getUserFunction(OperatorID operatorID) throws Exception {
-		StreamConfig config = findStreamConfig(operatorID);
-		return ((SimpleUdfStreamOperatorFactory<?>) config.getStreamOperatorFactory(this.userCodeLoader)).getUserFunction();
-	}
-
-	public <OUT> JobVertexID updateOperator(OperatorID operatorID,
-											StreamOperatorFactory<OUT> operatorFactory,
-											ControlPolicy waitingController) throws Exception {
-		setStateUpdatingFlag(waitingController);
-		return jobGraphUpdater.updateOperator(operatorID, operatorFactory);
 	}
 
 	@Override
@@ -114,64 +111,45 @@ public final class StreamJobStateImpl implements StreamJobState {
 		throw new Exception("There is not any state updating");
 	}
 
+	public <OUT> JobVertexID updateOperator(OperatorID operatorID,
+											StreamOperatorFactory<OUT> operatorFactory,
+											ControlPolicy waitingController) throws Exception {
+		setStateUpdatingFlag(waitingController);
+		return jobGraphUpdater.updateOperator(operatorID, operatorFactory);
+	}
 
-	@Override
-	public List<Integer> getKeyStateAllocation(OperatorID operatorID) throws Exception {
-		Map<OperatorID, Integer> map = new HashMap<>();
-		StreamConfig config = findStreamConfig(operatorID);
-
-		List<Integer> res = new ArrayList<>(config.getNumberOfInputs());
-		List<StreamEdge> inEdges = config.getInPhysicalEdges(this.userCodeLoader);
-
-		return res;
+	public Function getUserFunction(OperatorID operatorID) throws Exception {
+		return operatorGraph.getUserFunction(operatorID);
 	}
 
 	@Override
-	public List<List<Integer>> getKeyMapping(OperatorID operatorID) throws Exception {
-		Map<OperatorID, Integer> map = new HashMap<>();
-		StreamConfig config = findStreamConfig(operatorID);
-
-		List<List<Integer>> res = new ArrayList<>(config.getNumberOfOutputs());
-		List<StreamEdge> outEdges = config.getOutEdges(this.userCodeLoader);
-		for(StreamEdge edge: outEdges){
-
-		}
-
-		return res;
+	public Map<String, List<List<Integer>>> getKeyStateAllocation(OperatorID operatorID) throws Exception {
+		return operatorGraph.getKeyStateAllocation(operatorID);
 	}
 
-	private void getKeyMessage(StreamEdge streamEdge){
-		StreamPartitioner<?> partitioner = streamEdge.getPartitioner();
-
-
-
-
+	@Override
+	public Map<String, List<List<Integer>>> getKeyMapping(OperatorID operatorID) throws Exception {
+		return operatorGraph.getKeyMapping(operatorID);
 	}
 
 	@Override
 	public int getParallelism(OperatorID operatorID) {
-		Map<OperatorID, Integer> map = new HashMap<>();
-		for(JobVertex vertex: this.operatorGraph.jobGraph.getVertices()){
-			int parallelism = vertex.getParallelism();
-			for(OperatorID id: vertex.getOperatorIDs()){
-				map.put(id, parallelism);
-			}
-		}
-		return map.get(operatorID);
+		return operatorGraph.getParallelism(operatorID);
 	}
 
 	@Override
 	public List<Host> getHosts() {
-		return null;
+		return deploymentGraph.getHosts();
 	}
 
 	@Override
 	public OperatorTask getTask(OperatorID operatorID, int offset) {
-		return null;
+		return deploymentGraph.getTask(operatorID, offset);
 	}
 
+	@VisibleForTesting
 	private StreamConfig findStreamConfig(OperatorID operatorID) throws Exception {
-		for (JobVertex vertex : this.operatorGraph.jobGraph.getVertices()) {
+		for (JobVertex vertex : this.jobGraph.getVertices()) {
 			StreamConfig streamConfig = new StreamConfig(vertex.getConfiguration());
 			Map<Integer, StreamConfig> configMap = streamConfig.getTransitiveChainedTaskConfigsWithSelf(this.userCodeLoader);
 			for (StreamConfig config : configMap.values()) {
@@ -187,24 +165,133 @@ public final class StreamJobStateImpl implements StreamJobState {
 
 	}
 
-	public static class OperatorGraph {
+	public class OperatorGraph implements OperatorGraphState{
 		/* contains topology of this stream job */
-		private final JobGraph jobGraph;
+		private Map<OperatorID, OperatorDescriptor> allOperators = new HashMap<>();
 
-		OperatorGraph(JobGraph jobGraph) {
-			this.jobGraph = Preconditions.checkNotNull(jobGraph);
+		private OperatorGraph() {
+			Map<Integer, OperatorDescriptor> allOperatorsById = new HashMap<>();
+			// add all nodes
+			for (JobVertex vertex : jobGraph.getVertices()) {
+				StreamConfig streamConfig = new StreamConfig(vertex.getConfiguration());
+				Map<Integer, StreamConfig> configMap = streamConfig.getTransitiveChainedTaskConfigsWithSelf(userCodeLoader);
+				for (StreamConfig config : configMap.values()) {
+					OperatorDescriptor operatorDescriptor = new OperatorDescriptor(
+						config.getOperatorID(), config, vertex.getParallelism());
+					allOperators.put(config.getOperatorID(), operatorDescriptor);
+					allOperatorsById.put(config.getVertexID(), operatorDescriptor);
+				}
+			}
+			// build topology
+			for (OperatorDescriptor descriptor : allOperatorsById.values()) {
+				StreamConfig config = descriptor.streamConfig;
+				List<StreamEdge> edges = config.getOutEdges(userCodeLoader);
+				allOperators.get(config.getOperatorID()).addChildren(edges, allOperatorsById);
+			}
+
 		}
 
+		@Override
+		public Function getUserFunction(OperatorID operatorID) throws Exception {
+			StreamConfig config = getStreamConfig(operatorID);
+			return ((SimpleUdfStreamOperatorFactory<?>) config.getStreamOperatorFactory(userCodeLoader)).getUserFunction();
+		}
+
+		@Override
+		public Map<String, List<List<Integer>>> getKeyStateAllocation(OperatorID operatorID) throws Exception {
+			StreamConfig config = getStreamConfig(operatorID);
+
+			Map<String, List<List<Integer>>> res = new HashMap<>();
+			List<StreamEdge> inPhysicalEdges = config.getInPhysicalEdges(userCodeLoader);
+			for (StreamEdge edge : inPhysicalEdges) {
+				getKeyMessage(edge);
+				res.put(edge.getEdgeId(), getKeyMessage(edge));
+			}
+			return res;
+		}
+
+		@Override
+		public Map<String, List<List<Integer>>> getKeyMapping(OperatorID operatorID) throws Exception {
+			StreamConfig config = getStreamConfig(operatorID);
+
+			Map<String, List<List<Integer>>> res = new HashMap<>();
+			List<StreamEdge> outEdges = config.getOutEdges(userCodeLoader);
+			for (StreamEdge edge : outEdges) {
+				getKeyMessage(edge);
+				res.put(edge.getEdgeId(), getKeyMessage(edge));
+			}
+			return res;
+		}
+
+		private List<List<Integer>> getKeyMessage(StreamEdge streamEdge) {
+			StreamPartitioner<?> partitioner = streamEdge.getPartitioner();
+			if (partitioner instanceof AssignedKeyGroupStreamPartitioner) {
+				return ((AssignedKeyGroupStreamPartitioner<?, ?>) partitioner).getKeyMappingInfo();
+			} else if (partitioner instanceof KeyGroupStreamPartitioner) {
+				return ((KeyGroupStreamPartitioner<?, ?>) partitioner).getKeyMappingInfo();
+			}
+			// it may be not a key stream operator
+			return List.of();
+		}
+
+		@Override
+		public int getParallelism(OperatorID operatorID) {
+			return this.allOperators.get(operatorID).parallelism;
+		}
+
+		private StreamConfig getStreamConfig(OperatorID operatorID) throws Exception {
+			OperatorDescriptor descriptor = Preconditions.checkNotNull(allOperators.get(operatorID), "can not found target operator");
+			return descriptor.streamConfig;
+		}
 	}
 
-	public static class DeploymentGraph {
-		/* contains topology of this stream job */
-		private final ExecutionGraph executionGraph;
+	public class DeploymentGraph implements DeployGraphState{
 
-		DeploymentGraph(ExecutionGraph executionGraph) {
-			this.executionGraph = Preconditions.checkNotNull(executionGraph);
+		private DeploymentGraph() {
+
 		}
 
+		@Override
+		public List<Host> getHosts() {
+			return null;
+		}
+
+		@Override
+		public OperatorTask getTask(OperatorID operatorID, int offset) {
+			return null;
+		}
+	}
+
+	//
+	private static class OperatorDescriptor {
+
+		private final OperatorID operatorID;
+		private final StreamConfig streamConfig;
+
+		private final ArrayList<OperatorDescriptor> parents = new ArrayList<>();
+
+		private ArrayList<OperatorDescriptor> children;
+
+		private int parallelism;
+
+		private OperatorDescriptor(OperatorID operatorID, StreamConfig config, int parallelism) {
+			this.operatorID = operatorID;
+			this.streamConfig = config;
+			this.parallelism = parallelism;
+		}
+
+		private void addChildren(List<StreamEdge> childEdges, Map<Integer, OperatorDescriptor> allOperatorsById) {
+			this.children = new ArrayList<>(childEdges.size());
+			for (StreamEdge edge : childEdges) {
+				OperatorDescriptor descriptor = allOperatorsById.get(edge.getTargetId());
+				// I think I am your father
+				descriptor.addParent(this);
+			}
+		}
+
+		private void addParent(OperatorDescriptor operatorDescriptor) {
+			parents.add(operatorDescriptor);
+		}
 	}
 
 
