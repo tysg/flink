@@ -70,7 +70,7 @@ public final class StreamJobStateImpl implements StreamJobState {
 		this.userCodeLoader = userLoader;
 
 		this.jobGraphUpdater = new JobGraphUpdater(
-			new StreamJobGraphRescaler(jobGraph, userCodeLoader), this);
+			new StreamJobGraphRescaler(jobGraph, userCodeLoader), jobGraph, userLoader);
 		this.operatorGraph = new OperatorGraph();
 		this.deploymentGraph = new DeploymentGraph();
 	}
@@ -81,13 +81,8 @@ public final class StreamJobStateImpl implements StreamJobState {
 	}
 
 	@Override
-	public JobGraph getJobGraph() {
-		return jobGraph;
-	}
-
-	@Override
-	public ClassLoader getUserClassLoader() {
-		return userCodeLoader;
+	public OperatorGraph getOperatorGraph() {
+		return operatorGraph;
 	}
 
 	@Override
@@ -139,6 +134,11 @@ public final class StreamJobStateImpl implements StreamJobState {
 	}
 
 	@Override
+	public Iterator<OperatorDescriptor> getAllOperatorDescriptor() {
+		return operatorGraph.getAllOperatorDescriptor();
+	}
+
+	@Override
 	public Host[] getHosts() {
 		return deploymentGraph.getHosts();
 	}
@@ -166,9 +166,10 @@ public final class StreamJobStateImpl implements StreamJobState {
 
 	}
 
-	public class OperatorGraph implements OperatorGraphState{
+	public class OperatorGraph implements OperatorGraphState {
 		/* contains topology of this stream job */
-		private Map<OperatorID, OperatorDescriptor> allOperators = new LinkedHashMap<>();
+		private final Map<OperatorID, OperatorDescriptor> allOperators = new LinkedHashMap<>();
+		private final OperatorDescriptor[] heads;
 
 		private OperatorGraph() {
 			Map<Integer, OperatorDescriptor> allOperatorsById = new LinkedHashMap<>();
@@ -185,11 +186,30 @@ public final class StreamJobStateImpl implements StreamJobState {
 			}
 			// build topology
 			for (OperatorDescriptor descriptor : allOperatorsById.values()) {
-				StreamConfig config = descriptor.streamConfig;
-				List<StreamEdge> edges = config.getOutEdges(userCodeLoader);
-				allOperators.get(config.getOperatorID()).addChildren(edges, allOperatorsById);
-			}
+				StreamConfig config = descriptor.getStreamConfig();
+				List<StreamEdge> outEdges = config.getOutEdges(userCodeLoader);
+				allOperators.get(config.getOperatorID()).addChildren(outEdges, allOperatorsById);
 
+				List<StreamEdge> inEdges = config.getInPhysicalEdges(userCodeLoader);
+				allOperators.get(config.getOperatorID()).addParent(inEdges, allOperatorsById);
+			}
+			// find head
+			List<OperatorDescriptor> heads = new ArrayList<>();
+			for (OperatorDescriptor descriptor : allOperators.values()) {
+				if (descriptor.getParents().isEmpty()) {
+					heads.add(descriptor);
+				}
+			}
+			checkRelationship();
+			this.heads = heads.toArray(new OperatorDescriptor[0]);
+		}
+
+		public OperatorDescriptor[] getHeads() {
+			return heads;
+		}
+
+		public Iterator<OperatorDescriptor> getAllOperatorDescriptor() {
+			return allOperators.values().iterator();
 		}
 
 		@Override
@@ -237,16 +257,28 @@ public final class StreamJobStateImpl implements StreamJobState {
 
 		@Override
 		public int getParallelism(OperatorID operatorID) {
-			return this.allOperators.get(operatorID).parallelism;
+			return this.allOperators.get(operatorID).getParallelism();
 		}
 
 		private StreamConfig getStreamConfig(OperatorID operatorID) throws Exception {
 			OperatorDescriptor descriptor = Preconditions.checkNotNull(allOperators.get(operatorID), "can not found target operator");
-			return descriptor.streamConfig;
+			return descriptor.getStreamConfig();
 		}
+
+		private void checkRelationship() {
+			for (OperatorDescriptor descriptor : allOperators.values()) {
+				for (OperatorDescriptor child : descriptor.getChildren()) {
+					Preconditions.checkArgument(child.getParents().contains(descriptor), child + "'s parents should contain " + descriptor);
+				}
+				for (OperatorDescriptor parent : descriptor.getParents()) {
+					Preconditions.checkArgument(parent.getChildren().contains(descriptor), parent + "'s children should contain " + descriptor);
+				}
+			}
+		}
+
 	}
 
-	public class DeploymentGraph implements DeployGraphState{
+	public class DeploymentGraph implements DeployGraphState {
 
 		private Map<OperatorID, List<DeployGraphState.OperatorTask>> operatorTaskListMap;
 		private Map<ResourceID, Host> hosts;
@@ -255,21 +287,29 @@ public final class StreamJobStateImpl implements StreamJobState {
 			operatorTaskListMap = new HashMap<>();
 			hosts = new HashMap<>();
 
-			for(ExecutionJobVertex jobVertex: executionGraph.getAllVertices().values()){
+			for (ExecutionJobVertex jobVertex : executionGraph.getAllVertices().values()) {
 				// contains all tasks of the same parallel operator instances
 				List<DeployGraphState.OperatorTask> operatorTaskList = new ArrayList<>(jobVertex.getParallelism());
-				for(ExecutionVertex vertex: jobVertex.getTaskVertices()){
-					LogicalSlot slot = vertex.getCurrentAssignedResource();
+				for (ExecutionVertex vertex : jobVertex.getTaskVertices()) {
+					LogicalSlot slot;
+					do {
+						slot = vertex.getCurrentAssignedResource();
+						try {
+							Thread.sleep(100);
+						} catch (InterruptedException e) {
+							e.printStackTrace();
+						}
+					} while (slot == null);
 
 					Host host = hosts.get(slot.getTaskManagerLocation().getResourceID());
-					if(host == null){
+					if (host == null) {
 						host = new Host(slot.getTaskManagerLocation());
 						hosts.put(slot.getTaskManagerLocation().getResourceID(), host);
 					}
 					OperatorTask operatorTask = new OperatorTask(slot, host);
 					operatorTaskList.add(operatorTask);
 				}
-				for(OperatorID operatorID: jobVertex.getOperatorIDs()){
+				for (OperatorID operatorID : jobVertex.getOperatorIDs()) {
 					operatorTaskListMap.put(operatorID, operatorTaskList);
 				}
 			}
@@ -285,38 +325,5 @@ public final class StreamJobStateImpl implements StreamJobState {
 			return operatorTaskListMap.get(operatorID).get(offset);
 		}
 	}
-
-	//
-	private static class OperatorDescriptor {
-
-		private final OperatorID operatorID;
-		private final StreamConfig streamConfig;
-
-		private final ArrayList<OperatorDescriptor> parents = new ArrayList<>();
-
-		private ArrayList<OperatorDescriptor> children;
-
-		private int parallelism;
-
-		private OperatorDescriptor(OperatorID operatorID, StreamConfig config, int parallelism) {
-			this.operatorID = operatorID;
-			this.streamConfig = config;
-			this.parallelism = parallelism;
-		}
-
-		private void addChildren(List<StreamEdge> childEdges, Map<Integer, OperatorDescriptor> allOperatorsById) {
-			this.children = new ArrayList<>(childEdges.size());
-			for (StreamEdge edge : childEdges) {
-				OperatorDescriptor descriptor = allOperatorsById.get(edge.getTargetId());
-				// I think I am your father
-				descriptor.addParent(this);
-			}
-		}
-
-		private void addParent(OperatorDescriptor operatorDescriptor) {
-			parents.add(operatorDescriptor);
-		}
-	}
-
 
 }

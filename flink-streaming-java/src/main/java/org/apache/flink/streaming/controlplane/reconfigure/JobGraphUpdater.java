@@ -22,10 +22,10 @@ public class JobGraphUpdater implements JobGraphRescaler, JobGraphOperatorUpdate
 	private JobGraph jobGraph;
 	private ClassLoader userClassLoader;
 
-	public JobGraphUpdater(JobGraphRescaler jobGraphRescaler, StreamJobState jobState) {
+	public JobGraphUpdater(JobGraphRescaler jobGraphRescaler, JobGraph jobGraph, ClassLoader userClassLoader) {
 		this.jobGraphRescaler = jobGraphRescaler;
-		this.jobGraph = jobState.getJobGraph();
-		this.userClassLoader = jobState.getUserClassLoader();
+		this.jobGraph = jobGraph;
+		this.userClassLoader = userClassLoader;
 	}
 
 	@Override

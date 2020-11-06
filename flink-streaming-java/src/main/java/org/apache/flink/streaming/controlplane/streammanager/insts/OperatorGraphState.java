@@ -2,7 +2,11 @@ package org.apache.flink.streaming.controlplane.streammanager.insts;
 
 import org.apache.flink.api.common.functions.Function;
 import org.apache.flink.runtime.jobgraph.OperatorID;
+import org.apache.flink.streaming.api.graph.StreamConfig;
+import org.apache.flink.streaming.api.graph.StreamEdge;
 
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -43,4 +47,6 @@ public interface OperatorGraphState {
 	 * @return
 	 */
 	int getParallelism(OperatorID operatorID);
+
+	Iterator<OperatorDescriptor> getAllOperatorDescriptor();
 }

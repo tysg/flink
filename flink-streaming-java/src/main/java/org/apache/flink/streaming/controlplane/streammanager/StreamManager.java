@@ -314,7 +314,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 	@Override
 	public void streamSwitchCompleted(JobVertexID targetVertexID) {
-		for(ControlPolicy policy: controlPolicyList){
+		for (ControlPolicy policy : controlPolicyList) {
 			policy.onChangeCompleted(targetVertexID);
 		}
 	}
@@ -493,16 +493,20 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 	@Override
 	public void jobStatusChanged(JobID jobId, JobStatus newJobStatus, long timestamp, Throwable error, ExecutionGraph executionGraph) {
-		this.streamJobState = StreamJobStateImpl.createFromGraph(jobGraph, executionGraph);
-		if (newJobStatus == JobStatus.RUNNING) {
-			for(ControlPolicy policy: controlPolicyList){
-				policy.startControllers();
+		runAsync(
+			() -> {
+				this.streamJobState = StreamJobStateImpl.createFromGraph(jobGraph, executionGraph);
+				if (newJobStatus == JobStatus.RUNNING) {
+					for (ControlPolicy policy : controlPolicyList) {
+						policy.startControllers();
+					}
+				} else {
+					for (ControlPolicy policy : controlPolicyList) {
+						policy.stopControllers();
+					}
+				}
 			}
-		} else {
-			for(ControlPolicy policy: controlPolicyList){
-				policy.stopControllers();
-			}
-		}
+		);
 	}
 
 	@Override
@@ -535,7 +539,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		}
 	}
 
-	public void callCustomizeInstruction(Enforcement.EnforcementCaller caller){
+	public void callCustomizeInstruction(Enforcement.EnforcementCaller caller) {
 		try {
 			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
 //			runAsync(() -> jobMasterGateway.triggerOperatorUpdate(this.jobGraph, jobVertexId, operatorID));

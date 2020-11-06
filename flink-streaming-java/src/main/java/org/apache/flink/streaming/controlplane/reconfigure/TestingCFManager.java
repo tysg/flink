@@ -1,18 +1,16 @@
 package org.apache.flink.streaming.controlplane.reconfigure;
 
-import org.apache.flink.runtime.jobgraph.JobGraph;
-import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
-import org.apache.flink.streaming.api.graph.StreamConfig;
-import org.apache.flink.streaming.controlplane.jobgraph.JobGraphRescaler;
 import org.apache.flink.streaming.controlplane.reconfigure.operator.ControlFunction;
-import org.apache.flink.streaming.controlplane.reconfigure.operator.ControlOperatorFactory;
+import org.apache.flink.streaming.controlplane.streammanager.insts.OperatorDescriptor;
+import org.apache.flink.streaming.controlplane.streammanager.insts.OperatorGraphState;
 import org.apache.flink.streaming.controlplane.streammanager.insts.PrimitiveInstruction;
 import org.apache.flink.streaming.controlplane.streammanager.insts.StreamJobState;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 
 import javax.annotation.Nonnull;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -29,14 +27,13 @@ public class TestingCFManager extends ControlFunctionManager implements ControlP
 
 		StreamJobState jobState = getInstructionSet().getStreamJobState();
 
-		JobGraph currentJobGraph = jobState.getJobGraph();
-		OperatorID secondOperatorId = findOperatorByName(currentJobGraph, jobState.getUserClassLoader(), "Splitter");
+		OperatorID secondOperatorId = findOperatorByName(jobState, "Splitter");
 
 		if(secondOperatorId != null) {
 			asyncRunAfter(5, () -> this.getKeyStateMapping(
-				findOperatorByName(currentJobGraph, jobState.getUserClassLoader(), "Splitter")));
+				findOperatorByName(jobState, "Splitter")));
 			asyncRunAfter(5, () -> this.getKeyStateAllocation(
-				findOperatorByName(currentJobGraph, jobState.getUserClassLoader(), "filte")));
+				findOperatorByName(jobState, "filte")));
 			asyncRunAfter(10, () -> this.reconfigure(secondOperatorId, getFilterFunction(2)));
 		}
 	}
@@ -81,14 +78,11 @@ public class TestingCFManager extends ControlFunctionManager implements ControlP
 	}
 
 
-	private OperatorID findOperatorByName(JobGraph jobGraph,  ClassLoader classLoader, @Nonnull String name) {
-		for (JobVertex vertex : jobGraph.getVertices()) {
-			StreamConfig streamConfig = new StreamConfig(vertex.getConfiguration());
-			Map<Integer, StreamConfig> configMap = streamConfig.getTransitiveChainedTaskConfigsWithSelf(classLoader);
-			for (StreamConfig config : configMap.values()) {
-				if (name.equals(config.getOperatorName())) {
-					return config.getOperatorID();
-				}
+	private OperatorID findOperatorByName(OperatorGraphState operatorGraphState, @Nonnull String name) {
+		for (Iterator<OperatorDescriptor> it = operatorGraphState.getAllOperatorDescriptor(); it.hasNext(); ) {
+			OperatorDescriptor descriptor = it.next();
+			if(descriptor.getName().equals(name)){
+				return descriptor.getOperatorID();
 			}
 		}
 		return null;

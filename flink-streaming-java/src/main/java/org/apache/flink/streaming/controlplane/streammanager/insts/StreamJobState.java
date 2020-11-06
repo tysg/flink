@@ -19,7 +19,6 @@
 package org.apache.flink.streaming.controlplane.streammanager.insts;
 
 import org.apache.flink.annotation.Internal;
-import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 
@@ -49,14 +48,14 @@ public interface StreamJobState extends OperatorGraphState, DeployGraphState {
 	 *
 	 * @return current job graph of stream manager
 	 */
-	JobGraph getJobGraph();
+	OperatorGraphState getOperatorGraph();
 
 	/**
 	 * get user class loader of job graph (the state of stream manager)
 	 *
 	 * @return current user class loader of job graph
 	 */
-	ClassLoader getUserClassLoader();
+//	ClassLoader getUserClassLoader();
 
 	//	/**
 //	 * @param operatorID      the id of target operarir

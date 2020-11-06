@@ -38,7 +38,6 @@ public abstract class ControlFunctionManager extends AbstractControlPolicy imple
 		System.out.println(System.currentTimeMillis() + ":Substitute `Control` Function...");
 		ControlOperatorFactory<?, ?> operatorFactory = new ControlOperatorFactory<>(
 			operatorID,
-			getInstructionSet().getStreamJobState().getJobGraph(),
 			function);
 		try {
 			// since job graph is shared in stream manager and among its services, we don't need to pass it

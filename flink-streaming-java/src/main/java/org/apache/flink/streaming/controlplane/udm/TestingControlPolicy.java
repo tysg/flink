@@ -2,9 +2,12 @@ package org.apache.flink.streaming.controlplane.udm;
 
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
+import org.apache.flink.streaming.controlplane.streammanager.insts.OperatorDescriptor;
 import org.apache.flink.streaming.controlplane.streammanager.insts.PrimitiveInstruction;
+import org.apache.flink.streaming.controlplane.streammanager.insts.StreamJobState;
 
 import java.util.Collections;
+import java.util.Iterator;
 
 public class TestingControlPolicy extends AbstractControlPolicy {
 
@@ -20,7 +23,18 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 			() -> {
 				try {
 					Thread.sleep(5);
-					getInstructionSet().getStreamJobState().setStateUpdatingFlag(this);
+
+					StreamJobState streamJobState = getInstructionSet().getStreamJobState();
+					for (Iterator<OperatorDescriptor> it = streamJobState.getAllOperatorDescriptor(); it.hasNext(); ) {
+						OperatorDescriptor descriptor = it.next();
+						System.out.println(descriptor);
+						System.out.println(streamJobState.getKeyMapping(descriptor.getOperatorID()));
+						System.out.println(streamJobState.getKeyStateAllocation(descriptor.getOperatorID()));
+						System.out.println(streamJobState.getParallelism(descriptor.getOperatorID()));
+						System.out.println(streamJobState.getUserFunction(descriptor.getOperatorID()));
+					}
+
+					streamJobState.setStateUpdatingFlag(this);
 					getInstructionSet().callCustomizeInstruction(
 						enforcement -> FutureUtils.completedVoidFuture()
 							.thenCompose(o -> enforcement.prepareExecutionPlan())
@@ -28,7 +42,7 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 							.thenCompose(o -> enforcement.updateState())
 							.thenAccept(o -> {
 								try {
-									getInstructionSet().getStreamJobState().notifyUpdateFinished(null);
+									streamJobState.notifyUpdateFinished(null);
 								} catch (Exception e) {
 									e.printStackTrace();
 								}
