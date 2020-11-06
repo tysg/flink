@@ -71,11 +71,8 @@ public class OperatorDescriptor {
 
 	@Override
 	public String toString() {
-		return "OperatorDescriptor{" +
-			"operatorID=" + operatorID +
-			", name='" + name + '\'' +
-			", parallelism=" + parallelism +
-			'}';
+		return "OperatorDescriptor{name='" + name + "\'', parallelism=" + parallelism +
+			", parents:" + parents.size() + ", children:" + children.size() + '}';
 	}
 
 }

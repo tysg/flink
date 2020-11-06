@@ -119,12 +119,12 @@ public final class StreamJobStateImpl implements StreamJobState {
 	}
 
 	@Override
-	public Map<String, List<List<Integer>>> getKeyStateAllocation(OperatorID operatorID) throws Exception {
+	public Map<OperatorID, List<List<Integer>>> getKeyStateAllocation(OperatorID operatorID) throws Exception {
 		return operatorGraph.getKeyStateAllocation(operatorID);
 	}
 
 	@Override
-	public Map<String, List<List<Integer>>> getKeyMapping(OperatorID operatorID) throws Exception {
+	public Map<OperatorID, List<List<Integer>>> getKeyMapping(OperatorID operatorID) throws Exception {
 		return operatorGraph.getKeyMapping(operatorID);
 	}
 
@@ -171,6 +171,8 @@ public final class StreamJobStateImpl implements StreamJobState {
 		private final Map<OperatorID, OperatorDescriptor> allOperators = new LinkedHashMap<>();
 		private final OperatorDescriptor[] heads;
 
+		private final Map<Integer, OperatorID> vertexIdToOperatorId = new HashMap<>();
+
 		private OperatorGraph() {
 			Map<Integer, OperatorDescriptor> allOperatorsById = new LinkedHashMap<>();
 			// add all nodes
@@ -182,6 +184,8 @@ public final class StreamJobStateImpl implements StreamJobState {
 						config.getOperatorID(), config, vertex.getParallelism());
 					allOperators.put(config.getOperatorID(), operatorDescriptor);
 					allOperatorsById.put(config.getVertexID(), operatorDescriptor);
+
+					vertexIdToOperatorId.put(config.getVertexID(), config.getOperatorID());
 				}
 			}
 			// build topology
@@ -219,37 +223,33 @@ public final class StreamJobStateImpl implements StreamJobState {
 		}
 
 		@Override
-		public Map<String, List<List<Integer>>> getKeyStateAllocation(OperatorID operatorID) throws Exception {
+		public Map<OperatorID, List<List<Integer>>> getKeyStateAllocation(OperatorID operatorID) throws Exception {
 			StreamConfig config = getStreamConfig(operatorID);
 
-			Map<String, List<List<Integer>>> res = new HashMap<>();
+			Map<OperatorID, List<List<Integer>>> res = new HashMap<>();
 			List<StreamEdge> inPhysicalEdges = config.getInPhysicalEdges(userCodeLoader);
 			for (StreamEdge edge : inPhysicalEdges) {
-				getKeyMessage(edge);
-				res.put(edge.getEdgeId(), getKeyMessage(edge));
+				res.put(vertexIdToOperatorId.get(edge.getSourceId()), getKeyMessage(edge, getParallelism(operatorID)));
 			}
 			return res;
 		}
 
 		@Override
-		public Map<String, List<List<Integer>>> getKeyMapping(OperatorID operatorID) throws Exception {
-			StreamConfig config = getStreamConfig(operatorID);
-
-			Map<String, List<List<Integer>>> res = new HashMap<>();
-			List<StreamEdge> outEdges = config.getOutEdges(userCodeLoader);
-			for (StreamEdge edge : outEdges) {
-				getKeyMessage(edge);
-				res.put(edge.getEdgeId(), getKeyMessage(edge));
+		public Map<OperatorID, List<List<Integer>>> getKeyMapping(OperatorID operatorID) throws Exception {
+			Map<OperatorID, List<List<Integer>>> res = new HashMap<>();
+			OperatorDescriptor targetOp = allOperators.get(operatorID);
+			for (OperatorDescriptor child : targetOp.getChildren()) {
+				res.put(child.getOperatorID(), getKeyStateAllocation(child.getOperatorID()).get(targetOp.getOperatorID()));
 			}
 			return res;
 		}
 
-		private List<List<Integer>> getKeyMessage(StreamEdge streamEdge) {
+		private List<List<Integer>> getKeyMessage(StreamEdge streamEdge, int parallelism) {
 			StreamPartitioner<?> partitioner = streamEdge.getPartitioner();
 			if (partitioner instanceof AssignedKeyGroupStreamPartitioner) {
-				return ((AssignedKeyGroupStreamPartitioner<?, ?>) partitioner).getKeyMappingInfo();
+				return ((AssignedKeyGroupStreamPartitioner<?, ?>) partitioner).getKeyMappingInfo(parallelism);
 			} else if (partitioner instanceof KeyGroupStreamPartitioner) {
-				return ((KeyGroupStreamPartitioner<?, ?>) partitioner).getKeyMappingInfo();
+				return ((KeyGroupStreamPartitioner<?, ?>) partitioner).getKeyMappingInfo(parallelism);
 			}
 			// it may be not a key stream operator
 			return Collections.emptyList();

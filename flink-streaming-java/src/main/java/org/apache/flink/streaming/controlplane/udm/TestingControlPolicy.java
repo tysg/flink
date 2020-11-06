@@ -30,8 +30,8 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 						System.out.println(descriptor);
 						System.out.println(streamJobState.getKeyMapping(descriptor.getOperatorID()));
 						System.out.println(streamJobState.getKeyStateAllocation(descriptor.getOperatorID()));
-						System.out.println(streamJobState.getParallelism(descriptor.getOperatorID()));
-						System.out.println(streamJobState.getUserFunction(descriptor.getOperatorID()));
+//						System.out.println(streamJobState.getParallelism(descriptor.getOperatorID()));
+//						System.out.println(streamJobState.getUserFunction(descriptor.getOperatorID()));
 					}
 
 					streamJobState.setStateUpdatingFlag(this);

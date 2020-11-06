@@ -66,10 +66,10 @@ public class KeyGroupStreamPartitioner<T, K> extends StreamPartitioner<T> implem
 		return KeyGroupRangeAssignment.assignKeyToParallelOperator(key, maxParallelism, numberOfChannels);
 	}
 
-	public List<List<Integer>> getKeyMappingInfo(){
-		List<List<Integer>> keyInfo = new ArrayList<>(numberOfChannels);
-		for(int channelIndex=0;channelIndex < numberOfChannels;channelIndex++) {
-			KeyGroupRange range = KeyGroupRangeAssignment.computeKeyGroupRangeForOperatorIndex(maxParallelism, numberOfChannels, channelIndex);
+	public List<List<Integer>> getKeyMappingInfo(int parallelism){
+		List<List<Integer>> keyInfo = new ArrayList<>(parallelism);
+		for(int channelIndex=0;channelIndex < parallelism;channelIndex++) {
+			KeyGroupRange range = KeyGroupRangeAssignment.computeKeyGroupRangeForOperatorIndex(maxParallelism, parallelism, channelIndex);
 			int keyGroupId = range.getStartKeyGroup();
 			int end = range.getEndKeyGroup();
 			List<Integer> thisChannelKeyInfo = new ArrayList<>(range.getNumberOfKeyGroups());

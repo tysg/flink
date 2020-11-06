@@ -40,7 +40,7 @@ public class TestingCFManager extends ControlFunctionManager implements ControlP
 
 	private void getKeyStateMapping(OperatorID operatorID){
 		try {
-			Map<String, List<List<Integer>>> res = this.getInstructionSet().getStreamJobState().getKeyMapping(operatorID);
+			this.getInstructionSet().getStreamJobState().getKeyMapping(operatorID);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -49,7 +49,7 @@ public class TestingCFManager extends ControlFunctionManager implements ControlP
 
 	private void getKeyStateAllocation(OperatorID operatorID){
 		try {
-			Map<String, List<List<Integer>>> res = this.getInstructionSet().getStreamJobState().getKeyStateAllocation(operatorID);
+			this.getInstructionSet().getStreamJobState().getKeyStateAllocation(operatorID);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

@@ -29,7 +29,7 @@ public interface OperatorGraphState {
 	 * representing the output channel with its assigned keys.
 	 * @throws Exception
 	 */
-	Map<String, List<List<Integer>>> getKeyStateAllocation(OperatorID operatorID) throws Exception;
+	Map<OperatorID, List<List<Integer>>> getKeyStateAllocation(OperatorID operatorID) throws Exception;
 
 	/**
 	 * Return how the key mapping to down stream operator
@@ -39,7 +39,7 @@ public interface OperatorGraphState {
 	 * representing the output channel with its assigned keys. Map(StreamEdgeId -> [OutputChannelIndex, [assigned keys]])
 	 * @throws Exception
 	 */
-	Map<String, List<List<Integer>>> getKeyMapping(OperatorID operatorID) throws Exception;
+	Map<OperatorID, List<List<Integer>>> getKeyMapping(OperatorID operatorID) throws Exception;
 
 	/**
 	 * Return the parallilism of operator with given operator id
