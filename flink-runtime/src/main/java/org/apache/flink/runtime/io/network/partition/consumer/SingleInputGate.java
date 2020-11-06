@@ -123,7 +123,7 @@ public class SingleInputGate extends InputGate {
 	 * The index of the consumed subpartition of each consumed partition. This index depends on the
 	 * {@link DistributionPattern} and the subtask indices of the producing and consuming task.
 	 */
-	private final int consumedSubpartitionIndex;
+	private int consumedSubpartitionIndex;
 
 	/** The number of input channels (equivalent to the number of consumed partitions). */
 	private int numberOfInputChannels;
@@ -262,6 +262,9 @@ public class SingleInputGate extends InputGate {
 		return consumedSubpartitionIndex;
 	}
 
+	public void setConsumedSubpartitionIndex(int consumedSubpartitionIndex) {
+		this.consumedSubpartitionIndex = consumedSubpartitionIndex;
+	}
 	/**
 	 * Returns the type of this input channel's consumed result partition.
 	 *
