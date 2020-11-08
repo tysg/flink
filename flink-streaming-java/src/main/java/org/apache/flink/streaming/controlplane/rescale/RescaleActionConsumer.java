@@ -1,14 +1,14 @@
 package org.apache.flink.streaming.controlplane.rescale;
 
 import org.apache.flink.runtime.jobgraph.JobVertexID;
+import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.rescale.JobRescaleAction;
 import org.apache.flink.runtime.rescale.JobRescalePartitionAssignment;
 import org.apache.flink.streaming.controlplane.streammanager.insts.PrimitiveInstruction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.LinkedList;
-import java.util.Queue;
+import java.util.*;
 
 
 public class RescaleActionConsumer implements Runnable {
@@ -43,7 +43,14 @@ public class RescaleActionConsumer implements Runnable {
 					if (wrapper != null) {
 						isFinished = false;
 //						rescaleAction.parseParams(wrapper);
-						primitiveInstruction.rescaleStreamJob(wrapper);
+//						primitiveInstruction.rescaleStreamJob(wrapper);
+						Map<Integer, List<Integer>> partitionAssignment = wrapper.jobRescalePartitionAssignment.getPartitionAssignment();
+						List<List<Integer>> keyStateAllocation = new ArrayList<>(
+							partitionAssignment.values());
+						for(Integer key: partitionAssignment.keySet()){
+							keyStateAllocation.add(key, partitionAssignment.get(key));
+						}
+						primitiveInstruction.rescale(-1, wrapper.newParallelism, keyStateAllocation);
 
 						while (!isFinished && !isStop) {
 							queue.wait(); // wait for finish

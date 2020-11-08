@@ -14,7 +14,7 @@ public class OperatorDescriptor implements Serializable {
 	TypeInformation inputType;
 	TypeInformation outputType;
 
-	OperatorDescriptor(OperatorID operatorID, JobGraph jobGraph){
+	OperatorDescriptor(int operatorID, JobGraph jobGraph){
 
 	}
 

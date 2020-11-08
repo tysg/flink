@@ -8,5 +8,5 @@ public interface ControlFunctionManagerService {
 
 	void registerFunction(ControlFunction function);
 
-	void reconfigure(OperatorID operatorID, ControlFunction function);
+	void reconfigure(int operatorID, ControlFunction function);
 }

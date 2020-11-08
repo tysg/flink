@@ -19,7 +19,6 @@
 package org.apache.flink.streaming.controlplane.streammanager.insts;
 
 import org.apache.flink.annotation.Internal;
-import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 
 import javax.annotation.Nullable;
@@ -42,13 +41,13 @@ import javax.annotation.Nullable;
  * H represents the hosts in the cluster, each host has a certain number of CPU and memory resources.
  * T is the set of tasks, the main information in T is: number of threads owned by each task and task location.
  */
-public interface StreamJobState extends OperatorGraphState, DeployGraphState {
+public interface StreamJobReconfigurable {
 	/**
 	 * get job graph from stream manager (the state of stream manager)
 	 *
 	 * @return current job graph of stream manager
 	 */
-	OperatorGraphState getOperatorGraph();
+//	OperatorGraphState getOperatorGraph();
 
 	/**
 	 * get user class loader of job graph (the state of stream manager)
@@ -57,7 +56,7 @@ public interface StreamJobState extends OperatorGraphState, DeployGraphState {
 	 */
 //	ClassLoader getUserClassLoader();
 
-	//	/**
+//	/**
 //	 * @param operatorID      the id of target operarir
 //	 * @param operatorFactory the new stream operator factory
 //	 * @param <OUT>           Output type of StreamOperatorFactory
@@ -76,9 +75,9 @@ public interface StreamJobState extends OperatorGraphState, DeployGraphState {
 	 * Notify that current state update is finished.
 	 * This could only be invoke once
 	 *
-	 * @param jobVertexID
+	 * @param operatorId
 	 * @throws Exception
 	 */
 	@Internal
-	void notifyUpdateFinished(JobVertexID jobVertexID) throws Exception;
+	void notifyUpdateFinished(Integer operatorId) throws Exception;
 }

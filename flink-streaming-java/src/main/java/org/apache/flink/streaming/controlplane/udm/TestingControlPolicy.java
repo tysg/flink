@@ -1,10 +1,9 @@
 package org.apache.flink.streaming.controlplane.udm;
 
 import org.apache.flink.runtime.concurrent.FutureUtils;
-import org.apache.flink.runtime.jobgraph.JobVertexID;
-import org.apache.flink.streaming.controlplane.streammanager.insts.OperatorDescriptor;
+import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
+import org.apache.flink.runtime.controlplane.abstraction.StreamJobAbstraction;
 import org.apache.flink.streaming.controlplane.streammanager.insts.PrimitiveInstruction;
-import org.apache.flink.streaming.controlplane.streammanager.insts.StreamJobState;
 
 import java.util.Collections;
 import java.util.Iterator;
@@ -24,7 +23,7 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 				try {
 					Thread.sleep(5);
 
-					StreamJobState streamJobState = getInstructionSet().getStreamJobState();
+					StreamJobAbstraction streamJobState = getInstructionSet().getStreamJobState();
 					for (Iterator<OperatorDescriptor> it = streamJobState.getAllOperatorDescriptor(); it.hasNext(); ) {
 						OperatorDescriptor descriptor = it.next();
 						System.out.println(descriptor);
@@ -34,19 +33,11 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 //						System.out.println(streamJobState.getUserFunction(descriptor.getOperatorID()));
 					}
 
-					streamJobState.setStateUpdatingFlag(this);
 					getInstructionSet().callCustomizeInstruction(
 						enforcement -> FutureUtils.completedVoidFuture()
 							.thenCompose(o -> enforcement.prepareExecutionPlan())
 							.thenCompose(o -> enforcement.synchronizeTasks(Collections.emptyList()))
 							.thenCompose(o -> enforcement.updateState())
-							.thenAccept(o -> {
-								try {
-									streamJobState.notifyUpdateFinished(null);
-								} catch (Exception e) {
-									e.printStackTrace();
-								}
-							})
 					);
 				} catch (Exception e) {
 					e.printStackTrace();
@@ -58,10 +49,24 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 	@Override
 	public void stopControllers() {
 		System.out.println("Testing TestingControlPolicy is stopping...");
+		StreamJobAbstraction streamJobState = getInstructionSet().getStreamJobState();
+		for (Iterator<OperatorDescriptor> it = streamJobState.getAllOperatorDescriptor(); it.hasNext(); ) {
+			OperatorDescriptor descriptor = it.next();
+			System.out.println(descriptor);
+			try {
+				System.out.println(streamJobState.getKeyMapping(descriptor.getOperatorID()));
+				System.out.println(streamJobState.getKeyStateAllocation(descriptor.getOperatorID()));
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+//						System.out.println(streamJobState.getParallelism(descriptor.getOperatorID()));
+//						System.out.println(streamJobState.getUserFunction(descriptor.getOperatorID()));
+		}
 	}
 
 	@Override
-	public void onChangeCompleted(JobVertexID jobVertexID) {
+	public void onChangeCompleted(Integer jobVertexID) {
 		System.out.println("my self defined instruction finished??");
 	}
+
 }

@@ -18,11 +18,13 @@
 
 package org.apache.flink.streaming.controlplane.streammanager.insts;
 
-import org.apache.flink.runtime.controlplane.streammanager.Enforcement;
-import org.apache.flink.runtime.jobgraph.OperatorID;
+import org.apache.flink.runtime.controlplane.Enforcement;
+import org.apache.flink.runtime.controlplane.abstraction.StreamJobAbstraction;
 import org.apache.flink.runtime.rescale.JobRescaleAction;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
+
+import java.util.List;
 
 /**
  * This interface defined some instruction which could be called by several control policy user defined model
@@ -35,18 +37,24 @@ public interface PrimitiveInstruction extends Instruction {
 	 *
 	 * @return the stream job state maintained in some place (e.g. {@link org.apache.flink.streaming.controlplane.streammanager.StreamManager})
 	 */
-	StreamJobState getStreamJobState();
+	StreamJobAbstraction getStreamJobState();
 
 	void rescaleStreamJob(JobRescaleAction.RescaleParamsWrapper wrapper);
 
+	void rescale(int operatorID, int newParallelism, List<List<Integer>> keyStateAllocation);
+
+	void rebalance(int operatorID, List<List<Integer>> keyStateAllocation);
+
 	/**
 	 * Use to notify job master that some operator inside job vertex changed,
-	 * Thus the corresponding executor could substitute new operator from the original one
+	 * Thus the corresponding executor could substitute new operator from the original one.
+	 *
+	 * todo stream operator factory belongs to flink, should we decouple it?
 	 *
 	 * @param operatorID the id of changed operator
 	 * @param operatorFactory the new operator factory to create new operator
 	 */
-	void changeOperator(OperatorID operatorID, StreamOperatorFactory<?> operatorFactory, ControlPolicy waitingController);
+	void changeOperator(int operatorID, StreamOperatorFactory<?> operatorFactory, ControlPolicy waitingController);
 
 	default void callCustomizeInstruction(Enforcement.EnforcementCaller caller){
 

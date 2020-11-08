@@ -111,6 +111,10 @@ public class FlinkStreamSwitchAdaptor implements ControlPolicy {
 	}
 
 	@Override
+	public void onChangeCompleted(Integer jobVertexID) {
+
+	}
+
 	public void onChangeCompleted(JobVertexID jobVertexID) {
 		this.onMigrationExecutorsStopped(jobVertexID);
 

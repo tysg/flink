@@ -20,7 +20,7 @@ public class ControlOperatorFactory<IN, OUT> implements StreamOperatorFactory<OU
 	private ControlOperator<IN, OUT> operator = null;
 	private final ControlFunction function;
 
-	public ControlOperatorFactory(OperatorID operatorID, ControlFunction function) {
+	public ControlOperatorFactory(int operatorID, ControlFunction function) {
 		// using default control function
 		descriptor = new OperatorDescriptor(operatorID, null);
 		this.function = function;

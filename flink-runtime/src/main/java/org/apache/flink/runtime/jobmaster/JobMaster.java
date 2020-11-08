@@ -31,12 +31,15 @@ import org.apache.flink.runtime.checkpoint.TaskStateSnapshot;
 import org.apache.flink.runtime.clusterframework.types.AllocationID;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
-import org.apache.flink.runtime.controlplane.streammanager.Enforcement;
+import org.apache.flink.runtime.controlplane.Enforcement;
+import org.apache.flink.runtime.controlplane.ReflectJobAbstractionInstanceFactory;
+import org.apache.flink.runtime.controlplane.abstraction.StreamJobAbstraction;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerId;
 import org.apache.flink.runtime.execution.ExecutionState;
 import org.apache.flink.runtime.executiongraph.ArchivedExecutionGraph;
 import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
+import org.apache.flink.runtime.executiongraph.ExecutionGraph;
 import org.apache.flink.runtime.executiongraph.JobStatusListener;
 import org.apache.flink.runtime.heartbeat.HeartbeatListener;
 import org.apache.flink.runtime.heartbeat.HeartbeatManager;
@@ -961,9 +964,15 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		//todo notify upper stream manager or make sm periodly check job status?
 		checkState(streamManagerGatewayFuture != null);
 		streamManagerGatewayFuture.thenAccept(
-			streamManagerGateway -> streamManagerGateway.jobStatusChanged(
-				jobGraph.getJobID(), newJobStatus, timestamp, error,
-				this.schedulerNG.getJobRescaleCoordinator().getOperatorUpdateCoordinator().getExecutionGraph())
+			streamManagerGateway -> {
+				Class<? extends StreamJobAbstraction> Clz = streamManagerGateway.getJobAbstractionClass();
+				ExecutionGraph executionGraph = this.schedulerNG.getJobRescaleCoordinator().getOperatorUpdateCoordinator().getExecutionGraph();
+				StreamJobAbstraction jobAbstraction = ReflectJobAbstractionInstanceFactory.instance.reflectInstance(
+					Clz, jobGraph, executionGraph, executionGraph.getUserClassLoader());
+				streamManagerGateway.jobStatusChanged(
+					jobGraph.getJobID(), newJobStatus, timestamp, error, jobAbstraction
+				);
+			}
 		);
 	}
 

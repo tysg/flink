@@ -11,7 +11,6 @@ import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
 import org.apache.flink.streaming.controlplane.jobgraph.JobGraphRescaler;
 import org.apache.flink.streaming.controlplane.jobgraph.JobGraphOperatorUpdate;
-import org.apache.flink.streaming.controlplane.streammanager.insts.StreamJobState;
 
 import java.util.List;
 import java.util.Map;

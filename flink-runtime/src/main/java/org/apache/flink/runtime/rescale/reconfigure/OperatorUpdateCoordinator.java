@@ -1,7 +1,7 @@
 package org.apache.flink.runtime.rescale.reconfigure;
 
 import org.apache.flink.runtime.concurrent.FutureUtils;
-import org.apache.flink.runtime.controlplane.streammanager.Enforcement;
+import org.apache.flink.runtime.controlplane.Enforcement;
 import org.apache.flink.runtime.executiongraph.Execution;
 import org.apache.flink.runtime.executiongraph.ExecutionGraph;
 import org.apache.flink.runtime.executiongraph.ExecutionJobVertex;

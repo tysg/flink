@@ -34,7 +34,7 @@ public abstract class ControlFunctionManager extends AbstractControlPolicy imple
 	}
 
 	@Override
-	public void reconfigure(OperatorID operatorID, ControlFunction function) {
+	public void reconfigure(int operatorID, ControlFunction function) {
 		System.out.println(System.currentTimeMillis() + ":Substitute `Control` Function...");
 		ControlOperatorFactory<?, ?> operatorFactory = new ControlOperatorFactory<>(
 			operatorID,
