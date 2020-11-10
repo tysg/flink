@@ -2,16 +2,16 @@ package org.apache.flink.streaming.controlplane.udm;
 
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
-import org.apache.flink.runtime.controlplane.abstraction.StreamJobAbstraction;
-import org.apache.flink.streaming.controlplane.streammanager.insts.PrimitiveInstruction;
+import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
+import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
 
 import java.util.Collections;
 import java.util.Iterator;
 
 public class TestingControlPolicy extends AbstractControlPolicy {
 
-	public TestingControlPolicy(PrimitiveInstruction primitiveInstruction) {
-		super(primitiveInstruction);
+	public TestingControlPolicy(ReconfigurationAPI reconfigurationAPI) {
+		super(reconfigurationAPI);
 	}
 
 	@Override
@@ -23,7 +23,7 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 				try {
 					Thread.sleep(5);
 
-					StreamJobAbstraction streamJobState = getInstructionSet().getStreamJobState();
+					StreamJobExecutionPlan streamJobState = getInstructionSet().getJobAbstraction();
 					for (Iterator<OperatorDescriptor> it = streamJobState.getAllOperatorDescriptor(); it.hasNext(); ) {
 						OperatorDescriptor descriptor = it.next();
 						System.out.println(descriptor);
@@ -49,7 +49,7 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 	@Override
 	public void stopControllers() {
 		System.out.println("Testing TestingControlPolicy is stopping...");
-		StreamJobAbstraction streamJobState = getInstructionSet().getStreamJobState();
+		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobAbstraction();
 		for (Iterator<OperatorDescriptor> it = streamJobState.getAllOperatorDescriptor(); it.hasNext(); ) {
 			OperatorDescriptor descriptor = it.next();
 			System.out.println(descriptor);

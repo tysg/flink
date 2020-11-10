@@ -1,10 +1,9 @@
 package org.apache.flink.streaming.controlplane.rescale;
 
 import org.apache.flink.runtime.jobgraph.JobVertexID;
-import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.rescale.JobRescaleAction;
 import org.apache.flink.runtime.rescale.JobRescalePartitionAssignment;
-import org.apache.flink.streaming.controlplane.streammanager.insts.PrimitiveInstruction;
+import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,7 +14,7 @@ public class RescaleActionConsumer implements Runnable {
 
 	private static final Logger LOG = LoggerFactory.getLogger(RescaleActionConsumer.class);
 
-	private final PrimitiveInstruction primitiveInstruction;
+	private final ReconfigurationAPI reconfigurationAPI;
 
 	private final Queue<JobRescaleAction.RescaleParamsWrapper> queue;
 
@@ -23,8 +22,8 @@ public class RescaleActionConsumer implements Runnable {
 
 	private volatile boolean isStop;
 
-	public RescaleActionConsumer(PrimitiveInstruction primitiveInstruction) {
-		this.primitiveInstruction = primitiveInstruction;
+	public RescaleActionConsumer(ReconfigurationAPI reconfigurationAPI) {
+		this.reconfigurationAPI = reconfigurationAPI;
 		this.queue = new LinkedList<>();
 	}
 
@@ -50,7 +49,7 @@ public class RescaleActionConsumer implements Runnable {
 						for(Integer key: partitionAssignment.keySet()){
 							keyStateAllocation.add(key, partitionAssignment.get(key));
 						}
-						primitiveInstruction.rescale(-1, wrapper.newParallelism, keyStateAllocation);
+						reconfigurationAPI.rescale(-1, wrapper.newParallelism, keyStateAllocation);
 
 						while (!isFinished && !isStop) {
 							queue.wait(); // wait for finish

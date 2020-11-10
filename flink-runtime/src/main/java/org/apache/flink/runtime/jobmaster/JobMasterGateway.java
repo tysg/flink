@@ -24,7 +24,7 @@ import org.apache.flink.api.common.time.Time;
 import org.apache.flink.runtime.checkpoint.CheckpointCoordinatorGateway;
 import org.apache.flink.runtime.clusterframework.types.AllocationID;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
-import org.apache.flink.runtime.controlplane.Enforcement;
+import org.apache.flink.runtime.controlplane.PrimitiveOperation;
 import org.apache.flink.runtime.execution.ExecutionState;
 import org.apache.flink.runtime.executiongraph.ArchivedExecutionGraph;
 import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
@@ -288,6 +288,6 @@ public interface JobMasterGateway extends
 	 */
 	void triggerOperatorUpdate(JobGraph jobGraph, JobVertexID targetVertexID, OperatorID operatorID);
 
-	default void callEnforcements(Enforcement.EnforcementCaller enforcementCall){
+	default void callEnforcements(PrimitiveOperation.OperationCaller enforcementCall){
 	}
 }

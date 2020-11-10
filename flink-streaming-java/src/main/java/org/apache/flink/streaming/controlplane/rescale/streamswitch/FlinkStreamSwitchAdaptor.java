@@ -1,7 +1,6 @@
 package org.apache.flink.streaming.controlplane.rescale.streamswitch;
 
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
@@ -10,7 +9,7 @@ import org.apache.flink.runtime.state.KeyGroupRangeAssignment;
 import org.apache.flink.streaming.controlplane.rescale.RescaleActionConsumer;
 import org.apache.flink.streaming.controlplane.rescale.controller.OperatorController;
 import org.apache.flink.streaming.controlplane.rescale.controller.OperatorControllerListener;
-import org.apache.flink.streaming.controlplane.streammanager.insts.PrimitiveInstruction;
+import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,10 +35,10 @@ public class FlinkStreamSwitchAdaptor implements ControlPolicy {
 //	private final long migrationInterval;
 
 	public FlinkStreamSwitchAdaptor(
-		PrimitiveInstruction primitiveInstruction,
+		ReconfigurationAPI reconfigurationAPI,
 		JobGraph jobGraph) {
 
-		this.actionConsumer = new RescaleActionConsumer(primitiveInstruction);
+		this.actionConsumer = new RescaleActionConsumer(reconfigurationAPI);
 
 		this.controllers = new HashMap<>(jobGraph.getNumberOfVertices());
 

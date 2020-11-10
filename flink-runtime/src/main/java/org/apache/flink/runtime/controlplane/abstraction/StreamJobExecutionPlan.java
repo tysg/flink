@@ -5,6 +5,6 @@ package org.apache.flink.runtime.controlplane.abstraction;
  * put it on the third module (may call streammanger-common), make both our stream manager and flink runtime import this module
  *
  */
-public interface StreamJobAbstraction extends DeployGraphState, OperatorGraphState{
+public interface StreamJobExecutionPlan extends ExecutionGraphConfig, JobGraphConfig {
 
 }

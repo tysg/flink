@@ -18,12 +18,13 @@
 
 package org.apache.flink.streaming.controlplane.streammanager.insts;
 
+import org.apache.flink.annotation.Internal;
 import org.apache.flink.api.common.functions.Function;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
-import org.apache.flink.runtime.controlplane.abstraction.DeployGraphState;
+import org.apache.flink.runtime.controlplane.abstraction.ExecutionGraphConfig;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
-import org.apache.flink.runtime.controlplane.abstraction.StreamJobAbstraction;
+import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
 import org.apache.flink.runtime.executiongraph.ExecutionGraph;
 import org.apache.flink.runtime.executiongraph.ExecutionJobVertex;
 import org.apache.flink.runtime.executiongraph.ExecutionVertex;
@@ -43,15 +44,16 @@ import org.apache.flink.util.Preconditions;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public final class StreamJobExecutionPlan implements StreamJobAbstraction {
+public final class StreamJobExecutionPlanImpl implements StreamJobExecutionPlan {
 
 	private final Map<Integer, OperatorDescriptor> allOperatorsById = new LinkedHashMap<>();
 	private final OperatorDescriptor[] heads;
 
-	private final Map<Integer, List<DeployGraphState.OperatorTask>> operatorTaskListMap = new HashMap<>();
+	private final Map<Integer, List<ExecutionGraphConfig.OperatorTask>> operatorTaskListMap = new HashMap<>();
 	private final Collection<Host> hosts;
 
-	public StreamJobExecutionPlan(JobGraph jobGraph, ExecutionGraph executionGraph, ClassLoader userLoader) {
+	@Internal
+	public StreamJobExecutionPlanImpl(JobGraph jobGraph, ExecutionGraph executionGraph, ClassLoader userLoader) {
 		heads = initialOperatorGraphState(jobGraph, userLoader);
 
 		Map<OperatorID, Integer> operatorIdToVertexId = new HashMap<>();
@@ -200,11 +202,11 @@ public final class StreamJobExecutionPlan implements StreamJobAbstraction {
 
 	// DeployGraphState related
 	private Collection<Host> initDeploymentGraphState(ExecutionGraph executionGraph, Map<OperatorID, Integer> operatorIdToVertexId) {
-		Map<ResourceID, StreamJobAbstraction.Host> hosts = new HashMap<>();
+		Map<ResourceID, org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan.Host> hosts = new HashMap<>();
 
 		for (ExecutionJobVertex jobVertex : executionGraph.getAllVertices().values()) {
 			// contains all tasks of the same parallel operator instances
-			List<DeployGraphState.OperatorTask> operatorTaskList = new ArrayList<>(jobVertex.getParallelism());
+			List<ExecutionGraphConfig.OperatorTask> operatorTaskList = new ArrayList<>(jobVertex.getParallelism());
 			for (ExecutionVertex vertex : jobVertex.getTaskVertices()) {
 				LogicalSlot slot;
 				do {
@@ -216,13 +218,13 @@ public final class StreamJobExecutionPlan implements StreamJobAbstraction {
 					}
 				} while (slot == null);
 
-				StreamJobAbstraction.Host host = hosts.get(slot.getTaskManagerLocation().getResourceID());
+				org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan.Host host = hosts.get(slot.getTaskManagerLocation().getResourceID());
 				if (host == null) {
-					host = new StreamJobAbstraction.Host(slot.getTaskManagerLocation().address(), 0, 0);
+					host = new org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan.Host(slot.getTaskManagerLocation().address(), 0, 0);
 					hosts.put(slot.getTaskManagerLocation().getResourceID(), host);
 				}
 				// todo how to get cpu, number of threads, memory?
-				StreamJobAbstraction.OperatorTask operatorTask = new StreamJobAbstraction.OperatorTask(slot.getPhysicalSlotNumber(), host);
+				org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan.OperatorTask operatorTask = new org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan.OperatorTask(slot.getPhysicalSlotNumber(), host);
 				operatorTaskList.add(operatorTask);
 			}
 			for (OperatorID operatorID : jobVertex.getOperatorIDs()) {
@@ -233,12 +235,12 @@ public final class StreamJobExecutionPlan implements StreamJobAbstraction {
 	}
 
 	@Override
-	public StreamJobAbstraction.Host[] getHosts() {
-		return hosts.toArray(new StreamJobAbstraction.Host[0]);
+	public org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan.Host[] getHosts() {
+		return hosts.toArray(new org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan.Host[0]);
 	}
 
 	@Override
-	public StreamJobAbstraction.OperatorTask getTask(Integer operatorID, int offset) {
+	public org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan.OperatorTask getTask(Integer operatorID, int offset) {
 		return operatorTaskListMap.get(operatorID).get(offset);
 	}
 

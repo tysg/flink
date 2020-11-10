@@ -24,16 +24,14 @@ import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
-import org.apache.flink.runtime.controlplane.Enforcement;
-import org.apache.flink.runtime.controlplane.abstraction.StreamJobAbstraction;
+import org.apache.flink.runtime.controlplane.PrimitiveOperation;
+import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerId;
 import org.apache.flink.runtime.dispatcher.DispatcherGateway;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
-import org.apache.flink.runtime.executiongraph.ExecutionGraph;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
-import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobmaster.JobMasterGateway;
 import org.apache.flink.runtime.jobmaster.JobMasterId;
 import org.apache.flink.runtime.jobmaster.JobMasterRegistrationSuccess;
@@ -52,10 +50,10 @@ import org.apache.flink.streaming.controlplane.reconfigure.TestingCFManager;
 import org.apache.flink.streaming.controlplane.rescale.StreamJobGraphRescaler;
 import org.apache.flink.streaming.controlplane.rescale.streamswitch.FlinkStreamSwitchAdaptor;
 import org.apache.flink.streaming.controlplane.streammanager.exceptions.StreamManagerException;
-import org.apache.flink.streaming.controlplane.streammanager.insts.PrimitiveInstruction;
-import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurableStreamJobExecutionPlan;
-import org.apache.flink.streaming.controlplane.streammanager.insts.StreamJobExecutionPlan;
-import org.apache.flink.streaming.controlplane.streammanager.insts.StreamJobReconfigurable;
+import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
+import org.apache.flink.streaming.controlplane.streammanager.insts.StreamJobAbstraction;
+import org.apache.flink.streaming.controlplane.streammanager.insts.StreamJobAbstractionImpl;
+import org.apache.flink.streaming.controlplane.streammanager.insts.StreamJobExecutionPlanImpl;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 import org.apache.flink.streaming.controlplane.udm.TestingControlPolicy;
 import org.apache.flink.util.OptionalConsumer;
@@ -75,7 +73,7 @@ import static org.apache.flink.util.Preconditions.checkState;
  * 2. initialize other fields
  * 3. i do not know how to decouple the connection between stream manager and flink job master
  */
-public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements StreamManagerGateway, StreamManagerService, PrimitiveInstruction {
+public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements StreamManagerGateway, StreamManagerService, ReconfigurationAPI {
 
 	/**
 	 * Default names for Flink's distributed components.
@@ -102,7 +100,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 	private final List<ControlPolicy> controlPolicyList = new LinkedList<>();
 
-	private ReconfigurableStreamJobExecutionPlan streamJobState;
+	private StreamJobAbstraction jobAbstraction;
 
 	private CompletableFuture<Acknowledge> rescalePartitionFuture;
 
@@ -319,7 +317,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		try {
 			checkState(keyStateAllocation.size()==newParallelism,
 				"new parallelism not match key state allocation");
-			this.streamJobState.setStateUpdatingFlag(null);
+			this.jobAbstraction.setStateUpdatingFlag(null);
 
 			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
 //			runAsync(() -> jobMasterGateway.triggerOperatorUpdate(this.jobGraph, jobVertexId, operatorID));
@@ -338,7 +336,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					.thenAccept(
 						(acknowledge) -> {
 							try {
-								this.streamJobState.notifyUpdateFinished(null);
+								this.jobAbstraction.notifyUpdateFinished(null);
 							} catch (Exception e) {
 								e.printStackTrace();
 							}
@@ -354,7 +352,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	@Override
 	public void rebalance(int operatorID, List<List<Integer>> keyStateAllocation) {
 		try {
-			this.streamJobState.setStateUpdatingFlag(null);
+			this.jobAbstraction.setStateUpdatingFlag(null);
 
 			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
 //			runAsync(() -> jobMasterGateway.triggerOperatorUpdate(this.jobGraph, jobVertexId, operatorID));
@@ -371,7 +369,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					.thenAccept(
 						(acknowledge) -> {
 							try {
-								this.streamJobState.notifyUpdateFinished(null);
+								this.jobAbstraction.notifyUpdateFinished(null);
 							} catch (Exception e) {
 								e.printStackTrace();
 							}
@@ -391,10 +389,10 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	}
 
 	@Override
-	public void jobStatusChanged(JobID jobId, JobStatus newJobStatus, long timestamp, Throwable error, StreamJobAbstraction jobAbstraction) {
+	public void jobStatusChanged(JobID jobId, JobStatus newJobStatus, long timestamp, Throwable error, StreamJobExecutionPlan jobAbstraction) {
 		runAsync(
 			() -> {
-				this.streamJobState = new ReconfigurableStreamJobExecutionPlan(jobAbstraction);
+				this.jobAbstraction = new StreamJobAbstractionImpl(jobAbstraction);
 				if (newJobStatus == JobStatus.RUNNING) {
 					for (ControlPolicy policy : controlPolicyList) {
 						policy.startControllers();
@@ -409,8 +407,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	}
 
 	@Override
-	public Class<? extends StreamJobAbstraction> getJobAbstractionClass() {
-		return StreamJobExecutionPlan.class;
+	public Class<? extends StreamJobExecutionPlan> getJobAbstractionClass() {
+		return StreamJobExecutionPlanImpl.class;
 	}
 
 
@@ -537,8 +535,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	}
 
 	@Override
-	public StreamJobAbstraction getStreamJobState() {
-		return checkNotNull(streamJobState, "stream job state have not been initialized");
+	public StreamJobExecutionPlan getJobAbstraction() {
+		return checkNotNull(jobAbstraction, "stream job abstraction (execution plan) have not been initialized");
 	}
 
 	// ------------------------------------------------------------------------
@@ -586,9 +584,9 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	}
 
 	@Override
-	public void changeOperator(int operatorID, StreamOperatorFactory<?> operatorFactory, ControlPolicy waitingController) {
+	public void reconfigureUserFunction(int operatorID, StreamOperatorFactory<?> operatorFactory, ControlPolicy waitingController) {
 		try {
-			this.streamJobState.setStateUpdatingFlag(waitingController);
+			this.jobAbstraction.setStateUpdatingFlag(waitingController);
 
 			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
 //			runAsync(() -> jobMasterGateway.triggerOperatorUpdate(this.jobGraph, jobVertexId, operatorID));
@@ -603,7 +601,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					.thenAccept(
 						(acknowledge) -> {
 							try {
-								this.streamJobState.notifyUpdateFinished(null);
+								this.jobAbstraction.notifyUpdateFinished(null);
 							} catch (Exception e) {
 								e.printStackTrace();
 							}
@@ -615,7 +613,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		}
 	}
 
-	public void callCustomizeInstruction(Enforcement.EnforcementCaller caller) {
+	public void callCustomizeInstruction(PrimitiveOperation.OperationCaller caller) {
 		try {
 			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
 //			runAsync(() -> jobMasterGateway.triggerOperatorUpdate(this.jobGraph, jobVertexId, operatorID));

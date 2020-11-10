@@ -31,9 +31,9 @@ import org.apache.flink.runtime.checkpoint.TaskStateSnapshot;
 import org.apache.flink.runtime.clusterframework.types.AllocationID;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
-import org.apache.flink.runtime.controlplane.Enforcement;
+import org.apache.flink.runtime.controlplane.PrimitiveOperation;
 import org.apache.flink.runtime.controlplane.ReflectJobAbstractionInstanceFactory;
-import org.apache.flink.runtime.controlplane.abstraction.StreamJobAbstraction;
+import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerId;
 import org.apache.flink.runtime.execution.ExecutionState;
@@ -508,7 +508,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 	}
 
 	@Override
-	public void callEnforcements(Enforcement.EnforcementCaller caller){
+	public void callEnforcements(PrimitiveOperation.OperationCaller caller){
 		validateRunsInMainThread();
 		JobRescaleCoordinator rescaleCoordinator = schedulerNG.getJobRescaleCoordinator();
 		caller.call(rescaleCoordinator.getOperatorUpdateCoordinator());
@@ -965,9 +965,9 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		checkState(streamManagerGatewayFuture != null);
 		streamManagerGatewayFuture.thenAccept(
 			streamManagerGateway -> {
-				Class<? extends StreamJobAbstraction> Clz = streamManagerGateway.getJobAbstractionClass();
+				Class<? extends StreamJobExecutionPlan> Clz = streamManagerGateway.getJobAbstractionClass();
 				ExecutionGraph executionGraph = this.schedulerNG.getJobRescaleCoordinator().getOperatorUpdateCoordinator().getExecutionGraph();
-				StreamJobAbstraction jobAbstraction = ReflectJobAbstractionInstanceFactory.instance.reflectInstance(
+				StreamJobExecutionPlan jobAbstraction = ReflectJobAbstractionInstanceFactory.INSTANCE.reflectInstance(
 					Clz, jobGraph, executionGraph, executionGraph.getUserClassLoader());
 				streamManagerGateway.jobStatusChanged(
 					jobGraph.getJobID(), newJobStatus, timestamp, error, jobAbstraction

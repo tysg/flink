@@ -7,7 +7,7 @@ import java.util.List;
 /**
  * Deployment state should be get in real time since it is changed due to streaming system fail/restart strategy
  */
-public interface DeployGraphState {
+public interface ExecutionGraphConfig {
 	/**
 	 * Get all hosts of current job
 	 *

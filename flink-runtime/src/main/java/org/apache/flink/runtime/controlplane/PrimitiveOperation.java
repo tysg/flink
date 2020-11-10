@@ -36,7 +36,7 @@ import java.util.concurrent.CompletableFuture;
  * updateMapping()
  * updateState()
  */
-public interface Enforcement {
+public interface PrimitiveOperation {
 
 	CompletableFuture<Void> prepareExecutionPlan();
 
@@ -51,8 +51,8 @@ public interface Enforcement {
 	CompletableFuture<Acknowledge> updateFunction(@Nullable JobGraph jobGraph, JobVertexID targetVertexID, OperatorID operatorID);
 
 	@FunctionalInterface
-	interface EnforcementCaller {
-		void call(Enforcement enforcement);
+	interface OperationCaller {
+		void call(PrimitiveOperation primitiveOperation);
 	}
 
 }

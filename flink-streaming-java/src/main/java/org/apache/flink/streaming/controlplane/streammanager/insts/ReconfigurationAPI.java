@@ -18,8 +18,8 @@
 
 package org.apache.flink.streaming.controlplane.streammanager.insts;
 
-import org.apache.flink.runtime.controlplane.Enforcement;
-import org.apache.flink.runtime.controlplane.abstraction.StreamJobAbstraction;
+import org.apache.flink.runtime.controlplane.PrimitiveOperation;
+import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
 import org.apache.flink.runtime.rescale.JobRescaleAction;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
@@ -28,16 +28,16 @@ import java.util.List;
 
 /**
  * This interface defined some instruction which could be called by several control policy user defined model
- * to update the stream job state maintained by stream manager.
+ * to update the stream job execution plan which is maintained by stream manager.
  */
-public interface PrimitiveInstruction extends Instruction {
+public interface ReconfigurationAPI {
 
 	/**
 	 * Get the state of stream job managed by this stream manager
 	 *
 	 * @return the stream job state maintained in some place (e.g. {@link org.apache.flink.streaming.controlplane.streammanager.StreamManager})
 	 */
-	StreamJobAbstraction getStreamJobState();
+	StreamJobExecutionPlan getJobAbstraction();
 
 	void rescaleStreamJob(JobRescaleAction.RescaleParamsWrapper wrapper);
 
@@ -54,9 +54,9 @@ public interface PrimitiveInstruction extends Instruction {
 	 * @param operatorID the id of changed operator
 	 * @param operatorFactory the new operator factory to create new operator
 	 */
-	void changeOperator(int operatorID, StreamOperatorFactory<?> operatorFactory, ControlPolicy waitingController);
+	void reconfigureUserFunction(int operatorID, StreamOperatorFactory<?> operatorFactory, ControlPolicy waitingController);
 
-	default void callCustomizeInstruction(Enforcement.EnforcementCaller caller){
+	default void callCustomizeInstruction(PrimitiveOperation.OperationCaller caller){
 
 	}
 }

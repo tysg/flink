@@ -6,7 +6,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-public interface OperatorGraphState {
+public interface JobGraphConfig {
 	/**
 	 * Return UserFunction, StreamOperator, or StreamOperatorFactory?
 	 * The Function type belongs to Flink, should we use a new data structure since we want to decouple

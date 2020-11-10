@@ -19,6 +19,7 @@
 package org.apache.flink.streaming.controlplane.streammanager.insts;
 
 import org.apache.flink.annotation.Internal;
+import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 
 import javax.annotation.Nullable;
@@ -41,7 +42,7 @@ import javax.annotation.Nullable;
  * H represents the hosts in the cluster, each host has a certain number of CPU and memory resources.
  * T is the set of tasks, the main information in T is: number of threads owned by each task and task location.
  */
-public interface StreamJobReconfigurable {
+public interface StreamJobAbstraction extends StreamJobExecutionPlan {
 	/**
 	 * get job graph from stream manager (the state of stream manager)
 	 *

@@ -1,11 +1,10 @@
 package org.apache.flink.streaming.controlplane.reconfigure;
 
-import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.streaming.controlplane.reconfigure.operator.ControlFunction;
 import org.apache.flink.streaming.controlplane.reconfigure.operator.ControlOperatorFactory;
 import org.apache.flink.streaming.controlplane.reconfigure.type.FunctionTypeStorage;
 import org.apache.flink.streaming.controlplane.reconfigure.type.InMemoryFunctionStorge;
-import org.apache.flink.streaming.controlplane.streammanager.insts.PrimitiveInstruction;
+import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
 import org.apache.flink.streaming.controlplane.udm.AbstractControlPolicy;
 
 /**
@@ -15,8 +14,8 @@ public abstract class ControlFunctionManager extends AbstractControlPolicy imple
 
 	private FunctionTypeStorage functionTypeStorage;
 
-	ControlFunctionManager(PrimitiveInstruction primitiveInstruction) {
-		super(primitiveInstruction);
+	ControlFunctionManager(ReconfigurationAPI reconfigurationAPI) {
+		super(reconfigurationAPI);
 		this.functionTypeStorage = new InMemoryFunctionStorge();
 	}
 
@@ -41,7 +40,7 @@ public abstract class ControlFunctionManager extends AbstractControlPolicy imple
 			function);
 		try {
 			// since job graph is shared in stream manager and among its services, we don't need to pass it
-			getInstructionSet().changeOperator(operatorID, operatorFactory, this);
+			getInstructionSet().reconfigureUserFunction(operatorID, operatorFactory, this);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

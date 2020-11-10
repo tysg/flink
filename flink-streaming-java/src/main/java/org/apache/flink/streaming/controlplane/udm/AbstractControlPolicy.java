@@ -1,16 +1,16 @@
 package org.apache.flink.streaming.controlplane.udm;
 
-import org.apache.flink.streaming.controlplane.streammanager.insts.PrimitiveInstruction;
+import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
 
 public abstract class AbstractControlPolicy implements ControlPolicy{
 
-	private final PrimitiveInstruction primitiveInstruction;
+	private final ReconfigurationAPI reconfigurationAPI;
 
-	protected AbstractControlPolicy(PrimitiveInstruction primitiveInstruction){
-		this.primitiveInstruction = primitiveInstruction;
+	protected AbstractControlPolicy(ReconfigurationAPI reconfigurationAPI){
+		this.reconfigurationAPI = reconfigurationAPI;
 	}
 
-	public PrimitiveInstruction getInstructionSet() {
-		return primitiveInstruction;
+	public ReconfigurationAPI getInstructionSet() {
+		return reconfigurationAPI;
 	}
 }

@@ -1,10 +1,10 @@
 package org.apache.flink.streaming.controlplane.reconfigure;
 
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
-import org.apache.flink.runtime.controlplane.abstraction.OperatorGraphState;
-import org.apache.flink.runtime.controlplane.abstraction.StreamJobAbstraction;
+import org.apache.flink.runtime.controlplane.abstraction.JobGraphConfig;
+import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
 import org.apache.flink.streaming.controlplane.reconfigure.operator.ControlFunction;
-import org.apache.flink.streaming.controlplane.streammanager.insts.PrimitiveInstruction;
+import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 
 import javax.annotation.Nonnull;
@@ -13,15 +13,15 @@ import java.util.Iterator;
 public class TestingCFManager extends ControlFunctionManager implements ControlPolicy {
 
 
-	public TestingCFManager(PrimitiveInstruction primitiveInstruction) {
-		super(primitiveInstruction);
+	public TestingCFManager(ReconfigurationAPI reconfigurationAPI) {
+		super(reconfigurationAPI);
 	}
 
 	@Override
 	public void startControllerInternal() {
 		System.out.println("Testing Control Function Manager starting...");
 
-		StreamJobAbstraction jobState = getInstructionSet().getStreamJobState();
+		StreamJobExecutionPlan jobState = getInstructionSet().getJobAbstraction();
 
 		int secondOperatorId = findOperatorByName(jobState, "filte");
 
@@ -36,7 +36,7 @@ public class TestingCFManager extends ControlFunctionManager implements ControlP
 
 	private void getKeyStateMapping(int operatorID){
 		try {
-			this.getInstructionSet().getStreamJobState().getKeyMapping(operatorID);
+			this.getInstructionSet().getJobAbstraction().getKeyMapping(operatorID);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -45,7 +45,7 @@ public class TestingCFManager extends ControlFunctionManager implements ControlP
 
 	private void getKeyStateAllocation(int operatorID){
 		try {
-			this.getInstructionSet().getStreamJobState().getKeyStateAllocation(operatorID);
+			this.getInstructionSet().getJobAbstraction().getKeyStateAllocation(operatorID);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -74,8 +74,8 @@ public class TestingCFManager extends ControlFunctionManager implements ControlP
 	}
 
 
-	private int findOperatorByName(OperatorGraphState operatorGraphState, @Nonnull String name) {
-		for (Iterator<OperatorDescriptor> it = operatorGraphState.getAllOperatorDescriptor(); it.hasNext(); ) {
+	private int findOperatorByName(JobGraphConfig jobGraphConfig, @Nonnull String name) {
+		for (Iterator<OperatorDescriptor> it = jobGraphConfig.getAllOperatorDescriptor(); it.hasNext(); ) {
 			OperatorDescriptor descriptor = it.next();
 			if(descriptor.getName().equals(name)){
 				return descriptor.getOperatorID();

@@ -22,21 +22,14 @@ import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
-import org.apache.flink.runtime.controlplane.abstraction.StreamJobAbstraction;
-import org.apache.flink.runtime.executiongraph.ExecutionGraph;
-import org.apache.flink.runtime.executiongraph.JobStatusListener;
-import org.apache.flink.runtime.jobgraph.JobGraph;
+import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
-import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobmaster.JobMaster;
 import org.apache.flink.runtime.jobmaster.JobMasterId;
 import org.apache.flink.runtime.registration.RegistrationResponse;
-import org.apache.flink.runtime.rescale.JobRescaleAction;
-import org.apache.flink.runtime.rescale.JobRescalePartitionAssignment;
 import org.apache.flink.runtime.rpc.FencedRpcGateway;
 import org.apache.flink.runtime.rpc.RpcTimeout;
 
-import javax.annotation.Nullable;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -87,8 +80,8 @@ public interface StreamManagerGateway extends FencedRpcGateway<StreamManagerId> 
 	 * @param error         In case the job status switches to a failure state, this is the
 	 *                      exception that caused the failure.
 	 */
-	void jobStatusChanged(JobID jobId, JobStatus newJobStatus, long timestamp, Throwable error, StreamJobAbstraction jobAbstraction);
+	void jobStatusChanged(JobID jobId, JobStatus newJobStatus, long timestamp, Throwable error, StreamJobExecutionPlan jobAbstraction);
 
-	Class<? extends StreamJobAbstraction> getJobAbstractionClass();
+	Class<? extends StreamJobExecutionPlan> getJobAbstractionClass();
 
 }
