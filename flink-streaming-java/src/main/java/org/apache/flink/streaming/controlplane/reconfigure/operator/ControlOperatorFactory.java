@@ -1,7 +1,5 @@
 package org.apache.flink.streaming.controlplane.reconfigure.operator;
 
-import org.apache.flink.runtime.jobgraph.JobGraph;
-import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.*;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
@@ -15,14 +13,14 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 public class ControlOperatorFactory<IN, OUT> implements StreamOperatorFactory<OUT> {
 
 	// use to check whether this operator update is valid
-	OperatorDescriptor descriptor;
+	OperatorIOTypeDescriptor descriptor;
 
 	private ControlOperator<IN, OUT> operator = null;
 	private final ControlFunction function;
 
 	public ControlOperatorFactory(int operatorID, ControlFunction function) {
 		// using default control function
-		descriptor = new OperatorDescriptor(operatorID, null);
+		descriptor = new OperatorIOTypeDescriptor(operatorID);
 		this.function = function;
 	}
 

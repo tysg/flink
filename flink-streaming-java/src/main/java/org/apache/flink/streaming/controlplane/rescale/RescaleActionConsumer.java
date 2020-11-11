@@ -4,6 +4,7 @@ import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.rescale.JobRescaleAction;
 import org.apache.flink.runtime.rescale.JobRescalePartitionAssignment;
 import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
+import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,6 +16,7 @@ public class RescaleActionConsumer implements Runnable {
 	private static final Logger LOG = LoggerFactory.getLogger(RescaleActionConsumer.class);
 
 	private final ReconfigurationAPI reconfigurationAPI;
+	private final ControlPolicy controlPolicy;
 
 	private final Queue<JobRescaleAction.RescaleParamsWrapper> queue;
 
@@ -22,8 +24,9 @@ public class RescaleActionConsumer implements Runnable {
 
 	private volatile boolean isStop;
 
-	public RescaleActionConsumer(ReconfigurationAPI reconfigurationAPI) {
+	public RescaleActionConsumer(ReconfigurationAPI reconfigurationAPI, ControlPolicy controlPolicy) {
 		this.reconfigurationAPI = reconfigurationAPI;
+		this.controlPolicy = controlPolicy;
 		this.queue = new LinkedList<>();
 	}
 
@@ -50,7 +53,7 @@ public class RescaleActionConsumer implements Runnable {
 							keyStateAllocation.add(key, partitionAssignment.get(key));
 						}
 						// todo should we use JobVertexID in user defined control policy?
-						reconfigurationAPI.rescale(-1, wrapper.newParallelism, keyStateAllocation);
+						reconfigurationAPI.rescale(-1, wrapper.newParallelism, keyStateAllocation, controlPolicy);
 
 						while (!isFinished && !isStop) {
 							queue.wait(); // wait for finish

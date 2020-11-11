@@ -38,7 +38,7 @@ public class FlinkStreamSwitchAdaptor implements ControlPolicy {
 		ReconfigurationAPI reconfigurationAPI,
 		JobGraph jobGraph) {
 
-		this.actionConsumer = new RescaleActionConsumer(reconfigurationAPI);
+		this.actionConsumer = new RescaleActionConsumer(reconfigurationAPI, this);
 
 		this.controllers = new HashMap<>(jobGraph.getNumberOfVertices());
 
