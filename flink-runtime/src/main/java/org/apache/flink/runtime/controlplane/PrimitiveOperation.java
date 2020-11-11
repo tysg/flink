@@ -103,7 +103,8 @@ public interface PrimitiveOperation {
 	CompletableFuture<Acknowledge> updateFunction(int vertexID, int offset);
 
 	/**
-	 * Deprecated since we need a general primitive operation, use code{@code PrimitiveOperation::updateFunction(int vertexID, int offset)}
+	 * Deprecated since we need a general primitive operation, use {@code PrimitiveOperation::updateFunction(int vertexID, int offset)},
+	 * The JobGraph should be not visitable for control policy writer.
 	 *
 	 * @param jobGraph
 	 * @param targetVertexID

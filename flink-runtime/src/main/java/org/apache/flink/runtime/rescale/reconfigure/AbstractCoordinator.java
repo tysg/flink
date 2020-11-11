@@ -82,6 +82,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation {
 	}
 
 	@Override
+	@Deprecated
 	public CompletableFuture<Acknowledge> updateFunction(JobGraph jobGraph, JobVertexID targetVertexID, OperatorID operatorID) {
 		System.out.println("some one want to triggerOperatorUpdate using OperatorUpdateCoordinator?");
 //		this.jobGraph = jobGraph;

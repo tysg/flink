@@ -323,20 +323,17 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 	public void rescale(int operatorID, int newParallelism, List<List<Integer>> keyStateAllocation, ControlPolicy waitingController){
 		try {
+			// scale in is not support now
 			checkState(keyStateAllocation.size()==newParallelism,
 				"new parallelism not match key state allocation");
 			this.jobAbstraction.setStateUpdatingFlag(waitingController);
 
 			OperatorDescriptor targetDescriptor = jobAbstraction.getOperatorDescriptorByID(operatorID);
-			List<Tuple2<Integer, Integer>> affectedTasks = new ArrayList<>();
-			for(int i=0;i<targetDescriptor.getParallelism();i++){
-				affectedTasks.add(Tuple2.of(operatorID, i));
-			}
-			for(OperatorDescriptor descriptor: targetDescriptor.getParents()){
-				for(int i=0;i<descriptor.getParallelism();i++){
-					affectedTasks.add(Tuple2.of(operatorID, i));
-				}
-			}
+			List<Tuple2<Integer, Integer>> affectedTasks  = targetDescriptor.getParents()
+				.stream()
+				.map(d -> Tuple2.of(d.getOperatorID(), -1))
+				.collect(Collectors.toList());
+			affectedTasks.add(Tuple2.of(operatorID, -1));
 
 			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
 //			runAsync(() -> jobMasterGateway.triggerOperatorUpdate(this.jobGraph, jobVertexId, operatorID));
@@ -378,16 +375,11 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		try {
 			this.jobAbstraction.setStateUpdatingFlag(waitingController);
 			OperatorDescriptor targetDescriptor = jobAbstraction.getOperatorDescriptorByID(operatorID);
-
-			List<Tuple2<Integer, Integer>> affectedTasks = new ArrayList<>();
-			for(int i=0;i<targetDescriptor.getParallelism();i++){
-				affectedTasks.add(Tuple2.of(operatorID, i));
-			}
-			for(OperatorDescriptor descriptor: targetDescriptor.getParents()){
-				for(int i=0;i<descriptor.getParallelism();i++){
-					affectedTasks.add(Tuple2.of(operatorID, i));
-				}
-			}
+			List<Tuple2<Integer, Integer>> affectedTasks  = targetDescriptor.getParents()
+				.stream()
+				.map(d -> Tuple2.of(d.getOperatorID(), -1))
+				.collect(Collectors.toList());
+			affectedTasks.add(Tuple2.of(operatorID, -1));
 
 			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
 //			runAsync(() -> jobMasterGateway.triggerOperatorUpdate(this.jobGraph, jobVertexId, operatorID));
@@ -435,16 +427,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					.thenCompose(
 						o -> enforcement.prepareExecutionPlan(jobAbstraction, operatorID))
 					.thenCompose(
-						o -> enforcement.synchronizeTasks(
-							Stream.of(target)
-								.flatMap(
-									(Function<OperatorDescriptor, Stream<Tuple2<Integer, Integer>>>) operatorDescriptor -> {
-									List<Tuple2<Integer, Integer>> affectedTasks = new ArrayList<>();
-									for(int i=0;i<operatorDescriptor.getParallelism();i++){
-										affectedTasks.add(Tuple2.of(operatorDescriptor.getOperatorID(), i));
-									}
-									return affectedTasks.stream();
-								}).collect(Collectors.toList())))
+						o -> enforcement.synchronizeTasks(Collections.singletonList(Tuple2.of(operatorID, -1))))
 					.thenCompose(
 						o -> enforcement.updateFunction(operatorID, -1))
 					.thenAccept(
