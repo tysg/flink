@@ -96,4 +96,9 @@ public class StreamJobAbstractionImpl implements StreamJobAbstraction {
 	public Iterator<OperatorDescriptor> getAllOperatorDescriptor() {
 		return streamJobExecutionPlanDelegate.getAllOperatorDescriptor();
 	}
+
+	@Override
+	public OperatorDescriptor getOperatorDescriptorByID(Integer operatorID) {
+		return streamJobExecutionPlanDelegate.getOperatorDescriptorByID(operatorID);
+	}
 }

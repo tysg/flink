@@ -25,10 +25,11 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.controlplane.PrimitiveOperation;
+import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
 import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
+import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerId;
 import org.apache.flink.runtime.dispatcher.DispatcherGateway;
-import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
@@ -37,15 +38,17 @@ import org.apache.flink.runtime.jobmaster.JobMasterId;
 import org.apache.flink.runtime.jobmaster.JobMasterRegistrationSuccess;
 import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.registration.RegistrationResponse;
-import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
-import org.apache.flink.streaming.controlplane.jobgraph.JobGraphRescaler;
 import org.apache.flink.runtime.rescale.JobRescaleAction;
 import org.apache.flink.runtime.resourcemanager.JobLeaderIdActions;
 import org.apache.flink.runtime.resourcemanager.JobLeaderIdService;
 import org.apache.flink.runtime.resourcemanager.registration.JobManagerRegistration;
-import org.apache.flink.runtime.rpc.*;
+import org.apache.flink.runtime.rpc.FatalErrorHandler;
+import org.apache.flink.runtime.rpc.FencedRpcEndpoint;
+import org.apache.flink.runtime.rpc.RpcService;
+import org.apache.flink.runtime.rpc.RpcUtils;
 import org.apache.flink.runtime.rpc.akka.AkkaRpcServiceUtils;
 import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
+import org.apache.flink.streaming.controlplane.jobgraph.JobGraphRescaler;
 import org.apache.flink.streaming.controlplane.reconfigure.TestingCFManager;
 import org.apache.flink.streaming.controlplane.rescale.StreamJobGraphRescaler;
 import org.apache.flink.streaming.controlplane.rescale.streamswitch.FlinkStreamSwitchAdaptor;
@@ -60,6 +63,9 @@ import org.apache.flink.util.OptionalConsumer;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.apache.flink.util.Preconditions.checkState;
@@ -313,30 +319,46 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		runAsync(() -> jobMasterGateway.triggerJobRescale(wrapper, jobGraph, upDownStream.f0, upDownStream.f1));
 	}
 
-	public void rescale(int operatorID, int newParallelism, List<List<Integer>> keyStateAllocation){
+	public void rescale(int operatorID, int newParallelism, List<List<Integer>> keyStateAllocation, ControlPolicy waitingController){
 		try {
 			checkState(keyStateAllocation.size()==newParallelism,
 				"new parallelism not match key state allocation");
-			this.jobAbstraction.setStateUpdatingFlag(null);
+			this.jobAbstraction.setStateUpdatingFlag(waitingController);
+
+			OperatorDescriptor targetDescriptor = jobAbstraction.getOperatorDescriptorByID(operatorID);
+			List<Tuple2<Integer, Integer>> affectedTasks = new ArrayList<>();
+			for(int i=0;i<targetDescriptor.getParallelism();i++){
+				affectedTasks.add(Tuple2.of(operatorID, i));
+			}
+			for(OperatorDescriptor descriptor: targetDescriptor.getParents()){
+				for(int i=0;i<descriptor.getParallelism();i++){
+					affectedTasks.add(Tuple2.of(operatorID, i));
+				}
+			}
 
 			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
 //			runAsync(() -> jobMasterGateway.triggerOperatorUpdate(this.jobGraph, jobVertexId, operatorID));
-			runAsync(() -> jobMasterGateway.callEnforcements(
+			runAsync(() -> jobMasterGateway.callOperations(
 				enforcement -> FutureUtils.completedVoidFuture()
 					.thenCompose(
-						o -> enforcement.prepareExecutionPlan())
+						o -> enforcement.prepareExecutionPlan(jobAbstraction, operatorID))
 					.thenCompose(
-						o -> enforcement.synchronizeTasks(Collections.emptyList()))
+						o -> enforcement.synchronizeTasks(affectedTasks))
 					.thenCompose(
-						o -> enforcement.deployTasks())
+						o -> enforcement.deployTasks(operatorID, newParallelism))
 					.thenCompose(
-						o -> enforcement.updateMapping())
-					.thenCompose(
-						o -> enforcement.updateState())
+						o -> CompletableFuture.allOf(
+							targetDescriptor.getParents()
+								.stream()
+								.map(d -> enforcement.updateMapping(d.getOperatorID(), -1))
+								.toArray(CompletableFuture[]::new)
+						)
+					).thenCompose(
+						o -> enforcement.updateState(operatorID, -1))
 					.thenAccept(
 						(acknowledge) -> {
 							try {
-								this.jobAbstraction.notifyUpdateFinished(null);
+								this.jobAbstraction.notifyUpdateFinished(operatorID);
 							} catch (Exception e) {
 								e.printStackTrace();
 							}
@@ -350,32 +372,99 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	}
 
 	@Override
-	public void rebalance(int operatorID, List<List<Integer>> keyStateAllocation) {
+	public void rebalance(int operatorID, List<List<Integer>> keyStateAllocation, ControlPolicy waitingController) {
 		try {
-			this.jobAbstraction.setStateUpdatingFlag(null);
+			this.jobAbstraction.setStateUpdatingFlag(waitingController);
+			OperatorDescriptor targetDescriptor = jobAbstraction.getOperatorDescriptorByID(operatorID);
+
+			List<Tuple2<Integer, Integer>> affectedTasks = new ArrayList<>();
+			for(int i=0;i<targetDescriptor.getParallelism();i++){
+				affectedTasks.add(Tuple2.of(operatorID, i));
+			}
+			for(OperatorDescriptor descriptor: targetDescriptor.getParents()){
+				for(int i=0;i<descriptor.getParallelism();i++){
+					affectedTasks.add(Tuple2.of(operatorID, i));
+				}
+			}
 
 			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
 //			runAsync(() -> jobMasterGateway.triggerOperatorUpdate(this.jobGraph, jobVertexId, operatorID));
-			runAsync(() -> jobMasterGateway.callEnforcements(
+			runAsync(() -> jobMasterGateway.callOperations(
 				enforcement -> FutureUtils.completedVoidFuture()
 					.thenCompose(
-						o -> enforcement.prepareExecutionPlan())
+						o -> enforcement.prepareExecutionPlan(jobAbstraction, operatorID))
 					.thenCompose(
-						o -> enforcement.synchronizeTasks(Collections.emptyList()))
+						o -> enforcement.synchronizeTasks(affectedTasks))
 					.thenCompose(
-						o -> enforcement.updateMapping())
-					.thenCompose(
-						o -> enforcement.updateState())
+						o -> CompletableFuture.allOf(
+							targetDescriptor.getParents()
+								.stream()
+								.map(d -> enforcement.updateMapping(d.getOperatorID(), -1))
+								.toArray(CompletableFuture[]::new)
+						)
+					).thenCompose(
+						o -> enforcement.updateState(operatorID, -1))
 					.thenAccept(
 						(acknowledge) -> {
 							try {
-								this.jobAbstraction.notifyUpdateFinished(null);
+								this.jobAbstraction.notifyUpdateFinished(operatorID);
 							} catch (Exception e) {
 								e.printStackTrace();
 							}
 						}
 					)
 			));
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	@Override
+	public void reconfigureUserFunction(int operatorID, org.apache.flink.api.common.functions.Function function, ControlPolicy waitingController) {
+		try {
+			// very similar to acquire a positive spin write lock
+			this.jobAbstraction.setStateUpdatingFlag(waitingController);
+			OperatorDescriptor target = jobAbstraction.getOperatorDescriptorByID(operatorID);
+			target.setUdf(function);
+
+			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
+			runAsync(() -> jobMasterGateway.callOperations(
+				enforcement -> FutureUtils.completedVoidFuture()
+					.thenCompose(
+						o -> enforcement.prepareExecutionPlan(jobAbstraction, operatorID))
+					.thenCompose(
+						o -> enforcement.synchronizeTasks(
+							Stream.of(target)
+								.flatMap(
+									(Function<OperatorDescriptor, Stream<Tuple2<Integer, Integer>>>) operatorDescriptor -> {
+									List<Tuple2<Integer, Integer>> affectedTasks = new ArrayList<>();
+									for(int i=0;i<operatorDescriptor.getParallelism();i++){
+										affectedTasks.add(Tuple2.of(operatorDescriptor.getOperatorID(), i));
+									}
+									return affectedTasks.stream();
+								}).collect(Collectors.toList())))
+					.thenCompose(
+						o -> enforcement.updateFunction(operatorID, -1))
+					.thenAccept(
+						(acknowledge) -> {
+							try {
+								this.jobAbstraction.notifyUpdateFinished(operatorID);
+							} catch (Exception e) {
+								e.printStackTrace();
+							}
+						}
+					)
+			));
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	public void callCustomizeOperations(Function<PrimitiveOperation, CompletableFuture<?>> operationCaller) {
+		try {
+			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
+//			runAsync(() -> jobMasterGateway.triggerOperatorUpdate(this.jobGraph, jobVertexId, operatorID));
+			runAsync(() -> jobMasterGateway.callOperations(operationCaller));
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -583,45 +672,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		}
 	}
 
-	@Override
-	public void reconfigureUserFunction(int operatorID, StreamOperatorFactory<?> operatorFactory, ControlPolicy waitingController) {
-		try {
-			this.jobAbstraction.setStateUpdatingFlag(waitingController);
 
-			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
-//			runAsync(() -> jobMasterGateway.triggerOperatorUpdate(this.jobGraph, jobVertexId, operatorID));
-			runAsync(() -> jobMasterGateway.callEnforcements(
-				enforcement -> FutureUtils.completedVoidFuture()
-					.thenCompose(
-						o -> enforcement.prepareExecutionPlan())
-					.thenCompose(
-						o -> enforcement.synchronizeTasks(Collections.emptyList()))
-					.thenCompose(
-						o -> enforcement.updateFunction(jobGraph, null, null))
-					.thenAccept(
-						(acknowledge) -> {
-							try {
-								this.jobAbstraction.notifyUpdateFinished(null);
-							} catch (Exception e) {
-								e.printStackTrace();
-							}
-						}
-					)
-			));
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
-
-	public void callCustomizeInstruction(PrimitiveOperation.OperationCaller caller) {
-		try {
-			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
-//			runAsync(() -> jobMasterGateway.triggerOperatorUpdate(this.jobGraph, jobVertexId, operatorID));
-			runAsync(() -> jobMasterGateway.callEnforcements(caller));
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
 
 	private class JobLeaderIdActionsImpl implements JobLeaderIdActions {
 

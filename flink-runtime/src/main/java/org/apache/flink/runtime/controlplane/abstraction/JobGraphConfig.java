@@ -50,4 +50,6 @@ public interface JobGraphConfig {
 	int getParallelism(Integer operatorID);
 
 	Iterator<OperatorDescriptor> getAllOperatorDescriptor();
+
+	OperatorDescriptor getOperatorDescriptorByID(Integer operatorID);
 }

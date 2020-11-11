@@ -21,10 +21,11 @@ package org.apache.flink.streaming.controlplane.streammanager.insts;
 import org.apache.flink.runtime.controlplane.PrimitiveOperation;
 import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
 import org.apache.flink.runtime.rescale.JobRescaleAction;
-import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 
 /**
  * This interface defined some instruction which could be called by several control policy user defined model
@@ -41,9 +42,9 @@ public interface ReconfigurationAPI {
 
 	void rescaleStreamJob(JobRescaleAction.RescaleParamsWrapper wrapper);
 
-	void rescale(int operatorID, int newParallelism, List<List<Integer>> keyStateAllocation);
+	void rescale(int operatorID, int newParallelism, List<List<Integer>> keyStateAllocation, ControlPolicy waitingController);
 
-	void rebalance(int operatorID, List<List<Integer>> keyStateAllocation);
+	void rebalance(int operatorID, List<List<Integer>> keyStateAllocation, ControlPolicy waitingController);
 
 	/**
 	 * Use to notify job master that some operator inside job vertex changed,
@@ -52,11 +53,11 @@ public interface ReconfigurationAPI {
 	 * todo stream operator factory belongs to flink, should we decouple it?
 	 *
 	 * @param operatorID the id of changed operator
-	 * @param operatorFactory the new operator factory to create new operator
+	 * @param function the new operator UDF, noted this only suitable for UDFOperator
 	 */
-	void reconfigureUserFunction(int operatorID, StreamOperatorFactory<?> operatorFactory, ControlPolicy waitingController);
+	void reconfigureUserFunction(int operatorID, org.apache.flink.api.common.functions.Function function, ControlPolicy waitingController);
 
-	default void callCustomizeInstruction(PrimitiveOperation.OperationCaller caller){
+	default void callCustomizeOperations(Function<PrimitiveOperation, CompletableFuture<?>> enforcementCall){
 
 	}
 }

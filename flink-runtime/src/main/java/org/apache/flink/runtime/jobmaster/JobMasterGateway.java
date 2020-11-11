@@ -54,6 +54,7 @@ import javax.annotation.Nullable;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 
 /**
  * {@link JobMaster} rpc gateway interface.
@@ -288,6 +289,7 @@ public interface JobMasterGateway extends
 	 */
 	void triggerOperatorUpdate(JobGraph jobGraph, JobVertexID targetVertexID, OperatorID operatorID);
 
-	default void callEnforcements(PrimitiveOperation.OperationCaller enforcementCall){
+	default void callOperations(Function<PrimitiveOperation, CompletableFuture<?>> operationCaller){
+
 	}
 }

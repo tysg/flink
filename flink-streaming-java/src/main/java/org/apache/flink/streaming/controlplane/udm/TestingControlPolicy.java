@@ -32,12 +32,12 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 //						System.out.println(streamJobState.getParallelism(descriptor.getOperatorID()));
 //						System.out.println(streamJobState.getUserFunction(descriptor.getOperatorID()));
 					}
-
-					getInstructionSet().callCustomizeInstruction(
+					// just show how to defined customize operations
+					getInstructionSet().callCustomizeOperations(
 						enforcement -> FutureUtils.completedVoidFuture()
-							.thenCompose(o -> enforcement.prepareExecutionPlan())
+							.thenCompose(o -> enforcement.prepareExecutionPlan(streamJobState, 0))
 							.thenCompose(o -> enforcement.synchronizeTasks(Collections.emptyList()))
-							.thenCompose(o -> enforcement.updateState())
+							.thenCompose(o -> enforcement.updateState(0, -1))
 					);
 				} catch (Exception e) {
 					e.printStackTrace();

@@ -50,7 +50,7 @@ public final class StreamJobExecutionPlanImpl implements StreamJobExecutionPlan 
 	private final OperatorDescriptor[] heads;
 
 	private final Map<Integer, List<ExecutionGraphConfig.OperatorTask>> operatorTaskListMap = new HashMap<>();
-	private final Collection<Host> hosts;
+	private final List<Host> hosts;
 
 	@Internal
 	public StreamJobExecutionPlanImpl(JobGraph jobGraph, ExecutionGraph executionGraph, ClassLoader userLoader) {
@@ -147,6 +147,11 @@ public final class StreamJobExecutionPlanImpl implements StreamJobExecutionPlan 
 		return allOperatorsById.values().iterator();
 	}
 
+	@Override
+	public OperatorDescriptor getOperatorDescriptorByID(Integer operatorID) {
+		return allOperatorsById.get(operatorID);
+	}
+
 	public OperatorDescriptor[] getHeads() {
 		return heads;
 	}
@@ -201,7 +206,7 @@ public final class StreamJobExecutionPlanImpl implements StreamJobExecutionPlan 
 	}
 
 	// DeployGraphState related
-	private Collection<Host> initDeploymentGraphState(ExecutionGraph executionGraph, Map<OperatorID, Integer> operatorIdToVertexId) {
+	private List<Host> initDeploymentGraphState(ExecutionGraph executionGraph, Map<OperatorID, Integer> operatorIdToVertexId) {
 		Map<ResourceID, org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan.Host> hosts = new HashMap<>();
 
 		for (ExecutionJobVertex jobVertex : executionGraph.getAllVertices().values()) {
@@ -218,29 +223,29 @@ public final class StreamJobExecutionPlanImpl implements StreamJobExecutionPlan 
 					}
 				} while (slot == null);
 
-				org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan.Host host = hosts.get(slot.getTaskManagerLocation().getResourceID());
+				Host host = hosts.get(slot.getTaskManagerLocation().getResourceID());
 				if (host == null) {
-					host = new org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan.Host(slot.getTaskManagerLocation().address(), 0, 0);
+					host = new Host(slot.getTaskManagerLocation().address(), 0, 0);
 					hosts.put(slot.getTaskManagerLocation().getResourceID(), host);
 				}
 				// todo how to get cpu, number of threads, memory?
-				org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan.OperatorTask operatorTask = new org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan.OperatorTask(slot.getPhysicalSlotNumber(), host);
+				OperatorTask operatorTask = new OperatorTask(slot.getPhysicalSlotNumber(), host);
 				operatorTaskList.add(operatorTask);
 			}
 			for (OperatorID operatorID : jobVertex.getOperatorIDs()) {
 				operatorTaskListMap.put(operatorIdToVertexId.get(operatorID), operatorTaskList);
 			}
 		}
-		return hosts.values();
+		return new ArrayList<>(hosts.values());
 	}
 
 	@Override
-	public org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan.Host[] getHosts() {
-		return hosts.toArray(new org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan.Host[0]);
+	public Host[] getHosts() {
+		return hosts.toArray(new Host[0]);
 	}
 
 	@Override
-	public org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan.OperatorTask getTask(Integer operatorID, int offset) {
+	public OperatorTask getTask(Integer operatorID, int offset) {
 		return operatorTaskListMap.get(operatorID).get(offset);
 	}
 

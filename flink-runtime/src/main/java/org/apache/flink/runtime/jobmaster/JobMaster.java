@@ -109,6 +109,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.Function;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.apache.flink.util.Preconditions.checkState;
@@ -508,10 +509,10 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 	}
 
 	@Override
-	public void callEnforcements(PrimitiveOperation.OperationCaller caller){
+	public void callOperations(Function<PrimitiveOperation, CompletableFuture<?>> operationCaller){
 		validateRunsInMainThread();
 		JobRescaleCoordinator rescaleCoordinator = schedulerNG.getJobRescaleCoordinator();
-		caller.call(rescaleCoordinator.getOperatorUpdateCoordinator());
+		operationCaller.apply(rescaleCoordinator.getOperatorUpdateCoordinator());
 	}
 
 

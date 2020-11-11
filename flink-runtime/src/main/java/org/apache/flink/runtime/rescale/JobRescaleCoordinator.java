@@ -18,7 +18,6 @@
 
 package org.apache.flink.runtime.rescale;
 
-import org.apache.flink.api.common.JobID;
 import org.apache.flink.runtime.JobException;
 import org.apache.flink.runtime.checkpoint.CheckpointCoordinator;
 import org.apache.flink.runtime.checkpoint.OperatorState;
@@ -29,12 +28,11 @@ import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
 import org.apache.flink.runtime.executiongraph.*;
 import org.apache.flink.runtime.jobgraph.JobGraph;
-import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobgraph.jsonplan.JsonPlanGenerator;
-import org.apache.flink.runtime.jobmaster.JobMasterGateway;
-import org.apache.flink.runtime.rescale.reconfigure.OperatorUpdateCoordinator;
+import org.apache.flink.runtime.rescale.reconfigure.AbstractCoordinator;
+import org.apache.flink.runtime.rescale.reconfigure.ReconfigureCoordinator;
 import org.apache.flink.runtime.state.KeyGroupRange;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -85,7 +83,7 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 
 	private volatile Collection<Execution> allocatedExecutions;
 
-	private final OperatorUpdateCoordinator operatorUpdateCoordinator;
+	private final AbstractCoordinator abstractCoordinator;
 
 	public JobRescaleCoordinator(
 			JobGraph jobGraph,
@@ -95,7 +93,7 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 		this.executionGraph = executionGraph;
 
 		this.notYetAcknowledgedTasks = new ArrayList<>();
-		this.operatorUpdateCoordinator = new OperatorUpdateCoordinator(jobGraph, executionGraph);
+		this.abstractCoordinator = new ReconfigureCoordinator(jobGraph, executionGraph);
 	}
 
 	public void init(ComponentMainThreadExecutor mainThreadExecutor) {
@@ -782,7 +780,7 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 		this.checkpointId = checkpointId;
 	}
 
-	public OperatorUpdateCoordinator getOperatorUpdateCoordinator() {
-		return operatorUpdateCoordinator;
+	public AbstractCoordinator getOperatorUpdateCoordinator() {
+		return abstractCoordinator;
 	}
 }

@@ -49,6 +49,7 @@ public class RescaleActionConsumer implements Runnable {
 						for(Integer key: partitionAssignment.keySet()){
 							keyStateAllocation.add(key, partitionAssignment.get(key));
 						}
+						// todo should we use JobVertexID in user defined control policy?
 						reconfigurationAPI.rescale(-1, wrapper.newParallelism, keyStateAllocation);
 
 						while (!isFinished && !isStop) {

@@ -2,6 +2,7 @@ package org.apache.flink.runtime.rescale.reconfigure;
 
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.controlplane.PrimitiveOperation;
+import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
 import org.apache.flink.runtime.executiongraph.Execution;
 import org.apache.flink.runtime.executiongraph.ExecutionGraph;
 import org.apache.flink.runtime.executiongraph.ExecutionJobVertex;
@@ -13,17 +14,16 @@ import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.util.Preconditions;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
 
 
-public class OperatorUpdateCoordinator implements PrimitiveOperation {
+public abstract class AbstractCoordinator implements PrimitiveOperation {
 
-	private JobGraph jobGraph;
-	private ExecutionGraph executionGraph;
-	private ClassLoader userCodeClassLoader;
+	protected JobGraph jobGraph;
+	protected ExecutionGraph executionGraph;
+	protected ClassLoader userCodeClassLoader;
 
-	public OperatorUpdateCoordinator(JobGraph jobGraph, ExecutionGraph executionGraph) {
+	protected AbstractCoordinator(JobGraph jobGraph, ExecutionGraph executionGraph) {
 		this.jobGraph = jobGraph;
 		this.executionGraph = executionGraph;
 		this.userCodeClassLoader = executionGraph.getUserClassLoader();
@@ -34,32 +34,11 @@ public class OperatorUpdateCoordinator implements PrimitiveOperation {
 	}
 
 	@Override
-	public CompletableFuture<Void> prepareExecutionPlan() {
-		return FutureUtils.completedVoidFuture();
+	public CompletableFuture<Void> prepareExecutionPlan(StreamJobExecutionPlan jobExecutionPlan, int operatorID) {
+		return CompletableFuture.completedFuture(null);
 	}
 
 	@Override
-	public CompletableFuture<Void> synchronizeTasks(Collection<JobVertexID> jobVertexIDS) {
-		// sync will take a lot of time, should be used async
-		// a nature way is to make it return a future
-		return FutureUtils.completedVoidFuture();
-	}
-
-	@Override
-	public CompletableFuture<Void> deployTasks() {
-		return FutureUtils.completedVoidFuture();
-	}
-
-	@Override
-	public CompletableFuture<Void> updateMapping() {
-		return FutureUtils.completedVoidFuture();
-	}
-
-	@Override
-	public CompletableFuture<Void> updateState() {
-		return FutureUtils.completedVoidFuture();
-	}
-
 	public CompletableFuture<Acknowledge> updateFunction(JobGraph jobGraph, JobVertexID targetVertexID, OperatorID operatorID) {
 		System.out.println("some one want to triggerOperatorUpdate using OperatorUpdateCoordinator?");
 //		this.jobGraph = jobGraph;
