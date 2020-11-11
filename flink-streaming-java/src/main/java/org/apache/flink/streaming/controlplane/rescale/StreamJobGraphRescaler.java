@@ -23,7 +23,7 @@ import org.apache.flink.runtime.jobgraph.DistributionPattern;
 import org.apache.flink.runtime.jobgraph.IntermediateDataSet;
 import org.apache.flink.runtime.jobgraph.JobEdge;
 import org.apache.flink.runtime.jobgraph.JobGraph;
-import org.apache.flink.streaming.controlplane.jobgraph.JobGraphRescaler;
+import org.apache.flink.runtime.rescale.reconfigure.JobGraphRescaler;
 import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.streaming.api.graph.StreamConfig;
@@ -36,7 +36,6 @@ import org.apache.flink.streaming.runtime.partitioner.StreamPartitioner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nullable;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;

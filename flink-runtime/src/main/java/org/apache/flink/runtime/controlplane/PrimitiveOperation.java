@@ -46,7 +46,7 @@ public interface PrimitiveOperation {
 	 * Analyze the difference between current physical execution plan and passed abstract execution plan.
 	 *
 	 * @param jobExecutionPlan the abstract execution plan which is maintained by some one
-	 * @param operatorID the id of modified operator
+	 * @param operatorID       the id of modified operator
 	 * @return
 	 */
 	CompletableFuture<Void> prepareExecutionPlan(StreamJobExecutionPlan jobExecutionPlan, int operatorID);
@@ -96,12 +96,21 @@ public interface PrimitiveOperation {
 	CompletableFuture<Void> updateState(int operatorID, int offset);
 
 	/**
-	 * @param operatorID the operator id of this operator
-	 * @param offset     represent which parallel instance of this operator, -1 means all parallel instance
+	 * @param vertexID the operator id of this operator
+	 * @param offset   represent which parallel instance of this operator, -1 means all parallel instance
 	 * @return
 	 */
-	CompletableFuture<Acknowledge> updateFunction(int operatorID, int offset);
+	CompletableFuture<Acknowledge> updateFunction(int vertexID, int offset);
 
+	/**
+	 * Deprecated since we need a general primitive operation, use code{@code PrimitiveOperation::updateFunction(int vertexID, int offset)}
+	 *
+	 * @param jobGraph
+	 * @param targetVertexID
+	 * @param operatorID
+	 * @return
+	 */
+	@Deprecated
 	CompletableFuture<Acknowledge> updateFunction(@Nullable JobGraph jobGraph, JobVertexID targetVertexID, OperatorID operatorID);
 
 }

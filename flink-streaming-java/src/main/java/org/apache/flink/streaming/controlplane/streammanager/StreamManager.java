@@ -25,6 +25,7 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.controlplane.PrimitiveOperation;
+import org.apache.flink.runtime.controlplane.StreamingClassGroup;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
 import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
@@ -48,7 +49,8 @@ import org.apache.flink.runtime.rpc.RpcService;
 import org.apache.flink.runtime.rpc.RpcUtils;
 import org.apache.flink.runtime.rpc.akka.AkkaRpcServiceUtils;
 import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
-import org.apache.flink.streaming.controlplane.jobgraph.JobGraphRescaler;
+import org.apache.flink.runtime.rescale.reconfigure.JobGraphRescaler;
+import org.apache.flink.streaming.controlplane.jobgraph.StreamJobGraphUpdater;
 import org.apache.flink.streaming.controlplane.reconfigure.TestingCFManager;
 import org.apache.flink.streaming.controlplane.rescale.StreamJobGraphRescaler;
 import org.apache.flink.streaming.controlplane.rescale.streamswitch.FlinkStreamSwitchAdaptor;
@@ -496,8 +498,11 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	}
 
 	@Override
-	public Class<? extends StreamJobExecutionPlan> getJobAbstractionClass() {
-		return StreamJobExecutionPlanImpl.class;
+	public StreamingClassGroup getStreamingClassGroup() {
+		return new StreamingClassGroup(
+			StreamJobExecutionPlanImpl.class,
+			StreamJobGraphUpdater.class,
+			StreamJobGraphRescaler.class);
 	}
 
 
