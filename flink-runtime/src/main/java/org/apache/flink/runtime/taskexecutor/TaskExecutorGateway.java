@@ -98,6 +98,10 @@ public interface TaskExecutorGateway extends RpcGateway {
 		RescaleOptions rescaleOptions,
 		@RpcTimeout Time timeout);
 
+	CompletableFuture<Acknowledge> scheduleSync(
+		ExecutionAttemptID executionAttemptID,
+		@RpcTimeout Time timeout);
+
 	/**
 	 * Update the operator of the given task.
 	 *

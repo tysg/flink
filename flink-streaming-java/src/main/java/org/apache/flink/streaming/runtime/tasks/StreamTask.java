@@ -330,7 +330,8 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 				pauseActionController.getResumeFuture()
 			);
 			MailboxDefaultAction.Suspension suspendedDefaultAction = controller.suspendDefaultAction();
-			jointFuture.thenRun(suspendedDefaultAction::resume).thenRun(()->System.out.println("pauseActionController get resumed"));
+			jointFuture.thenRun(suspendedDefaultAction::resume)
+				.thenRun(()->System.out.println(getName() + "pauseActionController get resumed"));
 			return;
 		}
 		if (status == InputStatus.MORE_AVAILABLE && recordWriter.isAvailable()) {
@@ -637,12 +638,13 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 		// - future is done and then all task get resumed
 
 		CompletableFuture<Long> future = new CompletableFuture<>();
-		System.out.println("Update Should started at:"+System.currentTimeMillis());
+		System.out.println(getName() + " Update Should started at:"+System.currentTimeMillis());
 
-		this.pauseActionController.setPausedAndGetAckFuture().thenRunAsync(
+		this.pauseActionController.getAckPausedFuture().thenRunAsync(
 			() -> {
 				boolean exception = false;
 				try {
+					// todo use global or local state snapshot?
 					System.out.println("task ack pause, now start state snapshot:" + getName());
 					final CheckpointMetaData checkpointMetaData = new CheckpointMetaData(LocalSnapshotOperation.LOCAL_CHECKPOINT_ID, System.currentTimeMillis());
 					final CheckpointOptions checkpointOptions = CheckpointOptions.forCheckpointWithDefaultLocation();
@@ -663,12 +665,17 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 								while (System.currentTimeMillis()-start < 3000);
 								System.out.println("Stop busy: " + getName());
 								recreateOperatorChain(stateSnapshot);
-								pauseActionController.resume();
-								future.complete(System.currentTimeMillis());
-								System.out.println("Update Should finished at:"+System.currentTimeMillis());
 							} catch (Exception e) {
 								e.printStackTrace();
 								future.completeExceptionally(e);
+							}finally {
+								try {
+									pauseActionController.resume();
+								} catch (Exception e) {
+									e.printStackTrace();
+								}
+								future.complete(System.currentTimeMillis());
+								System.out.println(getName() + " Update Should finished at:"+System.currentTimeMillis());
 							}
 						}
 					);
@@ -1253,8 +1260,20 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 			return;
 		}
 
+		TaskOperatorManager operatorManager = ((RuntimeEnvironment) getEnvironment()).taskOperatorManager;
+		if(operatorManager.acknowledgeSyncRequest(checkpointMetaData.getCheckpointId())){
+			// we could now pause the current processing
+			try {
+				System.out.println("pause the current data processing:" + this.getName());
+				operatorManager.getPauseActionController().setPausedAndGetAckFuture();
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+			return;
+		}
+
 		// add a timer for measuring blocking time
-		System.out.println(this.toString() + " received checkpoint: " + System.currentTimeMillis());
+		//System.out.println(this.toString() + " received checkpoint: " + System.currentTimeMillis());
 
 		initReconnect();
 	}

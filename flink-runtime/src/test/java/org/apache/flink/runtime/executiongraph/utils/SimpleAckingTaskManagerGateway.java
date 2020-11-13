@@ -111,6 +111,11 @@ public class SimpleAckingTaskManagerGateway implements TaskManagerGateway {
 	}
 
 	@Override
+	public CompletableFuture<Acknowledge> scheduleSync(ExecutionAttemptID executionAttemptID, Time timeout) {
+		return null;
+	}
+
+	@Override
 	public CompletableFuture<Acknowledge> updateOperator(ExecutionAttemptID executionAttemptID, Configuration updatedConfig, OperatorID operatorID, Time timeout) {
 		return null;
 	}

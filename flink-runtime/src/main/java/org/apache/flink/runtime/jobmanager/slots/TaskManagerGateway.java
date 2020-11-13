@@ -79,6 +79,10 @@ public interface TaskManagerGateway {
 		RescaleOptions rescaleOptions,
 		Time timeout);
 
+	CompletableFuture<Acknowledge> scheduleSync(
+		ExecutionAttemptID executionAttemptID,
+		@RpcTimeout Time timeout);
+
 	/**
 	 * Update the operator of the given task.
 	 *

@@ -49,13 +49,18 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 		// if stateless, do not need to synchronize,
 
 		// stateful tasks, inject barrier
+		// todo, the passed operator id may be not head operator
 		List<Tuple2<JobVertexID, Integer>> vertexIDList = taskList.stream()
 			.map(t -> Tuple2.of(JobVertexID.fromHexString(operatorIDMap.get(t.f0).toHexString()), t.f1))
 			.collect(Collectors.toList());
 		SynchronizeOperation syncOp = new SynchronizeOperation(vertexIDList);
 		CompletableFuture<Map<OperatorID, OperatorState>> collectedOperatorStateFuture = syncOp.sync();
 
-		return collectedOperatorStateFuture.thenAccept(state -> LOG.debug("synchronizeTasks successful"));
+		return collectedOperatorStateFuture.thenAccept(state ->
+		{
+			System.out.println("synchronizeTasks successful");
+			LOG.debug("synchronizeTasks successful");
+		});
 	}
 
 	@Override
@@ -78,6 +83,13 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 		return CompletableFuture.completedFuture(null);
 	}
 
+	/**
+	 * This method also will wake up the paused tasks.
+	 *
+	 * @param vertexID the operator id of this operator
+	 * @param offset   represent which parallel instance of this operator, -1 means all parallel instance
+	 * @return
+	 */
 	@Override
 	public CompletableFuture<Acknowledge> updateFunction(int vertexID, int offset) {
 		System.out.println("some one want to triggerOperatorUpdate?");
@@ -106,7 +118,7 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 	// temporary use RescalepointAcknowledgeListener
 	private class SynchronizeOperation implements RescalepointAcknowledgeListener {
 
-		private final List<ExecutionAttemptID> notYetAcknowledgedTasks = new LinkedList<>();
+		private final Set<ExecutionAttemptID> notYetAcknowledgedTasks = new HashSet<>();
 
 		private final List<Tuple2<JobVertexID, Integer>> vertexIdList;
 		private final CompletableFuture<Map<OperatorID, OperatorState>> finishedFuture;
@@ -126,6 +138,7 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 			checkpointCoordinator.setRescalepointAcknowledgeListener(this);
 
 			// add needed acknowledge tasks
+			List<CompletableFuture<Void>> affectedExecutionPrepareSyncFutures = new LinkedList<>();
 			for (Tuple2<JobVertexID, Integer> taskID : vertexIdList) {
 				ExecutionJobVertex executionJobVertex = executionGraph.getJobVertex(taskID.f0);
 				checkNotNull(executionJobVertex);
@@ -133,20 +146,18 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 				if (offset < 0) {
 					for (ExecutionVertex executionVertex : executionJobVertex.getTaskVertices()) {
 						notYetAcknowledgedTasks.add(executionVertex.getCurrentExecutionAttempt().getAttemptId());
+						affectedExecutionPrepareSyncFutures.add(
+							executionVertex.getCurrentExecutionAttempt().scheduleForInterTaskSync());
 					}
 				} else {
 					checkArgument(offset < executionJobVertex.getParallelism(), "offset out of boundary");
-					notYetAcknowledgedTasks.add(executionJobVertex.getTaskVertices()[offset].getCurrentExecutionAttempt().getAttemptId());
+					Execution targetExecution = executionJobVertex.getTaskVertices()[offset].getCurrentExecutionAttempt();
+					notYetAcknowledgedTasks.add(targetExecution.getAttemptId());
+					affectedExecutionPrepareSyncFutures.add(targetExecution.scheduleForInterTaskSync());
 				}
 			}
 			// make affected task prepare synchronization
-			CompletableFuture<Void> rescaleCompleted = FutureUtils.completedVoidFuture()
-				.thenCompose(
-					(o1) -> {
-						Collection<CompletableFuture<Void>> rescaleCandidatesFutures = new ArrayList<>();
-						return FutureUtils
-							.completeAll(rescaleCandidatesFutures);
-					})
+			FutureUtils.completeAll(affectedExecutionPrepareSyncFutures)
 				.thenRunAsync(() -> {
 					try {
 						checkpointCoordinator.stopCheckpointScheduler();

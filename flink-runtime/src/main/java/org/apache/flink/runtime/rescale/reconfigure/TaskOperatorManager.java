@@ -6,12 +6,16 @@ import org.apache.flink.runtime.taskmanager.Task;
 
 import javax.annotation.concurrent.ThreadSafe;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class TaskOperatorManager {
 
+	private final static long NEED_SYNC_REQUEST = -1;
+
 	private final PauseActionController pauseActionController;
 	private final Task containedTask;
+	private AtomicLong hasSyncRequest = new AtomicLong(0L);
 
 	public TaskOperatorManager(Task task) {
 		this.containedTask = task;
@@ -20,6 +24,14 @@ public class TaskOperatorManager {
 
 	public PauseActionController getPauseActionController() {
 		return pauseActionController;
+	}
+
+	public void setSyncNeededRequestFlag(){
+		hasSyncRequest.set(NEED_SYNC_REQUEST);
+	}
+
+	public boolean acknowledgeSyncRequest(long finishedSyncRequestID){
+		return hasSyncRequest.compareAndSet(NEED_SYNC_REQUEST, finishedSyncRequestID);
 	}
 
 	@ThreadSafe
@@ -35,6 +47,8 @@ public class TaskOperatorManager {
 		boolean ackIfPause();
 
 		CompletableFuture<Acknowledge> getResumeFuture();
+
+		CompletableFuture<Acknowledge> getAckPausedFuture() throws Exception;
 
 		/**
 		 * This method should be thread safe.
@@ -96,6 +110,14 @@ public class TaskOperatorManager {
 			return resumeFuture;
 		}
 
+		@Override
+		public CompletableFuture<Acknowledge> getAckPausedFuture() throws Exception {
+			if (state.get() != TaskStatus.PAUSE) {
+				throw new Exception("state hasn't been paused before");
+			}
+			return ackPausedFuture;
+		}
+
 		private enum TaskStatus {
 			PAUSE,
 			READY
@@ -112,6 +134,11 @@ public class TaskOperatorManager {
 
 		@Override
 		public CompletableFuture<Acknowledge> getResumeFuture() {
+			return CompletableFuture.completedFuture(Acknowledge.get());
+		}
+
+		@Override
+		public CompletableFuture<Acknowledge> getAckPausedFuture() {
 			return CompletableFuture.completedFuture(Acknowledge.get());
 		}
 

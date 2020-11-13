@@ -988,6 +988,46 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 		}
 	}
 
+	public CompletableFuture<Void> scheduleForInterTaskSync() {
+
+		assertRunningInJobMasterMainThread();
+
+		final LogicalSlot slot = assignedResource;
+		checkNotNull(slot, "Try to rescale a vertex which isn't assigned slot.");
+
+		if(this.state != RUNNING) {
+			throw new IllegalStateException("The vertex must be in RUNNING state to be rescaled. Found state " + this.state);
+		}
+		try {
+			LOG.info(String.format("Update operator in this execution attempt: %s (attempt #%d) to %s",
+				vertex.getTaskNameWithSubtaskIndex(), attemptNumber, getAssignedResourceLocation()));
+
+			final TaskManagerGateway taskManagerGateway = slot.getTaskManagerGateway();
+
+			final ComponentMainThreadExecutor jobMasterMainThreadExecutor =
+				vertex.getExecutionGraph().getJobMasterMainThreadExecutor();
+
+			return CompletableFuture
+				.supplyAsync(() -> taskManagerGateway.scheduleSync(attemptId, rpcTimeout), executor)
+				.thenCompose(Function.identity())
+				.handleAsync((ack, failure) -> {
+					if (failure != null) {
+						LOG.error("++++++ scheduleOperatorUpdate err: ", failure);
+						throw new CompletionException(failure);
+					}
+					return null;
+				}, jobMasterMainThreadExecutor);
+		}
+		catch (Throwable t) {
+			markFailed(t);
+			if (isLegacyScheduling()) {
+				ExceptionUtils.rethrow(t);
+			}
+		}
+		return FutureUtils.completedVoidFuture();
+	}
+
+
 	public CompletableFuture<Void> scheduleOperatorUpdate(OperatorID operatorID) {
 
 		assertRunningInJobMasterMainThread();
