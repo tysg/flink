@@ -10,6 +10,7 @@ import org.apache.flink.runtime.executiongraph.ExecutionGraph;
 import org.apache.flink.runtime.executiongraph.ExecutionJobVertex;
 import org.apache.flink.runtime.executiongraph.ExecutionVertex;
 import org.apache.flink.runtime.jobgraph.JobGraph;
+import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.messages.Acknowledge;
@@ -52,6 +53,19 @@ public abstract class AbstractCoordinator implements PrimitiveOperation {
 		heldExecutionPlan = streamRelatedInstanceFactory.createExecutionPlan(jobGraph, executionGraph, userCodeClassLoader);
 		updater = streamRelatedInstanceFactory.createJobGraphUpdater(jobGraph, userCodeClassLoader);
 		operatorIDMap = updater.getOperatorIDMap();
+	}
+
+	protected JobVertexID rawVertexIDToJobVertexID(int rawID){
+		OperatorID operatorID = operatorIDMap.get(rawID);
+		if(operatorID == null){
+			return null;
+		}
+		for(JobVertex vertex: jobGraph.getVertices()){
+			if(vertex.getOperatorIDs().contains(operatorID)){
+				return vertex.getID();
+			}
+		}
+		return null;
 	}
 
 	@Override

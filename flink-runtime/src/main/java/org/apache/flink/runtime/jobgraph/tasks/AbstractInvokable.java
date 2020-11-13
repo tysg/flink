@@ -268,7 +268,7 @@ public abstract class AbstractInvokable {
 		throw new UnsupportedOperationException(String.format("updateKeyGroupRange not supported by %s", this.getClass().getName()));
 	}
 
-	public CompletableFuture<Long> updateOperator(Configuration updatedConfig, OperatorID operatorID) throws Exception {
+	public CompletableFuture<Long> updateOperator(Configuration updatedConfig, OperatorID operatorID) {
 		throw new UnsupportedOperationException(String.format("updateOperatorConfig not supported by %s", this.getClass().getName()));
 	}
 

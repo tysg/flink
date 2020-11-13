@@ -49,9 +49,8 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 		// if stateless, do not need to synchronize,
 
 		// stateful tasks, inject barrier
-		// todo, the passed operator id may be not head operator
 		List<Tuple2<JobVertexID, Integer>> vertexIDList = taskList.stream()
-			.map(t -> Tuple2.of(JobVertexID.fromHexString(operatorIDMap.get(t.f0).toHexString()), t.f1))
+			.map(t -> Tuple2.of(rawVertexIDToJobVertexID(t.f0), t.f1))
 			.collect(Collectors.toList());
 		SynchronizeOperation syncOp = new SynchronizeOperation(vertexIDList);
 		CompletableFuture<Map<OperatorID, OperatorState>> collectedOperatorStateFuture = syncOp.sync();
@@ -94,7 +93,7 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 	public CompletableFuture<Acknowledge> updateFunction(int vertexID, int offset) {
 		System.out.println("some one want to triggerOperatorUpdate?");
 		OperatorID operatorID = super.operatorIDMap.get(vertexID);
-		JobVertexID jobVertexID = JobVertexID.fromHexString(operatorID.toHexString());
+		JobVertexID jobVertexID = rawVertexIDToJobVertexID(vertexID);
 
 		ExecutionJobVertex executionJobVertex = executionGraph.getJobVertex(jobVertexID);
 		Preconditions.checkNotNull(executionJobVertex, "can not found this execution job vertex");

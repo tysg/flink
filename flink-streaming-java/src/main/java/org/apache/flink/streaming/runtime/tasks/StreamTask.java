@@ -28,6 +28,7 @@ import org.apache.flink.core.fs.FileSystemSafetyNet;
 import org.apache.flink.metrics.Counter;
 import org.apache.flink.metrics.SimpleCounter;
 import org.apache.flink.runtime.checkpoint.*;
+import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.execution.CancelTaskException;
 import org.apache.flink.runtime.execution.Environment;
 import org.apache.flink.runtime.io.network.api.CancelCheckpointMarker;
@@ -616,7 +617,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 		}
 	}
 
-	public CompletableFuture<Long> updateOperator(Configuration updatedConfig, OperatorID operatorID) throws Exception {
+	public CompletableFuture<Long> updateOperator(Configuration updatedConfig, OperatorID operatorID) {
 		// There are two implementation options:
 		// Option 1:
 		//  re-create the whole operator chain as well as head operator,
@@ -637,65 +638,39 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 		//   logic inside each tasks, reinitialize the state and open each tasks
 		// - future is done and then all task get resumed
 
-		CompletableFuture<Long> future = new CompletableFuture<>();
-		System.out.println(getName() + " Update Should started at:"+System.currentTimeMillis());
+		try {
+			// todo use global or local state snapshot?
+			System.out.println(getName() + "task ack pause, now start state snapshot:" + System.currentTimeMillis());
+			final CheckpointMetaData checkpointMetaData = new CheckpointMetaData(LocalSnapshotOperation.LOCAL_CHECKPOINT_ID, System.currentTimeMillis());
+			final CheckpointOptions checkpointOptions = CheckpointOptions.forCheckpointWithDefaultLocation();
+			final CheckpointStreamFactory storage = checkpointStorage.resolveCheckpointStorageLocation(
+				checkpointMetaData.getCheckpointId(),
+				checkpointOptions.getTargetLocation());
 
-		this.pauseActionController.getAckPausedFuture().thenRunAsync(
-			() -> {
-				boolean exception = false;
-				try {
-					// todo use global or local state snapshot?
-					System.out.println("task ack pause, now start state snapshot:" + getName());
-					final CheckpointMetaData checkpointMetaData = new CheckpointMetaData(LocalSnapshotOperation.LOCAL_CHECKPOINT_ID, System.currentTimeMillis());
-					final CheckpointOptions checkpointOptions = CheckpointOptions.forCheckpointWithDefaultLocation();
-					final CheckpointStreamFactory storage = checkpointStorage.resolveCheckpointStorageLocation(
-						checkpointMetaData.getCheckpointId(),
-						checkpointOptions.getTargetLocation());
-
-					LocalSnapshotOperation localSnapshotOperation = new LocalSnapshotOperation(
-						this,
-						checkpointMetaData,
-						checkpointOptions,
-						storage);
-					localSnapshotOperation.executeLocalSnapshot().thenAccept(
-						stateSnapshot ->{
-							try {
-								System.out.println("Start busy: " + getName());
-								long start = System.currentTimeMillis();
-								while (System.currentTimeMillis()-start < 3000);
-								System.out.println("Stop busy: " + getName());
-								recreateOperatorChain(stateSnapshot);
-							} catch (Exception e) {
-								e.printStackTrace();
-								future.completeExceptionally(e);
-							}finally {
-								try {
-									pauseActionController.resume();
-								} catch (Exception e) {
-									e.printStackTrace();
-								}
-								future.complete(System.currentTimeMillis());
-								System.out.println(getName() + " Update Should finished at:"+System.currentTimeMillis());
-							}
-						}
-					);
-				}catch (Exception e){
-					exception = true;
-					e.printStackTrace();
-					future.completeExceptionally(e);
-				}finally {
-					if(exception){
+			LocalSnapshotOperation localSnapshotOperation = new LocalSnapshotOperation(
+				this,
+				checkpointMetaData,
+				checkpointOptions,
+				storage);
+			return localSnapshotOperation.executeLocalSnapshot()
+				.thenApply(stateSnapshot -> {
 						try {
-							pauseActionController.resume();
+							System.out.println("Start busy: " + getName());
+							long start = System.currentTimeMillis();
+							while (System.currentTimeMillis() - start < 3000) ;
+							System.out.println("Stop busy: " + getName());
+							recreateOperatorChain(stateSnapshot);
+							System.out.println(getName() + " Update Should finished at:" + System.currentTimeMillis());
 						} catch (Exception e) {
 							e.printStackTrace();
 						}
+						return System.currentTimeMillis();
 					}
-				}
-			},
-			this.asyncOperationsThreadPool
-		);
-		return future;
+				);
+		} catch (Exception e) {
+			e.printStackTrace();
+			return FutureUtils.completedExceptionally(e);
+		}
 	}
 
 	public void recreateOperatorChain(TaskStateSnapshot stateSnapshot) throws Exception {

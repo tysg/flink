@@ -1286,7 +1286,19 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 		// since one java process share the same address space, so we only need to update configuration here,
 		// then all other task configuration referenced here will be updated
 		this.taskConfiguration.addAll(updatedConfig);
-		return checkNotNull(invokable).updateOperator(updatedConfig, operatorID);
+		return this.taskOperatorManager.getPauseActionController()
+			.getAckPausedFuture()
+			.thenCompose(ack -> checkNotNull(invokable).updateOperator(updatedConfig, operatorID))
+			.thenApply(
+				l -> {
+					try {
+						this.taskOperatorManager.getPauseActionController().resume();
+					} catch (Exception e) {
+						e.printStackTrace();
+					}
+					return l;
+				}
+			);
 	}
 
 	// ------------------------------------------------------------------------
