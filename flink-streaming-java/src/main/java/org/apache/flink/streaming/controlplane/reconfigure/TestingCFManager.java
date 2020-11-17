@@ -21,22 +21,22 @@ public class TestingCFManager extends ControlFunctionManager implements ControlP
 	public void startControllerInternal() {
 		System.out.println("Testing Control Function Manager starting...");
 
-		StreamJobExecutionPlan jobState = getInstructionSet().getJobAbstraction();
+		StreamJobExecutionPlan jobState = getInstructionSet().getJobExecutionPlan();
 
-		int secondOperatorId = findOperatorByName(jobState, "filte");
+		int secondOperatorId = findOperatorByName("filte");
 
 		if(secondOperatorId != -1) {
 			asyncRunAfter(5, () -> this.getKeyStateMapping(
-				findOperatorByName(jobState, "Splitter")));
+				findOperatorByName("Splitter")));
 			asyncRunAfter(5, () -> this.getKeyStateAllocation(
-				findOperatorByName(jobState, "filte")));
+				findOperatorByName("filte")));
 			asyncRunAfter(10, () -> this.reconfigure(secondOperatorId, getFilterFunction(2)));
 		}
 	}
 
 	private void getKeyStateMapping(int operatorID){
 		try {
-			this.getInstructionSet().getJobAbstraction().getKeyMapping(operatorID);
+			this.getInstructionSet().getJobExecutionPlan().getKeyMapping(operatorID);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -45,7 +45,7 @@ public class TestingCFManager extends ControlFunctionManager implements ControlP
 
 	private void getKeyStateAllocation(int operatorID){
 		try {
-			this.getInstructionSet().getJobAbstraction().getKeyStateAllocation(operatorID);
+			this.getInstructionSet().getJobExecutionPlan().getKeyStateAllocation(operatorID);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -71,17 +71,6 @@ public class TestingCFManager extends ControlFunctionManager implements ControlP
 				e.printStackTrace();
 			}
 		}).start();
-	}
-
-
-	private int findOperatorByName(JobGraphConfig jobGraphConfig, @Nonnull String name) {
-		for (Iterator<OperatorDescriptor> it = jobGraphConfig.getAllOperatorDescriptor(); it.hasNext(); ) {
-			OperatorDescriptor descriptor = it.next();
-			if(descriptor.getName().equals(name)){
-				return descriptor.getOperatorID();
-			}
-		}
-		return -1;
 	}
 
 	@Override

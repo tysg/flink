@@ -1,5 +1,6 @@
 package org.apache.flink.streaming.controlplane.udm;
 
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
 import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
@@ -23,7 +24,7 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 				try {
 					Thread.sleep(5);
 
-					StreamJobExecutionPlan streamJobState = getInstructionSet().getJobAbstraction();
+					StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
 					for (Iterator<OperatorDescriptor> it = streamJobState.getAllOperatorDescriptor(); it.hasNext(); ) {
 						OperatorDescriptor descriptor = it.next();
 						System.out.println(descriptor);
@@ -33,11 +34,11 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 //						System.out.println(streamJobState.getUserFunction(descriptor.getOperatorID()));
 					}
 					// just show how to defined customize operations
+					int testingID = findOperatorByName("filte");
 					getInstructionSet().callCustomizeOperations(
 						enforcement -> FutureUtils.completedVoidFuture()
-							.thenCompose(o -> enforcement.prepareExecutionPlan(streamJobState, 0))
-							.thenCompose(o -> enforcement.synchronizeTasks(Collections.emptyList()))
-							.thenCompose(o -> enforcement.updateState(0, -1))
+							.thenCompose(o -> enforcement.synchronizePauseTasks(Collections.singletonList(Tuple2.of(testingID, 1))))
+							.thenCompose(o -> enforcement.resumeTasks(Collections.singletonList(Tuple2.of(testingID, 1))))
 					);
 				} catch (Exception e) {
 					e.printStackTrace();
@@ -49,7 +50,7 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 	@Override
 	public void stopControllers() {
 		System.out.println("Testing TestingControlPolicy is stopping...");
-		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobAbstraction();
+		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
 		for (Iterator<OperatorDescriptor> it = streamJobState.getAllOperatorDescriptor(); it.hasNext(); ) {
 			OperatorDescriptor descriptor = it.next();
 			System.out.println(descriptor);

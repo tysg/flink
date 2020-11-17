@@ -1278,8 +1278,12 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 		taskRescaleManager.createNewResultPartitions();
 	}
 
-	public void prepareSync() {
-		taskOperatorManager.setSyncNeededRequestFlag();
+	public void prepareSync(int syncFlag) {
+		try {
+			taskOperatorManager.setSyncRequestFlag(syncFlag);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 
 	public CompletableFuture<Long> updateOperatorConfig(Configuration updatedConfig, OperatorID operatorID) throws Exception {
@@ -1288,17 +1292,7 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 		this.taskConfiguration.addAll(updatedConfig);
 		return this.taskOperatorManager.getPauseActionController()
 			.getAckPausedFuture()
-			.thenCompose(ack -> checkNotNull(invokable).updateOperator(updatedConfig, operatorID))
-			.thenApply(
-				l -> {
-					try {
-						this.taskOperatorManager.getPauseActionController().resume();
-					} catch (Exception e) {
-						e.printStackTrace();
-					}
-					return l;
-				}
-			);
+			.thenCompose(ack -> checkNotNull(invokable).updateOperator(updatedConfig, operatorID));
 	}
 
 	// ------------------------------------------------------------------------

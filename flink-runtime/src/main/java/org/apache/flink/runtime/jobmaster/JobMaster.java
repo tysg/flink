@@ -32,21 +32,14 @@ import org.apache.flink.runtime.clusterframework.types.AllocationID;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.controlplane.PrimitiveOperation;
-import org.apache.flink.runtime.controlplane.ReflectInstanceFactory;
-import org.apache.flink.runtime.controlplane.StreamingClassGroup;
 import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerId;
 import org.apache.flink.runtime.execution.ExecutionState;
 import org.apache.flink.runtime.executiongraph.ArchivedExecutionGraph;
 import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
-import org.apache.flink.runtime.executiongraph.ExecutionGraph;
 import org.apache.flink.runtime.executiongraph.JobStatusListener;
-import org.apache.flink.runtime.heartbeat.HeartbeatListener;
-import org.apache.flink.runtime.heartbeat.HeartbeatManager;
-import org.apache.flink.runtime.heartbeat.HeartbeatServices;
-import org.apache.flink.runtime.heartbeat.HeartbeatTarget;
-import org.apache.flink.runtime.heartbeat.NoOpHeartbeatManager;
+import org.apache.flink.runtime.heartbeat.*;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
 import org.apache.flink.runtime.io.network.partition.JobMasterPartitionTracker;
 import org.apache.flink.runtime.io.network.partition.PartitionTrackerFactory;
@@ -102,11 +95,9 @@ import org.apache.flink.runtime.taskmanager.TaskManagerLocation;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkException;
 import org.apache.flink.util.InstantiationUtil;
-
 import org.slf4j.Logger;
 
 import javax.annotation.Nullable;
-
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.*;
@@ -969,14 +960,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		streamManagerGatewayFuture.thenAccept(
 			streamManagerGateway -> {
 				AbstractCoordinator abstractCoordinator = schedulerNG.getJobRescaleCoordinator().getOperatorUpdateCoordinator();
-				ExecutionGraph executionGraph = abstractCoordinator.getExecutionGraph();
-
-				StreamJobExecutionPlan jobAbstraction = abstractCoordinator.getStreamRelatedInstanceFactory()
-					.createExecutionPlan(
-						jobGraph,
-						executionGraph,
-						executionGraph.getUserClassLoader()
-					);
+				StreamJobExecutionPlan jobAbstraction = abstractCoordinator.getHeldExecutionPlanCopy();
 				streamManagerGateway.jobStatusChanged(
 					jobGraph.getJobID(), newJobStatus, timestamp, error, jobAbstraction
 				);
@@ -1173,7 +1157,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 			log.info("a new stream manager gained Leadership:" + streamManagerGateway.getAddress());
 			schedulerNG.getJobRescaleCoordinator().setStreamManagerGateway(streamManagerGateway);
 			AbstractCoordinator abstractCoordinator = schedulerNG.getJobRescaleCoordinator().getOperatorUpdateCoordinator();
-			abstractCoordinator.setStreamRelatedInstanceFactory(new ReflectInstanceFactory(streamManagerGateway.getStreamingClassGroup()));
+			abstractCoordinator.setStreamRelatedInstanceFactory(streamManagerGateway.getStreamRelatedInstanceFactory());
 
 			assert streamManagerGatewayFuture != null;
 			streamManagerGatewayFuture.complete(streamManagerGateway);

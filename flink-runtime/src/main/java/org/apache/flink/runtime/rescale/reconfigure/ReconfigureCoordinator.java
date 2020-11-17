@@ -44,7 +44,7 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 	 * @return A future that representing  synchronize is successful
 	 */
 	@Override
-	public CompletableFuture<Void> synchronizeTasks(List<Tuple2<Integer, Integer>> taskList) {
+	public CompletableFuture<Void> synchronizePauseTasks(List<Tuple2<Integer, Integer>> taskList) {
 		// we should first check if the tasks is stateless
 		// if stateless, do not need to synchronize,
 
@@ -60,6 +60,39 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 			System.out.println("synchronizeTasks successful");
 			LOG.debug("synchronizeTasks successful");
 		});
+	}
+
+	/**
+	 * Resume the paused tasks by synchronize.
+	 * <p>
+	 * In implementation, since we use MailBoxProcessor to pause tasks,
+	 * to make this resume methods make sense, the task's MailBoxProcessor should not be changed.
+	 *
+	 * @param taskList The list of task id, each id is a tuple which the first element is operator id and the second element is offset
+	 * @return
+	 */
+	@Override
+	public CompletableFuture<Void> resumeTasks(List<Tuple2<Integer, Integer>> taskList) {
+
+		List<CompletableFuture<Void>> affectedExecutionPrepareSyncFutures = new LinkedList<>();
+		for (Tuple2<Integer, Integer> taskID : taskList) {
+			JobVertexID vertexID = rawVertexIDToJobVertexID(taskID.f0);
+			ExecutionJobVertex executionJobVertex = executionGraph.getJobVertex(vertexID);
+			checkNotNull(executionJobVertex);
+			int offset = taskID.f1;
+			if (offset < 0) {
+				for (ExecutionVertex executionVertex : executionJobVertex.getTaskVertices()) {
+					affectedExecutionPrepareSyncFutures.add(
+						executionVertex.getCurrentExecutionAttempt().scheduleForInterTaskSync(TaskOperatorManager.NEED_RESUME_REQUEST));
+				}
+			} else {
+				checkArgument(offset < executionJobVertex.getParallelism(), "offset out of boundary");
+				Execution targetExecution = executionJobVertex.getTaskVertices()[offset].getCurrentExecutionAttempt();
+				affectedExecutionPrepareSyncFutures.add(targetExecution.scheduleForInterTaskSync(TaskOperatorManager.NEED_RESUME_REQUEST));
+			}
+		}
+		// make affected task resume
+		return FutureUtils.completeAll(affectedExecutionPrepareSyncFutures);
 	}
 
 	@Override
@@ -146,13 +179,13 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 					for (ExecutionVertex executionVertex : executionJobVertex.getTaskVertices()) {
 						notYetAcknowledgedTasks.add(executionVertex.getCurrentExecutionAttempt().getAttemptId());
 						affectedExecutionPrepareSyncFutures.add(
-							executionVertex.getCurrentExecutionAttempt().scheduleForInterTaskSync());
+							executionVertex.getCurrentExecutionAttempt().scheduleForInterTaskSync(TaskOperatorManager.NEED_SYNC_REQUEST));
 					}
 				} else {
 					checkArgument(offset < executionJobVertex.getParallelism(), "offset out of boundary");
 					Execution targetExecution = executionJobVertex.getTaskVertices()[offset].getCurrentExecutionAttempt();
 					notYetAcknowledgedTasks.add(targetExecution.getAttemptId());
-					affectedExecutionPrepareSyncFutures.add(targetExecution.scheduleForInterTaskSync());
+					affectedExecutionPrepareSyncFutures.add(targetExecution.scheduleForInterTaskSync(TaskOperatorManager.NEED_SYNC_REQUEST));
 				}
 			}
 			// make affected task prepare synchronization
@@ -186,6 +219,13 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 
 							if (notYetAcknowledgedTasks.isEmpty()) {
 								LOG.info("++++++ handle operator states");
+
+								CheckpointCoordinator checkpointCoordinator = executionGraph.getCheckpointCoordinator();
+								checkNotNull(checkpointCoordinator);
+								if (checkpointCoordinator.isPeriodicCheckpointingConfigured()) {
+									checkpointCoordinator.startCheckpointScheduler();
+								}
+
 								finishedFuture.complete(new HashMap<>(checkpoint.getOperatorStates()));
 							}
 						}

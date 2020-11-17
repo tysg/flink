@@ -692,12 +692,13 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 	@Override
 	public CompletableFuture<Acknowledge> scheduleSync(
 		ExecutionAttemptID executionAttemptID,
+		int syncFlag,
 		@RpcTimeout Time timeout){
 		final Task task = taskSlotTable.getTask(executionAttemptID);
 		if (task != null) {
 			try {
 				// Run asynchronously because it might be blocking
-				task.prepareSync();
+				task.prepareSync(syncFlag);
 
 				return CompletableFuture.completedFuture(Acknowledge.get());
 			} catch (Exception e) {

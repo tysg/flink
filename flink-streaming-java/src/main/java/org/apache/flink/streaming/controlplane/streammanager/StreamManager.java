@@ -25,6 +25,7 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.controlplane.PrimitiveOperation;
+import org.apache.flink.runtime.controlplane.StreamRelatedInstanceFactory;
 import org.apache.flink.runtime.controlplane.StreamingClassGroup;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
 import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
@@ -50,14 +51,15 @@ import org.apache.flink.runtime.rpc.RpcUtils;
 import org.apache.flink.runtime.rpc.akka.AkkaRpcServiceUtils;
 import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
 import org.apache.flink.runtime.rescale.reconfigure.JobGraphRescaler;
+import org.apache.flink.streaming.controlplane.jobgraph.NormalInstantiateFactory;
 import org.apache.flink.streaming.controlplane.jobgraph.StreamJobGraphUpdater;
 import org.apache.flink.streaming.controlplane.reconfigure.TestingCFManager;
 import org.apache.flink.streaming.controlplane.rescale.StreamJobGraphRescaler;
 import org.apache.flink.streaming.controlplane.rescale.streamswitch.FlinkStreamSwitchAdaptor;
 import org.apache.flink.streaming.controlplane.streammanager.exceptions.StreamManagerException;
 import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
-import org.apache.flink.streaming.controlplane.streammanager.insts.StreamJobAbstraction;
-import org.apache.flink.streaming.controlplane.streammanager.insts.StreamJobAbstractionImpl;
+import org.apache.flink.streaming.controlplane.streammanager.insts.StreamJobExecutionPlanWithUpdatingFlag;
+import org.apache.flink.streaming.controlplane.streammanager.insts.StreamJobExecutionPlanWithUpdatingFlagImpl;
 import org.apache.flink.streaming.controlplane.streammanager.insts.StreamJobExecutionPlanImpl;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 import org.apache.flink.streaming.controlplane.udm.TestingControlPolicy;
@@ -67,7 +69,6 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.apache.flink.util.Preconditions.checkState;
@@ -108,7 +109,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 	private final List<ControlPolicy> controlPolicyList = new LinkedList<>();
 
-	private StreamJobAbstraction jobAbstraction;
+	private StreamJobExecutionPlanWithUpdatingFlag jobExecutionPlan;
 
 	private CompletableFuture<Acknowledge> rescalePartitionFuture;
 
@@ -326,9 +327,9 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			// scale in is not support now
 			checkState(keyStateAllocation.size()==newParallelism,
 				"new parallelism not match key state allocation");
-			this.jobAbstraction.setStateUpdatingFlag(waitingController);
+			this.jobExecutionPlan.setStateUpdatingFlag(waitingController);
 
-			OperatorDescriptor targetDescriptor = jobAbstraction.getOperatorDescriptorByID(operatorID);
+			OperatorDescriptor targetDescriptor = jobExecutionPlan.getOperatorDescriptorByID(operatorID);
 			List<Tuple2<Integer, Integer>> affectedTasks  = targetDescriptor.getParents()
 				.stream()
 				.map(d -> Tuple2.of(d.getOperatorID(), -1))
@@ -340,9 +341,9 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			runAsync(() -> jobMasterGateway.callOperations(
 				enforcement -> FutureUtils.completedVoidFuture()
 					.thenCompose(
-						o -> enforcement.prepareExecutionPlan(jobAbstraction, operatorID))
+						o -> enforcement.prepareExecutionPlan(jobExecutionPlan))
 					.thenCompose(
-						o -> enforcement.synchronizeTasks(affectedTasks))
+						o -> enforcement.synchronizePauseTasks(affectedTasks))
 					.thenCompose(
 						o -> enforcement.deployTasks(operatorID, newParallelism))
 					.thenCompose(
@@ -354,10 +355,13 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						)
 					).thenCompose(
 						o -> enforcement.updateState(operatorID, -1))
+					.thenCompose(
+						o -> enforcement.resumeTasks(affectedTasks)
+					)
 					.thenAccept(
 						(acknowledge) -> {
 							try {
-								this.jobAbstraction.notifyUpdateFinished(operatorID);
+								this.jobExecutionPlan.notifyUpdateFinished(operatorID);
 							} catch (Exception e) {
 								e.printStackTrace();
 							}
@@ -373,8 +377,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	@Override
 	public void rebalance(int operatorID, List<List<Integer>> keyStateAllocation, ControlPolicy waitingController) {
 		try {
-			this.jobAbstraction.setStateUpdatingFlag(waitingController);
-			OperatorDescriptor targetDescriptor = jobAbstraction.getOperatorDescriptorByID(operatorID);
+			this.jobExecutionPlan.setStateUpdatingFlag(waitingController);
+			OperatorDescriptor targetDescriptor = jobExecutionPlan.getOperatorDescriptorByID(operatorID);
 			List<Tuple2<Integer, Integer>> affectedTasks  = targetDescriptor.getParents()
 				.stream()
 				.map(d -> Tuple2.of(d.getOperatorID(), -1))
@@ -386,9 +390,9 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			runAsync(() -> jobMasterGateway.callOperations(
 				enforcement -> FutureUtils.completedVoidFuture()
 					.thenCompose(
-						o -> enforcement.prepareExecutionPlan(jobAbstraction, operatorID))
+						o -> enforcement.prepareExecutionPlan(jobExecutionPlan))
 					.thenCompose(
-						o -> enforcement.synchronizeTasks(affectedTasks))
+						o -> enforcement.synchronizePauseTasks(affectedTasks))
 					.thenCompose(
 						o -> CompletableFuture.allOf(
 							targetDescriptor.getParents()
@@ -398,10 +402,12 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						)
 					).thenCompose(
 						o -> enforcement.updateState(operatorID, -1))
+					.thenCompose(
+						o -> enforcement.resumeTasks(affectedTasks))
 					.thenAccept(
 						(acknowledge) -> {
 							try {
-								this.jobAbstraction.notifyUpdateFinished(operatorID);
+								this.jobExecutionPlan.notifyUpdateFinished(operatorID);
 							} catch (Exception e) {
 								e.printStackTrace();
 							}
@@ -417,23 +423,25 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	public void reconfigureUserFunction(int operatorID, org.apache.flink.api.common.functions.Function function, ControlPolicy waitingController) {
 		try {
 			// very similar to acquire a positive spin write lock
-			this.jobAbstraction.setStateUpdatingFlag(waitingController);
-			OperatorDescriptor target = jobAbstraction.getOperatorDescriptorByID(operatorID);
+			this.jobExecutionPlan.setStateUpdatingFlag(waitingController);
+			OperatorDescriptor target = jobExecutionPlan.getOperatorDescriptorByID(operatorID);
 			target.setUdf(function);
 
 			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
 			runAsync(() -> jobMasterGateway.callOperations(
 				enforcement -> FutureUtils.completedVoidFuture()
 					.thenCompose(
-						o -> enforcement.prepareExecutionPlan(jobAbstraction, operatorID))
+						o -> enforcement.prepareExecutionPlan(jobExecutionPlan))
 					.thenCompose(
-						o -> enforcement.synchronizeTasks(Collections.singletonList(Tuple2.of(operatorID, -1))))
+						o -> enforcement.synchronizePauseTasks(Collections.singletonList(Tuple2.of(operatorID, -1))))
 					.thenCompose(
 						o -> enforcement.updateFunction(operatorID, -1))
+					.thenCompose(
+						o -> enforcement.resumeTasks(Collections.singletonList(Tuple2.of(operatorID, -1))))
 					.thenAccept(
 						(acknowledge) -> {
 							try {
-								this.jobAbstraction.notifyUpdateFinished(operatorID);
+								this.jobExecutionPlan.notifyUpdateFinished(operatorID);
 							} catch (Exception e) {
 								e.printStackTrace();
 							}
@@ -466,7 +474,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	public void jobStatusChanged(JobID jobId, JobStatus newJobStatus, long timestamp, Throwable error, StreamJobExecutionPlan jobAbstraction) {
 		runAsync(
 			() -> {
-				this.jobAbstraction = new StreamJobAbstractionImpl(jobAbstraction);
+				this.jobExecutionPlan = new StreamJobExecutionPlanWithUpdatingFlagImpl(jobAbstraction);
 				if (newJobStatus == JobStatus.RUNNING) {
 					for (ControlPolicy policy : controlPolicyList) {
 						policy.startControllers();
@@ -481,11 +489,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	}
 
 	@Override
-	public StreamingClassGroup getStreamingClassGroup() {
-		return new StreamingClassGroup(
-			StreamJobExecutionPlanImpl.class,
-			StreamJobGraphUpdater.class,
-			StreamJobGraphRescaler.class);
+	public StreamRelatedInstanceFactory getStreamRelatedInstanceFactory() {
+		return NormalInstantiateFactory.INSTANCE;
 	}
 
 
@@ -612,8 +617,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	}
 
 	@Override
-	public StreamJobExecutionPlan getJobAbstraction() {
-		return checkNotNull(jobAbstraction, "stream job abstraction (execution plan) have not been initialized");
+	public StreamJobExecutionPlan getJobExecutionPlan() {
+		return checkNotNull(jobExecutionPlan, "stream job abstraction (execution plan) have not been initialized");
 	}
 
 	// ------------------------------------------------------------------------

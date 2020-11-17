@@ -26,7 +26,6 @@ import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.messages.Acknowledge;
 
 import javax.annotation.Nullable;
-import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -46,10 +45,9 @@ public interface PrimitiveOperation {
 	 * Analyze the difference between current physical execution plan and passed abstract execution plan.
 	 *
 	 * @param jobExecutionPlan the abstract execution plan which is maintained by some one
-	 * @param operatorID       the id of modified operator
 	 * @return
 	 */
-	CompletableFuture<Void> prepareExecutionPlan(StreamJobExecutionPlan jobExecutionPlan, int operatorID);
+	CompletableFuture<Void> prepareExecutionPlan(StreamJobExecutionPlan jobExecutionPlan);
 
 	/**
 	 * Synchronize the whole dataflow of the streaming job, temporarily pause the affected tasks.
@@ -57,7 +55,18 @@ public interface PrimitiveOperation {
 	 * @param taskList The list of task id, each id is a tuple which the first element is operator id and the second element is offset
 	 * @return
 	 */
-	CompletableFuture<Void> synchronizeTasks(List<Tuple2<Integer, Integer>> taskList);
+	CompletableFuture<Void> synchronizePauseTasks(List<Tuple2<Integer, Integer>> taskList);
+
+	/**
+	 * Resume the paused tasks by synchronize.
+	 *
+	 * In implementation, since we use MailBoxProcessor to pause tasks,
+	 * to make this resume methods make sense, the task's MailBoxProcessor should not be changed.
+	 *
+	 * @param taskList The list of task id, each id is a tuple which the first element is operator id and the second element is offset
+	 * @return
+	 */
+	CompletableFuture<Void> resumeTasks(List<Tuple2<Integer, Integer>> taskList);
 
 	/**
 	 * Request the resources request from the cluster.

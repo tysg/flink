@@ -100,6 +100,7 @@ public interface TaskExecutorGateway extends RpcGateway {
 
 	CompletableFuture<Acknowledge> scheduleSync(
 		ExecutionAttemptID executionAttemptID,
+		int syncFlag,
 		@RpcTimeout Time timeout);
 
 	/**

@@ -249,4 +249,8 @@ public final class StreamJobExecutionPlanImpl implements StreamJobExecutionPlan 
 		return operatorTaskListMap.get(operatorID).get(offset);
 	}
 
+	@Override
+	protected Object clone() throws CloneNotSupportedException {
+		return super.clone();
+	}
 }

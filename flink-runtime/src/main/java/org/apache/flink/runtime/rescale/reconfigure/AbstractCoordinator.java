@@ -17,6 +17,7 @@ import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.util.Preconditions;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -27,7 +28,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation {
 	protected ExecutionGraph executionGraph;
 	protected ClassLoader userCodeClassLoader;
 
-	protected StreamRelatedInstanceFactory streamRelatedInstanceFactory;
+	private StreamRelatedInstanceFactory streamRelatedInstanceFactory;
 
 	private JobGraphUpdater updater;
 	private StreamJobExecutionPlan heldExecutionPlan;
@@ -40,19 +41,22 @@ public abstract class AbstractCoordinator implements PrimitiveOperation {
 		this.userCodeClassLoader = executionGraph.getUserClassLoader();
 	}
 
-	public ExecutionGraph getExecutionGraph() {
-		return executionGraph;
-	}
-
-	public StreamRelatedInstanceFactory getStreamRelatedInstanceFactory() {
-		return streamRelatedInstanceFactory;
-	}
-
 	public void setStreamRelatedInstanceFactory(StreamRelatedInstanceFactory streamRelatedInstanceFactory) {
-		this.streamRelatedInstanceFactory = streamRelatedInstanceFactory;
 		heldExecutionPlan = streamRelatedInstanceFactory.createExecutionPlan(jobGraph, executionGraph, userCodeClassLoader);
 		updater = streamRelatedInstanceFactory.createJobGraphUpdater(jobGraph, userCodeClassLoader);
 		operatorIDMap = updater.getOperatorIDMap();
+		this.streamRelatedInstanceFactory = streamRelatedInstanceFactory;
+	}
+
+	public StreamJobExecutionPlan getHeldExecutionPlanCopy(){
+		StreamJobExecutionPlan executionPlan = streamRelatedInstanceFactory.createExecutionPlan(jobGraph, executionGraph, userCodeClassLoader);
+		for (Iterator<OperatorDescriptor> it = executionPlan.getAllOperatorDescriptor(); it.hasNext(); ) {
+			OperatorDescriptor descriptor = it.next();
+			OperatorDescriptor heldDescriptor = heldExecutionPlan.getOperatorDescriptorByID(descriptor.getOperatorID());
+			// make sure udf share the same reference so we could identity the change if any
+			descriptor.setUdf(heldDescriptor.getUdf());
+		}
+		return executionPlan;
 	}
 
 	protected JobVertexID rawVertexIDToJobVertexID(int rawID){
@@ -69,21 +73,24 @@ public abstract class AbstractCoordinator implements PrimitiveOperation {
 	}
 
 	@Override
-	public CompletableFuture<Void> prepareExecutionPlan(StreamJobExecutionPlan jobExecutionPlan, int operatorID) {
-		OperatorDescriptor descriptor = jobExecutionPlan.getOperatorDescriptorByID(operatorID);
-		OperatorDescriptor heldDescriptor = heldExecutionPlan.getOperatorDescriptorByID(operatorID);
-		ChangedPosition changedPosition = analyzeOperatorDifference(heldDescriptor, descriptor);
-		try {
-			switch (changedPosition) {
-				case UDF:
-					heldDescriptor.setUdf(descriptor.getUdf());
-					updater.updateOperator(operatorID, descriptor.getUdf());
-					break;
-				case NO_CHANGE:
+	public CompletableFuture<Void> prepareExecutionPlan(StreamJobExecutionPlan jobExecutionPlan) {
+		for (Iterator<OperatorDescriptor> it = jobExecutionPlan.getAllOperatorDescriptor(); it.hasNext(); ) {
+			OperatorDescriptor descriptor = it.next();
+			int operatorID = descriptor.getOperatorID();
+			OperatorDescriptor heldDescriptor = heldExecutionPlan.getOperatorDescriptorByID(operatorID);
+			ChangedPosition changedPosition = analyzeOperatorDifference(heldDescriptor, descriptor);
+			try {
+				switch (changedPosition) {
+					case UDF:
+						heldDescriptor.setUdf(descriptor.getUdf());
+						updater.updateOperator(operatorID, descriptor.getUdf());
+						break;
+					case NO_CHANGE:
+				}
+			}catch (Exception e){
+				e.printStackTrace();
+				return FutureUtils.completedExceptionally(e);
 			}
-		}catch (Exception e){
-			e.printStackTrace();
-			return FutureUtils.completedExceptionally(e);
 		}
 		return CompletableFuture.completedFuture(null);
 	}

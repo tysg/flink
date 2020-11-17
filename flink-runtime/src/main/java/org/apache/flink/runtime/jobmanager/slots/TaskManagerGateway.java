@@ -81,6 +81,7 @@ public interface TaskManagerGateway {
 
 	CompletableFuture<Acknowledge> scheduleSync(
 		ExecutionAttemptID executionAttemptID,
+		int syncFlag,
 		@RpcTimeout Time timeout);
 
 	/**

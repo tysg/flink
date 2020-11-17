@@ -11,7 +11,8 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public class TaskOperatorManager {
 
-	private final static long NEED_SYNC_REQUEST = -1;
+	public final static int NEED_SYNC_REQUEST = -1;
+	public final static int NEED_RESUME_REQUEST = -2;
 
 	private final PauseActionController pauseActionController;
 	private final Task containedTask;
@@ -26,8 +27,17 @@ public class TaskOperatorManager {
 		return pauseActionController;
 	}
 
-	public void setSyncNeededRequestFlag(){
-		hasSyncRequest.set(NEED_SYNC_REQUEST);
+	public void setSyncRequestFlag(int syncFlag) throws Exception {
+		switch (syncFlag){
+			case NEED_SYNC_REQUEST:
+				break;
+			case NEED_RESUME_REQUEST:
+				this.getPauseActionController().resume();
+				break;
+			default:
+				throw new Exception("unknow flag");
+		}
+		hasSyncRequest.set(syncFlag);
 	}
 
 	public boolean acknowledgeSyncRequest(long finishedSyncRequestID){

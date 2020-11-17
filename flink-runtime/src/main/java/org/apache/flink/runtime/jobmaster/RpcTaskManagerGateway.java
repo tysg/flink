@@ -79,8 +79,8 @@ public class RpcTaskManagerGateway implements TaskManagerGateway {
 	}
 
 	@Override
-	public CompletableFuture<Acknowledge> scheduleSync(ExecutionAttemptID executionAttemptID, @RpcTimeout Time timeout){
-		return taskExecutorGateway.scheduleSync(executionAttemptID, timeout);
+	public CompletableFuture<Acknowledge> scheduleSync(ExecutionAttemptID executionAttemptID, int syncFlag, @RpcTimeout Time timeout){
+		return taskExecutorGateway.scheduleSync(executionAttemptID, syncFlag, timeout);
 	}
 
 	@Override

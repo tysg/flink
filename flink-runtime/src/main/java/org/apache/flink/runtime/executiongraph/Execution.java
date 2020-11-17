@@ -988,7 +988,7 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 		}
 	}
 
-	public CompletableFuture<Void> scheduleForInterTaskSync() {
+	public CompletableFuture<Void> scheduleForInterTaskSync(int syncFlag) {
 
 		assertRunningInJobMasterMainThread();
 
@@ -1008,7 +1008,7 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 				vertex.getExecutionGraph().getJobMasterMainThreadExecutor();
 
 			return CompletableFuture
-				.supplyAsync(() -> taskManagerGateway.scheduleSync(attemptId, rpcTimeout), executor)
+				.supplyAsync(() -> taskManagerGateway.scheduleSync(attemptId, syncFlag, rpcTimeout), executor)
 				.thenCompose(Function.identity())
 				.handleAsync((ack, failure) -> {
 					if (failure != null) {

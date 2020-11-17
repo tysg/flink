@@ -130,9 +130,10 @@ public class TestingTaskExecutorGateway implements TaskExecutorGateway {
 	}
 
 	@Override
-	public CompletableFuture<Acknowledge> scheduleSync(ExecutionAttemptID executionAttemptID, Time timeout) {
+	public CompletableFuture<Acknowledge> scheduleSync(ExecutionAttemptID executionAttemptID, int syncFlag, Time timeout) {
 		return null;
 	}
+
 
 	@Override
 	public CompletableFuture<Acknowledge> updateOperator(ExecutionAttemptID executionAttemptID, Configuration updatedConfig, OperatorID operatorID, Time timeout) {

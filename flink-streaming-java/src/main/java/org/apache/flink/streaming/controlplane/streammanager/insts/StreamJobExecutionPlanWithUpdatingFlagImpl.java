@@ -26,7 +26,7 @@ import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class StreamJobAbstractionImpl implements StreamJobAbstraction {
+public class StreamJobExecutionPlanWithUpdatingFlagImpl implements StreamJobExecutionPlanWithUpdatingFlag {
 
 	private final static int COMMITTED = 1;
 	private final static int STAGED = 0;
@@ -36,7 +36,7 @@ public class StreamJobAbstractionImpl implements StreamJobAbstraction {
 
 	private final StreamJobExecutionPlan streamJobExecutionPlanDelegate;
 
-	public StreamJobAbstractionImpl(StreamJobExecutionPlan streamJobExecutionPlanDelegate) {
+	public StreamJobExecutionPlanWithUpdatingFlagImpl(StreamJobExecutionPlan streamJobExecutionPlanDelegate) {
 		this.streamJobExecutionPlanDelegate = streamJobExecutionPlanDelegate;
 	}
 
