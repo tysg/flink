@@ -105,19 +105,14 @@ public final class StreamJobExecutionPlanImpl implements StreamJobExecutionPlan 
 				heads.add(descriptor);
 			}
 		}
-		checkRelationship();
+		checkRelationship(allOperatorsById.values());
 		// finished other field
 		for (OperatorDescriptor descriptor : allOperatorsById.values()) {
 			StreamConfig streamConfig = streamConfigMap.get(descriptor.getOperatorID());
 			Function function = getUserFunction(streamConfigMap.get(descriptor.getOperatorID()), userCodeLoader);
-			Map<Integer, List<List<Integer>>> keyStateAllocation = getKeyStateAllocation(streamConfig, userCodeLoader);
+			Map<Integer, List<List<Integer>>> keyStateAllocation = getKeyStateAllocation(streamConfig, userCodeLoader, descriptor.getParallelism());
 			descriptor.setUdf(function);
 			descriptor.setKeyStateAllocation(keyStateAllocation);
-		}
-		// finished key mapping
-		for (OperatorDescriptor descriptor : allOperatorsById.values()) {
-			Map<Integer, List<List<Integer>>> keyMapping = getKeyMappingInternal(descriptor.getOperatorID());
-			descriptor.setKeyMapping(keyMapping);
 		}
 		return heads.toArray(new OperatorDescriptor[0]);
 	}
@@ -154,55 +149,6 @@ public final class StreamJobExecutionPlanImpl implements StreamJobExecutionPlan 
 
 	public OperatorDescriptor[] getHeads() {
 		return heads;
-	}
-
-	private Function getUserFunction(StreamConfig config, ClassLoader userCodeLoader) {
-		StreamOperatorFactory<?> factory = config.getStreamOperatorFactory(userCodeLoader);
-		if (factory instanceof SimpleUdfStreamOperatorFactory) {
-			return ((SimpleUdfStreamOperatorFactory<?>) factory).getUserFunction();
-		}
-		return null;
-	}
-
-	private Map<Integer, List<List<Integer>>> getKeyStateAllocation(StreamConfig config, ClassLoader userCodeLoader) {
-		Integer targetOperatorId = config.getVertexID();
-		Map<Integer, List<List<Integer>>> res = new HashMap<>();
-		List<StreamEdge> inPhysicalEdges = config.getInPhysicalEdges(userCodeLoader);
-		for (StreamEdge edge : inPhysicalEdges) {
-			res.put(edge.getSourceId(), getKeyMessage(edge, allOperatorsById.get(targetOperatorId).getParallelism()));
-		}
-		return res;
-	}
-
-	private Map<Integer, List<List<Integer>>> getKeyMappingInternal(Integer operatorID) {
-		Map<Integer, List<List<Integer>>> res = new HashMap<>();
-		OperatorDescriptor targetOp = allOperatorsById.get(operatorID);
-		for (OperatorDescriptor child : targetOp.getChildren()) {
-			res.put(child.getOperatorID(), getKeyStateAllocation(child.getOperatorID()).get(targetOp.getOperatorID()));
-		}
-		return res;
-	}
-
-	private List<List<Integer>> getKeyMessage(StreamEdge streamEdge, int parallelism) {
-		StreamPartitioner<?> partitioner = streamEdge.getPartitioner();
-		if (partitioner instanceof AssignedKeyGroupStreamPartitioner) {
-			return ((AssignedKeyGroupStreamPartitioner<?, ?>) partitioner).getKeyMappingInfo(parallelism);
-		} else if (partitioner instanceof KeyGroupStreamPartitioner) {
-			return ((KeyGroupStreamPartitioner<?, ?>) partitioner).getKeyMappingInfo(parallelism);
-		}
-		// it may be not a key stream operator
-		return Collections.emptyList();
-	}
-
-	private void checkRelationship() {
-		for (OperatorDescriptor descriptor : allOperatorsById.values()) {
-			for (OperatorDescriptor child : descriptor.getChildren()) {
-				Preconditions.checkArgument(child.getParents().contains(descriptor), child + "'s parents should contain " + descriptor);
-			}
-			for (OperatorDescriptor parent : descriptor.getParents()) {
-				Preconditions.checkArgument(parent.getChildren().contains(descriptor), parent + "'s children should contain " + descriptor);
-			}
-		}
 	}
 
 	// DeployGraphState related
@@ -249,8 +195,44 @@ public final class StreamJobExecutionPlanImpl implements StreamJobExecutionPlan 
 		return operatorTaskListMap.get(operatorID).get(offset);
 	}
 
-	@Override
-	protected Object clone() throws CloneNotSupportedException {
-		return super.clone();
+	private static Function getUserFunction(StreamConfig config, ClassLoader userCodeLoader) {
+		StreamOperatorFactory<?> factory = config.getStreamOperatorFactory(userCodeLoader);
+		if (factory instanceof SimpleUdfStreamOperatorFactory) {
+			return ((SimpleUdfStreamOperatorFactory<?>) factory).getUserFunction();
+		}
+		return null;
 	}
+
+	private static Map<Integer, List<List<Integer>>> getKeyStateAllocation(StreamConfig config, ClassLoader userCodeLoader, int parallelism) {
+		Map<Integer, List<List<Integer>>> res = new HashMap<>();
+		// very strange that some operator's out physical edge may not be completed
+		List<StreamEdge> inPhysicalEdges = config.getInPhysicalEdges(userCodeLoader);
+		for (StreamEdge edge : inPhysicalEdges) {
+			res.put(edge.getSourceId(), getKeyMessage(edge, parallelism));
+		}
+		return res;
+	}
+
+	private static List<List<Integer>> getKeyMessage(StreamEdge streamEdge, int parallelism) {
+		StreamPartitioner<?> partitioner = streamEdge.getPartitioner();
+		if (partitioner instanceof AssignedKeyGroupStreamPartitioner) {
+			return ((AssignedKeyGroupStreamPartitioner<?, ?>) partitioner).getKeyMappingInfo(parallelism);
+		} else if (partitioner instanceof KeyGroupStreamPartitioner) {
+			return ((KeyGroupStreamPartitioner<?, ?>) partitioner).getKeyMappingInfo(parallelism);
+		}
+		// the consumer operator may be not a key stream operator
+		return Collections.emptyList();
+	}
+
+	private static void checkRelationship(Collection<OperatorDescriptor> allOp) {
+		for (OperatorDescriptor descriptor : allOp) {
+			for (OperatorDescriptor child : descriptor.getChildren()) {
+				Preconditions.checkArgument(child.getParents().contains(descriptor), child + "'s parents should contain " + descriptor);
+			}
+			for (OperatorDescriptor parent : descriptor.getParents()) {
+				Preconditions.checkArgument(parent.getChildren().contains(descriptor), parent + "'s children should contain " + descriptor);
+			}
+		}
+	}
+
 }

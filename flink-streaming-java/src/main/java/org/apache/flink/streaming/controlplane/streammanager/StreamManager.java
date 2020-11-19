@@ -377,9 +377,14 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	@Override
 	public void rebalance(int operatorID, List<List<Integer>> keyStateAllocation, ControlPolicy waitingController) {
 		try {
+			// typically, the target operator should contain key state,
+			// todo if keyStateAllocation is null, means it is stateless operator, but not support now
 			this.jobExecutionPlan.setStateUpdatingFlag(waitingController);
+
 			OperatorDescriptor targetDescriptor = jobExecutionPlan.getOperatorDescriptorByID(operatorID);
-			List<Tuple2<Integer, Integer>> affectedTasks  = targetDescriptor.getParents()
+			targetDescriptor.setKeyStateAllocation(keyStateAllocation);
+
+			List<Tuple2<Integer, Integer>> affectedTasks = targetDescriptor.getParents()
 				.stream()
 				.map(d -> Tuple2.of(d.getOperatorID(), -1))
 				.collect(Collectors.toList());

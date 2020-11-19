@@ -16,9 +16,7 @@ import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.util.Preconditions;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
 
@@ -48,7 +46,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation {
 		this.streamRelatedInstanceFactory = streamRelatedInstanceFactory;
 	}
 
-	public StreamJobExecutionPlan getHeldExecutionPlanCopy(){
+	public StreamJobExecutionPlan getHeldExecutionPlanCopy() {
 		StreamJobExecutionPlan executionPlan = streamRelatedInstanceFactory.createExecutionPlan(jobGraph, executionGraph, userCodeClassLoader);
 		for (Iterator<OperatorDescriptor> it = executionPlan.getAllOperatorDescriptor(); it.hasNext(); ) {
 			OperatorDescriptor descriptor = it.next();
@@ -59,13 +57,13 @@ public abstract class AbstractCoordinator implements PrimitiveOperation {
 		return executionPlan;
 	}
 
-	protected JobVertexID rawVertexIDToJobVertexID(int rawID){
+	protected JobVertexID rawVertexIDToJobVertexID(int rawID) {
 		OperatorID operatorID = operatorIDMap.get(rawID);
-		if(operatorID == null){
+		if (operatorID == null) {
 			return null;
 		}
-		for(JobVertex vertex: jobGraph.getVertices()){
-			if(vertex.getOperatorIDs().contains(operatorID)){
+		for (JobVertex vertex : jobGraph.getVertices()) {
+			if (vertex.getOperatorIDs().contains(operatorID)) {
 				return vertex.getID();
 			}
 		}
@@ -73,54 +71,111 @@ public abstract class AbstractCoordinator implements PrimitiveOperation {
 	}
 
 	@Override
-	public CompletableFuture<Void> prepareExecutionPlan(StreamJobExecutionPlan jobExecutionPlan) {
+	public final CompletableFuture<Void> prepareExecutionPlan(StreamJobExecutionPlan jobExecutionPlan) {
 		for (Iterator<OperatorDescriptor> it = jobExecutionPlan.getAllOperatorDescriptor(); it.hasNext(); ) {
 			OperatorDescriptor descriptor = it.next();
 			int operatorID = descriptor.getOperatorID();
 			OperatorDescriptor heldDescriptor = heldExecutionPlan.getOperatorDescriptorByID(operatorID);
-			ChangedPosition changedPosition = analyzeOperatorDifference(heldDescriptor, descriptor);
-			try {
-				switch (changedPosition) {
-					case UDF:
-						heldDescriptor.setUdf(descriptor.getUdf());
-						updater.updateOperator(operatorID, descriptor.getUdf());
-						break;
-					case NO_CHANGE:
+			// loop until all change in this operator has been detected and sync
+			ChangedPosition changedPosition;
+			do {
+				changedPosition = analyzeOperatorDifference(heldDescriptor, descriptor);
+				try {
+					switch (changedPosition) {
+						case UDF:
+							heldDescriptor.setUdf(descriptor.getUdf());
+							updater.updateOperator(operatorID, descriptor.getUdf());
+							break;
+						case KEY_STATE_ALLOCATION:
+							heldDescriptor.setKeyStateAllocation(descriptor.getKeyStateAllocation());
+							updateKeyset(heldDescriptor);
+							break;
+						case PARALLELISM:
+							heldDescriptor.setParallelism(descriptor.getParallelism());
+							// next update job graph and execution graph
+							break;
+						case NO_CHANGE:
+					}
+
+				} catch (Exception e) {
+					e.printStackTrace();
+					return FutureUtils.completedExceptionally(e);
 				}
-			}catch (Exception e){
-				e.printStackTrace();
-				return FutureUtils.completedExceptionally(e);
-			}
+			} while (changedPosition != ChangedPosition.NO_CHANGE);
 		}
 		return CompletableFuture.completedFuture(null);
 	}
 
+	private void updateKeyset(OperatorDescriptor heldDescriptor) {
+		Map<Integer, List<Integer>> partionAssignment = new HashMap<>();
+		for (List<List<Integer>> one : heldDescriptor.getKeyStateAllocation().values()) {
+			for (int i = 0; i < one.size(); i++) {
+				partionAssignment.put(i, one.get(i));
+			}
+			updater.repartition(rawVertexIDToJobVertexID(heldDescriptor.getOperatorID()), partionAssignment);
+			break;
+		}
+	}
+
 	private ChangedPosition analyzeOperatorDifference(OperatorDescriptor self, OperatorDescriptor modified) {
-		if (self.getUdf() != modified.getUdf()){
+		if (self.getUdf() != modified.getUdf()) {
 			return ChangedPosition.UDF;
 		}
+		if (compare(self.getKeyStateAllocation(), modified.getKeyStateAllocation())) {
+			return ChangedPosition.KEY_STATE_ALLOCATION;
+		}
+		if (self.getParallelism() != modified.getParallelism()) {
+			return ChangedPosition.PARALLELISM;
+		}
 		return ChangedPosition.NO_CHANGE;
+	}
+
+	/**
+	 * @param map1
+	 * @param map2
+	 * @return true if there are different
+	 */
+	private boolean compare(Map<Integer, List<List<Integer>>> map1, Map<Integer, List<List<Integer>>> map2) {
+		if (map1.size() != map2.size()) {
+			return true;
+		}
+		for (Integer integer : map1.keySet()) {
+			List<List<Integer>> lists = map2.get(integer);
+			if (lists == null || compare(map1.get(integer), lists)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private boolean compare(List<List<Integer>> list1, List<List<Integer>> list2) {
+		if (list1.size() != list2.size()) {
+			return true;
+		}
+		for (int i = 0; i < list1.size(); i++) {
+			if (compareIntList(list1.get(i), list2.get(i))) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private boolean compareIntList(List<Integer> list1, List<Integer> list2) {
+		if (list1.size() != list2.size()) {
+			return true;
+		}
+		for (int i = 0; i < list1.size(); i++) {
+			if (!list1.get(i).equals(list2.get(i))) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	@Override
 	@Deprecated
 	public CompletableFuture<Acknowledge> updateFunction(JobGraph jobGraph, JobVertexID targetVertexID, OperatorID operatorID) {
-		System.out.println("some one want to triggerOperatorUpdate using OperatorUpdateCoordinator?");
-//		this.jobGraph = jobGraph;
-		// By evaluating:
-		// "new StreamConfig((executionGraph.tasks.values().toArray()[1]).jobVertex.configuration).getTransitiveChainedTaskConfigs(userCodeClassLoader).get(4).getStreamOperatorFactory(userCodeClassLoader).getOperator()"
-		// The logic in execution Graph has been modified since now they are in same process which sharing the same reference
-
-		// some deploy related here...
-		ExecutionJobVertex executionJobVertex = executionGraph.getJobVertex(targetVertexID);
-		Preconditions.checkNotNull(executionJobVertex, "can not found this execution job vertex");
-
-		ArrayList<CompletableFuture<Void>> futures = new ArrayList<>(executionJobVertex.getTaskVertices().length);
-		for (ExecutionVertex vertex : executionJobVertex.getTaskVertices()) {
-			Execution execution = vertex.getCurrentExecutionAttempt();
-			futures.add(execution.scheduleOperatorUpdate(operatorID));
-		}
-		return FutureUtils.completeAll(futures).thenApply(o -> Acknowledge.get());
+		throw new UnsupportedOperationException();
 	}
 
 	enum ChangedPosition {

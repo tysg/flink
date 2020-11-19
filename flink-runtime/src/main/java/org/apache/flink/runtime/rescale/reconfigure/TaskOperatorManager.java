@@ -16,7 +16,7 @@ public class TaskOperatorManager {
 
 	private final PauseActionController pauseActionController;
 	private final Task containedTask;
-	private AtomicLong hasSyncRequest = new AtomicLong(0L);
+	private final AtomicLong hasSyncRequest = new AtomicLong(0L);
 
 	public TaskOperatorManager(Task task) {
 		this.containedTask = task;

@@ -1,14 +1,18 @@
 package org.apache.flink.runtime.controlplane.abstraction;
 
+import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.functions.Function;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.util.Preconditions;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
+import java.util.function.Supplier;
+import java.util.stream.Collector;
+import java.util.stream.Collectors;
 
+/**
+ * this class make sure all field is not modifiable for external class
+ */
 public class OperatorDescriptor {
 
 	private final Integer operatorID;
@@ -34,11 +38,11 @@ public class OperatorDescriptor {
 	}
 
 	public Set<OperatorDescriptor> getParents() {
-		return parents;
+		return Collections.unmodifiableSet(parents);
 	}
 
 	public Set<OperatorDescriptor> getChildren() {
-		return children;
+		return Collections.unmodifiableSet(children);
 	}
 
 	public int getParallelism() {
@@ -50,11 +54,11 @@ public class OperatorDescriptor {
 	}
 
 	public Map<Integer, List<List<Integer>>> getKeyStateAllocation() {
-		return Preconditions.checkNotNull(payload.keyStateAllocation);
+		return Collections.unmodifiableMap(payload.keyStateAllocation);
 	}
 
 	public Map<Integer, List<List<Integer>>> getKeyMapping() {
-		return Preconditions.checkNotNull(payload.keyMapping);
+		return Collections.unmodifiableMap(payload.keyMapping);
 	}
 
 	public void setParallelism(int parallelism) {
@@ -66,11 +70,45 @@ public class OperatorDescriptor {
 	}
 
 	public void setKeyStateAllocation(Map<Integer, List<List<Integer>>> keyStateAllocation) {
-		payload.keyStateAllocation = keyStateAllocation;
+		Map<Integer, List<List<Integer>>> unmodifiable = convertToUnmodifiable(keyStateAllocation);
+		payload.keyStateAllocation.putAll(unmodifiable);
+		for (OperatorDescriptor parent : parents) {
+			parent.payload.keyMapping.put(operatorID, unmodifiable.get(parent.operatorID));
+		}
 	}
 
-	public void setKeyMapping(Map<Integer, List<List<Integer>>> keyMapping) {
-		payload.keyMapping = keyMapping;
+	private Map<Integer, List<List<Integer>>> convertToUnmodifiable(Map<Integer, List<List<Integer>>> keyStateAllocation) {
+		Map<Integer, List<List<Integer>>> unmodifiable = new HashMap<>();
+		for (Integer inOpID : keyStateAllocation.keySet()) {
+			List<List<Integer>> unmodifiableKeys = keyStateAllocation.get(inOpID)
+				.stream()
+				.map(Collections::unmodifiableList)
+				.collect(Collectors.toList());
+			unmodifiable.put(inOpID, Collections.unmodifiableList(unmodifiableKeys));
+		}
+		return unmodifiable;
+	}
+
+	/**
+	 * we assume that the key operator only have one operator
+	 *
+	 * @param keyStateAllocation
+	 */
+	@VisibleForTesting
+	public void setKeyStateAllocation(List<List<Integer>> keyStateAllocation) {
+		if (parents.size() != 1) {
+			System.out.println("not support now");
+			return;
+		}
+		OperatorDescriptor parent = (OperatorDescriptor) parents.toArray()[0];
+		List<List<Integer>> unmodifiableKeys = keyStateAllocation.stream()
+			.map(Collections::unmodifiableList)
+			.collect(Collectors.toList());
+		unmodifiableKeys = Collections.unmodifiableList(unmodifiableKeys);
+
+		payload.keyStateAllocation.put(parent.getOperatorID(), unmodifiableKeys);
+		// sync with parent's key mapping
+		parent.payload.keyMapping.put(operatorID, unmodifiableKeys);
 	}
 
 	/**
@@ -113,8 +151,8 @@ public class OperatorDescriptor {
 		int parallelism;
 		Function udf;
 
-		Map<Integer, List<List<Integer>>> keyStateAllocation;
-		Map<Integer, List<List<Integer>>> keyMapping;
+		final Map<Integer, List<List<Integer>>> keyStateAllocation = new HashMap<>();
+		final Map<Integer, List<List<Integer>>> keyMapping = new HashMap<>();
 
 		OperatorPayload(int parallelism) {
 			this.parallelism = parallelism;
