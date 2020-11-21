@@ -26,7 +26,6 @@ import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.controlplane.PrimitiveOperation;
 import org.apache.flink.runtime.controlplane.StreamRelatedInstanceFactory;
-import org.apache.flink.runtime.controlplane.StreamingClassGroup;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
 import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
@@ -52,7 +51,6 @@ import org.apache.flink.runtime.rpc.akka.AkkaRpcServiceUtils;
 import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
 import org.apache.flink.runtime.rescale.reconfigure.JobGraphRescaler;
 import org.apache.flink.streaming.controlplane.jobgraph.NormalInstantiateFactory;
-import org.apache.flink.streaming.controlplane.jobgraph.StreamJobGraphUpdater;
 import org.apache.flink.streaming.controlplane.reconfigure.TestingCFManager;
 import org.apache.flink.streaming.controlplane.rescale.StreamJobGraphRescaler;
 import org.apache.flink.streaming.controlplane.rescale.streamswitch.FlinkStreamSwitchAdaptor;
@@ -60,7 +58,6 @@ import org.apache.flink.streaming.controlplane.streammanager.exceptions.StreamMa
 import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
 import org.apache.flink.streaming.controlplane.streammanager.insts.StreamJobExecutionPlanWithUpdatingFlag;
 import org.apache.flink.streaming.controlplane.streammanager.insts.StreamJobExecutionPlanWithUpdatingFlagImpl;
-import org.apache.flink.streaming.controlplane.streammanager.insts.StreamJobExecutionPlanImpl;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 import org.apache.flink.streaming.controlplane.udm.TestingControlPolicy;
 import org.apache.flink.util.OptionalConsumer;
@@ -382,7 +379,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			this.jobExecutionPlan.setStateUpdatingFlag(waitingController);
 
 			OperatorDescriptor targetDescriptor = jobExecutionPlan.getOperatorDescriptorByID(operatorID);
-			targetDescriptor.setKeyStateAllocation(keyStateAllocation);
+			targetDescriptor.setKeyStateAllocationFrom(-1, keyStateAllocation);
 
 			List<Tuple2<Integer, Integer>> affectedTasks = targetDescriptor.getParents()
 				.stream()
@@ -391,7 +388,6 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			affectedTasks.add(Tuple2.of(operatorID, -1));
 
 			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
-//			runAsync(() -> jobMasterGateway.triggerOperatorUpdate(this.jobGraph, jobVertexId, operatorID));
 			runAsync(() -> jobMasterGateway.callOperations(
 				enforcement -> FutureUtils.completedVoidFuture()
 					.thenCompose(
@@ -402,7 +398,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						o -> CompletableFuture.allOf(
 							targetDescriptor.getParents()
 								.stream()
-								.map(d -> enforcement.updateMapping(d.getOperatorID(), -1))
+								.map(d -> enforcement.updateMapping(d.getOperatorID(), operatorID))
 								.toArray(CompletableFuture[]::new)
 						)
 					).thenCompose(

@@ -1,5 +1,8 @@
 package org.apache.flink.runtime.controlplane.abstraction;
 
+import org.apache.flink.annotation.Internal;
+import org.apache.flink.annotation.Public;
+import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.functions.Function;
 import org.apache.flink.api.java.tuple.Tuple2;
@@ -22,6 +25,7 @@ public class OperatorDescriptor {
 	private final Set<OperatorDescriptor> children = new HashSet<>();
 
 	private final OperatorPayload payload;
+	private boolean stateful = false;
 
 	public OperatorDescriptor(Integer operatorID, String name, int parallelism) {
 		this.operatorID = operatorID;
@@ -69,11 +73,25 @@ public class OperatorDescriptor {
 		payload.udf = udf;
 	}
 
+	@Internal
 	public void setKeyStateAllocation(Map<Integer, List<List<Integer>>> keyStateAllocation) {
 		Map<Integer, List<List<Integer>>> unmodifiable = convertToUnmodifiable(keyStateAllocation);
 		payload.keyStateAllocation.putAll(unmodifiable);
 		for (OperatorDescriptor parent : parents) {
 			parent.payload.keyMapping.put(operatorID, unmodifiable.get(parent.operatorID));
+		}
+		// stateless operator should not be allocated  key set
+		stateful = !payload.keyStateAllocation.isEmpty();
+	}
+
+	@Internal
+	public void setKeyMapping(Map<Integer, List<List<Integer>>> keyMapping) {
+		Map<Integer, List<List<Integer>>> unmodifiable = convertToUnmodifiable(keyMapping);
+		payload.keyMapping.putAll(unmodifiable);
+		for (OperatorDescriptor child : children) {
+			if (child.stateful) {
+				child.payload.keyStateAllocation.put(operatorID, unmodifiable.get(child.operatorID));
+			}
 		}
 	}
 
@@ -83,33 +101,77 @@ public class OperatorDescriptor {
 			List<List<Integer>> unmodifiableKeys = keyStateAllocation.get(inOpID)
 				.stream()
 				.map(Collections::unmodifiableList)
-				.collect(Collectors.toList());
-			unmodifiable.put(inOpID, Collections.unmodifiableList(unmodifiableKeys));
+				.collect(Collectors.toUnmodifiableList());
+			unmodifiable.put(inOpID, unmodifiableKeys);
 		}
 		return unmodifiable;
 	}
 
 	/**
-	 * we assume that the key operator only have one operator
+	 * we assume that the key operator only have one upstream opeartor
 	 *
 	 * @param keyStateAllocation
 	 */
-	@VisibleForTesting
-	public void setKeyStateAllocation(List<List<Integer>> keyStateAllocation) {
+	@PublicEvolving
+	public void setKeyStateAllocationFrom(int upstreamOperatorID, List<List<Integer>> keyStateAllocation) {
 		if (parents.size() != 1) {
 			System.out.println("not support now");
 			return;
 		}
-		OperatorDescriptor parent = (OperatorDescriptor) parents.toArray()[0];
-		List<List<Integer>> unmodifiableKeys = keyStateAllocation.stream()
-			.map(Collections::unmodifiableList)
-			.collect(Collectors.toList());
-		unmodifiableKeys = Collections.unmodifiableList(unmodifiableKeys);
+		try {
+			OperatorDescriptor parent;
+			if (upstreamOperatorID < 0) {
+				parent = (OperatorDescriptor) parents.toArray()[0];
+			} else {
+				parent = checkOperatorIDExistInSet(upstreamOperatorID, parents);
+			}
+			List<List<Integer>> unmodifiableKeys = keyStateAllocation.stream()
+				.map(Collections::unmodifiableList)
+				.collect(Collectors.toUnmodifiableList());
 
-		payload.keyStateAllocation.put(parent.getOperatorID(), unmodifiableKeys);
-		// sync with parent's key mapping
-		parent.payload.keyMapping.put(operatorID, unmodifiableKeys);
+			payload.keyStateAllocation.put(upstreamOperatorID, unmodifiableKeys);
+			// sync with parent's key mapping
+			parent.payload.keyMapping.put(operatorID, unmodifiableKeys);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
+
+	/**
+	 * Only use to update key mapping for case that target operator is stateless.
+	 * If the target is stateful, the key mapping should be changed by
+	 * setKeyStateAllocation(List<List<Integer>> keyStateAllocation);
+	 *
+	 * @param targetOperatorID
+	 * @param keyMapping
+	 */
+	@PublicEvolving
+	public void setKeyMappingTo(int targetOperatorID, List<List<Integer>> keyMapping) {
+		try {
+			OperatorDescriptor child = checkOperatorIDExistInSet(targetOperatorID, children);
+
+			List<List<Integer>> unmodifiableKeys = keyMapping.stream()
+				.map(Collections::unmodifiableList)
+				.collect(Collectors.toUnmodifiableList());
+
+			payload.keyMapping.put(targetOperatorID, unmodifiableKeys);
+			if (child.stateful) {
+				child.payload.keyStateAllocation.put(operatorID, unmodifiableKeys);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	private static OperatorDescriptor checkOperatorIDExistInSet(int opID, Set<OperatorDescriptor> set) throws Exception {
+		for (OperatorDescriptor descriptor : set) {
+			if (opID == descriptor.getOperatorID()) {
+				return descriptor;
+			}
+		}
+		throw new Exception("do not have this id in set");
+	}
+
 
 	/**
 	 * @param childEdges       the list of pair of parent id and child id to represent the relationship between operator
@@ -143,7 +205,7 @@ public class OperatorDescriptor {
 
 	@Override
 	public String toString() {
-		return "OperatorDescriptor{name='" + name + "\'', parallelism=" + payload.parallelism +
+		return "OperatorDescriptor{name='" + name + "'', parallelism=" + payload.parallelism +
 			", parents:" + parents.size() + ", children:" + children.size() + '}';
 	}
 
@@ -151,6 +213,7 @@ public class OperatorDescriptor {
 		int parallelism;
 		Function udf;
 
+		/* for stateful one input stream task, the key state allocation item is always one */
 		final Map<Integer, List<List<Integer>>> keyStateAllocation = new HashMap<>();
 		final Map<Integer, List<List<Integer>>> keyMapping = new HashMap<>();
 

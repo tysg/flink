@@ -10,6 +10,8 @@ import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.messages.Acknowledge;
+import org.apache.flink.runtime.rescale.RescaleID;
+import org.apache.flink.runtime.rescale.RescaleOptions;
 import org.apache.flink.runtime.rescale.RescalepointAcknowledgeListener;
 import org.apache.flink.util.Preconditions;
 import org.slf4j.Logger;
@@ -105,11 +107,49 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 		return CompletableFuture.completedFuture(null);
 	}
 
+	/**
+	 * update result partition on this operator,
+	 * update input gates, key group range on its down stream operator
+	 *
+	 * @param srcOpID  the operator id of this operator
+	 * @param destOpID represent which parallel instance of this operator, -1 means all parallel instance
+	 * @return
+	 */
 	@Override
-	public CompletableFuture<Void> updateMapping(int operatorID, int offset) {
-		return CompletableFuture.completedFuture(null);
+	public CompletableFuture<Void> updateMapping(int srcOpID, int destOpID) {
+		RescaleID rescaleID = RescaleID.generateNextID();
+		final List<CompletableFuture<Void>> rescaleCandidatesFutures = new ArrayList<>();
+		try {
+			// update result partition
+			JobVertexID srcJobVertexID = rawVertexIDToJobVertexID(srcOpID);
+			ExecutionJobVertex srcJobVertex = executionGraph.getJobVertex(srcJobVertexID);
+			Preconditions.checkNotNull(srcJobVertex, "can not found this execution job vertex");
+			for (ExecutionVertex vertex : srcJobVertex.getTaskVertices()) {
+				Execution execution = vertex.getCurrentExecutionAttempt();
+				rescaleCandidatesFutures.add(execution.scheduleRescale(rescaleID, RescaleOptions.RESCALE_PARTITIONS_ONLY, null));
+			}
+			// update input gates
+			JobVertexID destJobVertexID = rawVertexIDToJobVertexID(destOpID);
+			ExecutionJobVertex destJobVertex = executionGraph.getJobVertex(destJobVertexID);
+			Preconditions.checkNotNull(destJobVertex, "can not found this execution job vertex");
+			for (ExecutionVertex vertex : destJobVertex.getTaskVertices()) {
+				Execution execution = vertex.getCurrentExecutionAttempt();
+				rescaleCandidatesFutures.add(execution.scheduleRescale(rescaleID, RescaleOptions.RESCALE_GATES_ONLY, null));
+			}
+		} catch (ExecutionGraphException e) {
+			return FutureUtils.completedExceptionally(e);
+		}
+		// update input gates on down stream
+		return FutureUtils.completeAll(rescaleCandidatesFutures);
 	}
 
+	/**
+	 * redistribute operator state by task state manager
+	 *
+	 * @param operatorID the operator id of this operator
+	 * @param offset     represent which parallel instance of this operator, -1 means all parallel instance
+	 * @return
+	 */
 	@Override
 	public CompletableFuture<Void> updateState(int operatorID, int offset) {
 		return CompletableFuture.completedFuture(null);

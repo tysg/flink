@@ -87,13 +87,13 @@ public interface PrimitiveOperation {
 	CompletableFuture<Void> cancelTasks(int operatorID, int offset);
 
 	/**
-	 * Update key mappings of affected tasks.
+	 * Update key mappings between srcOp and destOp
 	 *
-	 * @param operatorID the operator id of this operator
-	 * @param offset     represent which parallel instance of this operator, -1 means all parallel instance
+	 * @param srcOpID the operator id of source operator
+	 * @param destOpID the operator id of destination operator
 	 * @return
 	 */
-	CompletableFuture<Void> updateMapping(int operatorID, int offset);
+	CompletableFuture<Void> updateMapping(int srcOpID, int destOpID);
 
 	/**
 	 * Update key state of affected tasks
