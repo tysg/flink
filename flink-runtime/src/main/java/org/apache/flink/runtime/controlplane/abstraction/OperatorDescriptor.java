@@ -98,10 +98,12 @@ public class OperatorDescriptor {
 	private Map<Integer, List<List<Integer>>> convertToUnmodifiable(Map<Integer, List<List<Integer>>> keyStateAllocation) {
 		Map<Integer, List<List<Integer>>> unmodifiable = new HashMap<>();
 		for (Integer inOpID : keyStateAllocation.keySet()) {
-			List<List<Integer>> unmodifiableKeys = keyStateAllocation.get(inOpID)
-				.stream()
-				.map(Collections::unmodifiableList)
-				.collect(Collectors.toUnmodifiableList());
+			List<List<Integer>> unmodifiableKeys = Collections.unmodifiableList(
+				keyStateAllocation.get(inOpID)
+					.stream()
+					.map(Collections::unmodifiableList)
+					.collect(Collectors.toList())
+			);
 			unmodifiable.put(inOpID, unmodifiableKeys);
 		}
 		return unmodifiable;
@@ -125,10 +127,11 @@ public class OperatorDescriptor {
 			} else {
 				parent = checkOperatorIDExistInSet(upstreamOperatorID, parents);
 			}
-			List<List<Integer>> unmodifiableKeys = keyStateAllocation.stream()
-				.map(Collections::unmodifiableList)
-				.collect(Collectors.toUnmodifiableList());
-
+			List<List<Integer>> unmodifiableKeys = Collections.unmodifiableList(
+				keyStateAllocation.stream()
+					.map(Collections::unmodifiableList)
+					.collect(Collectors.toList())
+			);
 			payload.keyStateAllocation.put(upstreamOperatorID, unmodifiableKeys);
 			// sync with parent's key mapping
 			parent.payload.keyMapping.put(operatorID, unmodifiableKeys);
@@ -150,10 +153,11 @@ public class OperatorDescriptor {
 		try {
 			OperatorDescriptor child = checkOperatorIDExistInSet(targetOperatorID, children);
 
-			List<List<Integer>> unmodifiableKeys = keyMapping.stream()
-				.map(Collections::unmodifiableList)
-				.collect(Collectors.toUnmodifiableList());
-
+			List<List<Integer>> unmodifiableKeys = Collections.unmodifiableList(
+				keyMapping.stream()
+					.map(Collections::unmodifiableList)
+					.collect(Collectors.toList())
+			);
 			payload.keyMapping.put(targetOperatorID, unmodifiableKeys);
 			if (child.stateful) {
 				child.payload.keyStateAllocation.put(operatorID, unmodifiableKeys);

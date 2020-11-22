@@ -83,7 +83,7 @@ public class StreamJobExecutionPlanWithUpdatingFlagImpl implements StreamJobExec
 	}
 
 	@Override
-	public Map<Integer, List<List<Integer>>> getKeyMapping(Integer operatorID) throws Exception {
+	public Map<Integer, List<List<Integer>>> getKeyMapping(Integer operatorID) {
 		return streamJobExecutionPlanDelegate.getKeyMapping(operatorID);
 	}
 

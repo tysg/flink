@@ -1316,6 +1316,10 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 		return String.format("%s (%s) [%s]", taskNameWithSubtask, executionId, executionState);
 	}
 
+	public void finalizeRescale() {
+		checkNotNull(invokable).finalizeRescale();
+	}
+
 	@VisibleForTesting
 	class PartitionProducerStateResponseHandle implements ResponseHandle {
 		private final Either<ExecutionState, Throwable> result;

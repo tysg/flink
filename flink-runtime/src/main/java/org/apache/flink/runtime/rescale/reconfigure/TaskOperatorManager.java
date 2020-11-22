@@ -58,7 +58,7 @@ public class TaskOperatorManager {
 
 		CompletableFuture<Acknowledge> getResumeFuture();
 
-		CompletableFuture<Acknowledge> getAckPausedFuture() throws Exception;
+		CompletableFuture<Acknowledge> getAckPausedFuture();
 
 		/**
 		 * This method should be thread safe.
@@ -121,9 +121,9 @@ public class TaskOperatorManager {
 		}
 
 		@Override
-		public CompletableFuture<Acknowledge> getAckPausedFuture() throws Exception {
+		public CompletableFuture<Acknowledge> getAckPausedFuture() {
 			if (state.get() != TaskStatus.PAUSE) {
-				throw new Exception("state hasn't been paused before");
+				return CompletableFuture.completedFuture(Acknowledge.get());
 			}
 			return ackPausedFuture;
 		}

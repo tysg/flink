@@ -25,7 +25,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation {
 	private StreamRelatedInstanceFactory streamRelatedInstanceFactory;
 
 	private JobGraphUpdater updater;
-	private StreamJobExecutionPlan heldExecutionPlan;
+	protected StreamJobExecutionPlan heldExecutionPlan;
 	protected Map<Integer, OperatorID> operatorIDMap;
 
 
@@ -73,9 +73,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation {
 			int operatorID = descriptor.getOperatorID();
 			OperatorDescriptor heldDescriptor = heldExecutionPlan.getOperatorDescriptorByID(operatorID);
 			// loop until all change in this operator has been detected and sync
-			ChangedPosition changedPosition;
-			do {
-				changedPosition = analyzeOperatorDifference(heldDescriptor, descriptor);
+			for (ChangedPosition changedPosition : analyzeOperatorDifference(heldDescriptor, descriptor)) {
 				try {
 					switch (changedPosition) {
 						case UDF:
@@ -90,14 +88,15 @@ public abstract class AbstractCoordinator implements PrimitiveOperation {
 							heldDescriptor.setParallelism(descriptor.getParallelism());
 							// next update job graph and execution graph
 							break;
+						case KEY_MAPPING:
+							break;
 						case NO_CHANGE:
 					}
-
 				} catch (Exception e) {
 					e.printStackTrace();
 					return FutureUtils.completedExceptionally(e);
 				}
-			} while (changedPosition != ChangedPosition.NO_CHANGE);
+			}
 		}
 		return CompletableFuture.completedFuture(null);
 	}
@@ -113,17 +112,21 @@ public abstract class AbstractCoordinator implements PrimitiveOperation {
 		}
 	}
 
-	private ChangedPosition analyzeOperatorDifference(OperatorDescriptor self, OperatorDescriptor modified) {
+	private List<ChangedPosition> analyzeOperatorDifference(OperatorDescriptor self, OperatorDescriptor modified) {
+		List<ChangedPosition> results = new LinkedList<>();
 		if (self.getUdf() != modified.getUdf()) {
-			return ChangedPosition.UDF;
-		}
-		if (compare(self.getKeyStateAllocation(), modified.getKeyStateAllocation())) {
-			return ChangedPosition.KEY_STATE_ALLOCATION;
+			results.add(ChangedPosition.UDF);
 		}
 		if (self.getParallelism() != modified.getParallelism()) {
-			return ChangedPosition.PARALLELISM;
+			results.add(ChangedPosition.PARALLELISM);
 		}
-		return ChangedPosition.NO_CHANGE;
+		if (compare(self.getKeyStateAllocation(), modified.getKeyStateAllocation())) {
+			results.add(ChangedPosition.KEY_STATE_ALLOCATION);
+		}
+		if(compare(self.getKeyMapping(), modified.getKeyMapping())){
+			results.add(ChangedPosition.KEY_MAPPING);
+		}
+		return results;
 	}
 
 	/**

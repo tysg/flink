@@ -4,6 +4,7 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.checkpoint.CheckpointCoordinator;
 import org.apache.flink.runtime.checkpoint.OperatorState;
 import org.apache.flink.runtime.checkpoint.PendingCheckpoint;
+import org.apache.flink.runtime.checkpoint.StateAssignmentOperation;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.executiongraph.*;
 import org.apache.flink.runtime.jobgraph.JobGraph;
@@ -13,6 +14,7 @@ import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.rescale.RescaleID;
 import org.apache.flink.runtime.rescale.RescaleOptions;
 import org.apache.flink.runtime.rescale.RescalepointAcknowledgeListener;
+import org.apache.flink.runtime.state.KeyGroupRange;
 import org.apache.flink.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,6 +30,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 public class ReconfigureCoordinator extends AbstractCoordinator {
 
 	private static final Logger LOG = LoggerFactory.getLogger(ReconfigureCoordinator.class);
+	private SynchronizeOperation currentSyncOp = null;
 
 	public ReconfigureCoordinator(JobGraph jobGraph, ExecutionGraph executionGraph) {
 		super(jobGraph, executionGraph);
@@ -56,7 +59,8 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 			.collect(Collectors.toList());
 		SynchronizeOperation syncOp = new SynchronizeOperation(vertexIDList);
 		CompletableFuture<Map<OperatorID, OperatorState>> collectedOperatorStateFuture = syncOp.sync();
-
+		// some check related here
+		currentSyncOp = syncOp;
 		return collectedOperatorStateFuture.thenAccept(state ->
 		{
 			System.out.println("synchronizeTasks successful");
@@ -117,7 +121,7 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 	 */
 	@Override
 	public CompletableFuture<Void> updateMapping(int srcOpID, int destOpID) {
-		RescaleID rescaleID = RescaleID.generateNextID();
+		final RescaleID rescaleID = currentSyncOp.rescaleID;
 		final List<CompletableFuture<Void>> rescaleCandidatesFutures = new ArrayList<>();
 		try {
 			// update result partition
@@ -126,21 +130,45 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 			Preconditions.checkNotNull(srcJobVertex, "can not found this execution job vertex");
 			for (ExecutionVertex vertex : srcJobVertex.getTaskVertices()) {
 				Execution execution = vertex.getCurrentExecutionAttempt();
+				execution.updateProducedPartitions(rescaleID);
 				rescaleCandidatesFutures.add(execution.scheduleRescale(rescaleID, RescaleOptions.RESCALE_PARTITIONS_ONLY, null));
 			}
 			// update input gates
 			JobVertexID destJobVertexID = rawVertexIDToJobVertexID(destOpID);
 			ExecutionJobVertex destJobVertex = executionGraph.getJobVertex(destJobVertexID);
 			Preconditions.checkNotNull(destJobVertex, "can not found this execution job vertex");
-			for (ExecutionVertex vertex : destJobVertex.getTaskVertices()) {
+
+			List<KeyGroupRange> keyGroupRanges = generateAlignedKeyGroupRanges(srcOpID, destOpID);
+			for (int i = 0; i < destJobVertex.getParallelism(); i++) {
+				ExecutionVertex vertex = destJobVertex.getTaskVertices()[i];
 				Execution execution = vertex.getCurrentExecutionAttempt();
 				rescaleCandidatesFutures.add(execution.scheduleRescale(rescaleID, RescaleOptions.RESCALE_GATES_ONLY, null));
+				rescaleCandidatesFutures.add(execution.scheduleRescale(rescaleID, RescaleOptions.RESCALE_KEYGROUP_RANGE_ONLY, keyGroupRanges.get(i)));
 			}
 		} catch (ExecutionGraphException e) {
 			return FutureUtils.completedExceptionally(e);
 		}
-		// update input gates on down stream
 		return FutureUtils.completeAll(rescaleCandidatesFutures);
+	}
+
+	private List<KeyGroupRange> generateAlignedKeyGroupRanges(int srcOpID, int destOpID) {
+		int keyGroupStart = 0;
+		List<KeyGroupRange> alignedKeyGroupRanges = new ArrayList<>();
+		List<List<Integer>> partitionAssignment = heldExecutionPlan.getKeyMapping(srcOpID).get(destOpID);
+		for (List<Integer> list : partitionAssignment) {
+			int rangeSize = list.size();
+
+			KeyGroupRange keyGroupRange = rangeSize == 0 ?
+				KeyGroupRange.EMPTY_KEY_GROUP_RANGE :
+				new KeyGroupRange(
+					keyGroupStart,
+					keyGroupStart + rangeSize - 1,
+					list);
+
+			alignedKeyGroupRanges.add(keyGroupRange);
+			keyGroupStart += rangeSize;
+		}
+		return alignedKeyGroupRanges;
 	}
 
 	/**
@@ -152,7 +180,48 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 	 */
 	@Override
 	public CompletableFuture<Void> updateState(int operatorID, int offset) {
-		return CompletableFuture.completedFuture(null);
+		final RescaleID rescaleID = currentSyncOp.rescaleID;
+		JobVertexID jobVertexID = rawVertexIDToJobVertexID(operatorID);
+
+		ExecutionJobVertex executionJobVertex = executionGraph.getJobVertex(jobVertexID);
+		Preconditions.checkNotNull(executionJobVertex, "can not found this execution job vertex");
+
+		CompletableFuture<Void> assignStateFuture = currentSyncOp.finishedFuture.thenAccept(
+			state -> {
+				StateAssignmentOperation stateAssignmentOperation =
+					new StateAssignmentOperation(currentSyncOp.checkpointId, Collections.singleton(executionJobVertex), state, true);
+				stateAssignmentOperation.setForceRescale(true);
+				// think about latter
+//				stateAssignmentOperation.setRedistributeStrategy(jobRescalePartitionAssignment);
+
+				LOG.info("++++++ start to assign states");
+				stateAssignmentOperation.assignStates();
+			}
+		);
+		return assignStateFuture.thenCompose(
+			o -> {
+				final List<CompletableFuture<Void>> rescaleCandidatesFutures = new ArrayList<>();
+				try {
+					if (offset >= 0) {
+						Preconditions.checkArgument(offset < executionJobVertex.getParallelism(), "offset out of boundary");
+						ExecutionVertex executionVertex = executionJobVertex.getTaskVertices()[offset];
+						rescaleCandidatesFutures.add(
+							executionVertex.getCurrentExecutionAttempt()
+								.scheduleRescale(rescaleID, RescaleOptions.RESCALE_REDISTRIBUTE, null)
+						);
+					} else {
+						for (int i = 0; i < executionJobVertex.getParallelism(); i++) {
+							ExecutionVertex vertex = executionJobVertex.getTaskVertices()[i];
+							Execution execution = vertex.getCurrentExecutionAttempt();
+							rescaleCandidatesFutures.add(execution.scheduleRescale(rescaleID, RescaleOptions.RESCALE_REDISTRIBUTE, null));
+						}
+					}
+				} catch (ExecutionGraphException e) {
+					e.printStackTrace();
+				}
+				return FutureUtils.completeAll(rescaleCandidatesFutures);
+			}
+		);
 	}
 
 	/**
@@ -193,10 +262,12 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 		private final Set<ExecutionAttemptID> notYetAcknowledgedTasks = new HashSet<>();
 
 		private final List<Tuple2<JobVertexID, Integer>> vertexIdList;
+		private final Object lock = new Object();
+		private final RescaleID rescaleID = RescaleID.generateNextID();
+
 		private final CompletableFuture<Map<OperatorID, OperatorState>> finishedFuture;
 
 		private long checkpointId;
-		private final Object lock = new Object();
 
 		SynchronizeOperation(List<Tuple2<JobVertexID, Integer>> vertexIdList) {
 			this.vertexIdList = vertexIdList;
