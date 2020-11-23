@@ -319,15 +319,15 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		runAsync(() -> jobMasterGateway.triggerJobRescale(wrapper, jobGraph, upDownStream.f0, upDownStream.f1));
 	}
 
-	public void rescale(int operatorID, int newParallelism, List<List<Integer>> keyStateAllocation, ControlPolicy waitingController){
+	public void rescale(int operatorID, int newParallelism, List<List<Integer>> keyStateAllocation, ControlPolicy waitingController) {
 		try {
 			// scale in is not support now
-			checkState(keyStateAllocation.size()==newParallelism,
+			checkState(keyStateAllocation.size() == newParallelism,
 				"new parallelism not match key state allocation");
 			this.jobExecutionPlan.setStateUpdatingFlag(waitingController);
 
 			OperatorDescriptor targetDescriptor = jobExecutionPlan.getOperatorDescriptorByID(operatorID);
-			List<Tuple2<Integer, Integer>> affectedTasks  = targetDescriptor.getParents()
+			List<Tuple2<Integer, Integer>> affectedTasks = targetDescriptor.getParents()
 				.stream()
 				.map(d -> Tuple2.of(d.getOperatorID(), -1))
 				.collect(Collectors.toList());
@@ -342,19 +342,23 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					.thenCompose(
 						o -> enforcement.synchronizePauseTasks(affectedTasks))
 					.thenCompose(
-						o -> enforcement.deployTasks(operatorID, newParallelism))
+						o -> CompletableFuture.allOf(
+							targetDescriptor.getParents()
+								.stream()
+								.map(d -> enforcement.updateMapping(d.getOperatorID(), operatorID))
+								.toArray(CompletableFuture[]::new)
+						))
 					.thenCompose(
 						o -> CompletableFuture.allOf(
 							targetDescriptor.getParents()
 								.stream()
-								.map(d -> enforcement.updateMapping(d.getOperatorID(), -1))
+								.map(d -> enforcement.updateState(d.getOperatorID(), operatorID, -1))
 								.toArray(CompletableFuture[]::new)
-						)
-					).thenCompose(
-						o -> enforcement.updateState(operatorID, -1))
+						))
 					.thenCompose(
-						o -> enforcement.resumeTasks(affectedTasks)
-					)
+						o -> enforcement.deployTasks(operatorID, newParallelism))
+					.thenCompose(
+						o -> enforcement.resumeTasks(affectedTasks))
 					.thenAccept(
 						(acknowledge) -> {
 							try {
@@ -402,7 +406,12 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 								.toArray(CompletableFuture[]::new)
 						)
 					).thenCompose(
-						o -> enforcement.updateState(operatorID, -1))
+						o -> CompletableFuture.allOf(
+							targetDescriptor.getParents()
+								.stream()
+								.map(d -> enforcement.updateState(d.getOperatorID(), operatorID, -1))
+								.toArray(CompletableFuture[]::new)
+						))
 					.thenCompose(
 						o -> enforcement.resumeTasks(affectedTasks))
 					.thenAccept(
@@ -665,7 +674,6 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			disconnectJobManager(jobId, new Exception("Job " + jobId + "was removed"));
 		}
 	}
-
 
 
 	private class JobLeaderIdActionsImpl implements JobLeaderIdActions {

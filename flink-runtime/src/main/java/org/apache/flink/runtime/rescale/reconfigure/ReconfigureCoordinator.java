@@ -151,6 +151,61 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 		return FutureUtils.completeAll(rescaleCandidatesFutures);
 	}
 
+	/**
+	 * update the key state in destination operator
+	 *
+	 * @param keySenderID the id of which operator send keys to destination operator
+	 * @param operatorID  the id of operator that need to update state
+	 * @param offset      the sub-operator offset of update stated needed operator
+	 * @return
+	 */
+	@Override
+	public CompletableFuture<Void> updateState(int keySenderID, int operatorID, int offset) {
+		final RescaleID rescaleID = currentSyncOp.rescaleID;
+		JobVertexID jobVertexID = rawVertexIDToJobVertexID(keySenderID);
+
+		ExecutionJobVertex executionJobVertex = executionGraph.getJobVertex(jobVertexID);
+		Preconditions.checkNotNull(executionJobVertex, "can not found this execution job vertex");
+
+		CompletableFuture<Void> assignStateFuture = currentSyncOp.finishedFuture.thenAccept(
+			state -> {
+				StateAssignmentOperation stateAssignmentOperation =
+					new StateAssignmentOperation(currentSyncOp.checkpointId, Collections.singleton(executionJobVertex), state, true);
+				stateAssignmentOperation.setForceRescale(true);
+				// think about latter
+//				stateAssignmentOperation.setRedistributeStrategy(jobRescalePartitionAssignment);
+
+				LOG.info("++++++ start to assign states");
+				stateAssignmentOperation.assignStates();
+			}
+		);
+		return assignStateFuture.thenCompose(
+			o -> {
+				final List<CompletableFuture<Void>> rescaleCandidatesFutures = new ArrayList<>();
+				List<KeyGroupRange> keyGroupRanges = generateAlignedKeyGroupRanges(keySenderID, operatorID);
+				try {
+					if (offset >= 0) {
+						Preconditions.checkArgument(offset < executionJobVertex.getParallelism(), "offset out of boundary");
+						ExecutionVertex executionVertex = executionJobVertex.getTaskVertices()[offset];
+						rescaleCandidatesFutures.add(
+							executionVertex.getCurrentExecutionAttempt()
+								.scheduleRescale(rescaleID, RescaleOptions.RESCALE_REDISTRIBUTE, keyGroupRanges.get(offset))
+						);
+					} else {
+						for (int i = 0; i < executionJobVertex.getParallelism(); i++) {
+							ExecutionVertex vertex = executionJobVertex.getTaskVertices()[i];
+							Execution execution = vertex.getCurrentExecutionAttempt();
+							rescaleCandidatesFutures.add(execution.scheduleRescale(rescaleID, RescaleOptions.RESCALE_REDISTRIBUTE, keyGroupRanges.get(i)));
+						}
+					}
+				} catch (ExecutionGraphException e) {
+					e.printStackTrace();
+				}
+				return FutureUtils.completeAll(rescaleCandidatesFutures);
+			}
+		);
+	}
+
 	private List<KeyGroupRange> generateAlignedKeyGroupRanges(int srcOpID, int destOpID) {
 		int keyGroupStart = 0;
 		List<KeyGroupRange> alignedKeyGroupRanges = new ArrayList<>();
@@ -171,58 +226,6 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 		return alignedKeyGroupRanges;
 	}
 
-	/**
-	 * redistribute operator state by task state manager
-	 *
-	 * @param operatorID the operator id of this operator
-	 * @param offset     represent which parallel instance of this operator, -1 means all parallel instance
-	 * @return
-	 */
-	@Override
-	public CompletableFuture<Void> updateState(int operatorID, int offset) {
-		final RescaleID rescaleID = currentSyncOp.rescaleID;
-		JobVertexID jobVertexID = rawVertexIDToJobVertexID(operatorID);
-
-		ExecutionJobVertex executionJobVertex = executionGraph.getJobVertex(jobVertexID);
-		Preconditions.checkNotNull(executionJobVertex, "can not found this execution job vertex");
-
-		CompletableFuture<Void> assignStateFuture = currentSyncOp.finishedFuture.thenAccept(
-			state -> {
-				StateAssignmentOperation stateAssignmentOperation =
-					new StateAssignmentOperation(currentSyncOp.checkpointId, Collections.singleton(executionJobVertex), state, true);
-				stateAssignmentOperation.setForceRescale(true);
-				// think about latter
-//				stateAssignmentOperation.setRedistributeStrategy(jobRescalePartitionAssignment);
-
-				LOG.info("++++++ start to assign states");
-				stateAssignmentOperation.assignStates();
-			}
-		);
-		return assignStateFuture.thenCompose(
-			o -> {
-				final List<CompletableFuture<Void>> rescaleCandidatesFutures = new ArrayList<>();
-				try {
-					if (offset >= 0) {
-						Preconditions.checkArgument(offset < executionJobVertex.getParallelism(), "offset out of boundary");
-						ExecutionVertex executionVertex = executionJobVertex.getTaskVertices()[offset];
-						rescaleCandidatesFutures.add(
-							executionVertex.getCurrentExecutionAttempt()
-								.scheduleRescale(rescaleID, RescaleOptions.RESCALE_REDISTRIBUTE, null)
-						);
-					} else {
-						for (int i = 0; i < executionJobVertex.getParallelism(); i++) {
-							ExecutionVertex vertex = executionJobVertex.getTaskVertices()[i];
-							Execution execution = vertex.getCurrentExecutionAttempt();
-							rescaleCandidatesFutures.add(execution.scheduleRescale(rescaleID, RescaleOptions.RESCALE_REDISTRIBUTE, null));
-						}
-					}
-				} catch (ExecutionGraphException e) {
-					e.printStackTrace();
-				}
-				return FutureUtils.completeAll(rescaleCandidatesFutures);
-			}
-		);
-	}
 
 	/**
 	 * This method also will wake up the paused tasks.

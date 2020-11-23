@@ -96,13 +96,14 @@ public interface PrimitiveOperation {
 	CompletableFuture<Void> updateMapping(int srcOpID, int destOpID);
 
 	/**
-	 * Update key state of affected tasks
+	 * update the key state in destination operator
 	 *
-	 * @param operatorID the operator id of this operator
-	 * @param offset     represent which parallel instance of this operator, -1 means all parallel instance
+	 * @param keySenderID the id of which operator send keys to destination operator
+	 * @param operatorID the id of operator that need to update state
+	 * @param offset  the sub-operator offset of update stated needed operator
 	 * @return
 	 */
-	CompletableFuture<Void> updateState(int operatorID, int offset);
+	CompletableFuture<Void> updateState(int keySenderID, int operatorID, int offset);
 
 	/**
 	 * @param vertexID the operator id of this operator
