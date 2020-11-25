@@ -132,7 +132,7 @@ public class OperatorDescriptor {
 					.map(Collections::unmodifiableList)
 					.collect(Collectors.toList())
 			);
-			payload.keyStateAllocation.put(upstreamOperatorID, unmodifiableKeys);
+			payload.keyStateAllocation.put(parent.operatorID, unmodifiableKeys);
 			// sync with parent's key mapping
 			parent.payload.keyMapping.put(operatorID, unmodifiableKeys);
 		} catch (Exception e) {

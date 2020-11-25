@@ -25,6 +25,8 @@ import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionGraphConfig;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
 import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
+import org.apache.flink.runtime.execution.ExecutionState;
+import org.apache.flink.runtime.executiongraph.Execution;
 import org.apache.flink.runtime.executiongraph.ExecutionGraph;
 import org.apache.flink.runtime.executiongraph.ExecutionJobVertex;
 import org.apache.flink.runtime.executiongraph.ExecutionVertex;
@@ -159,16 +161,16 @@ public final class StreamJobExecutionPlanImpl implements StreamJobExecutionPlan 
 			// contains all tasks of the same parallel operator instances
 			List<ExecutionGraphConfig.OperatorTask> operatorTaskList = new ArrayList<>(jobVertex.getParallelism());
 			for (ExecutionVertex vertex : jobVertex.getTaskVertices()) {
-				LogicalSlot slot;
+				Execution execution;
 				do {
-					slot = vertex.getCurrentAssignedResource();
+					execution = vertex.getCurrentExecutionAttempt();
 					try {
 						Thread.sleep(100);
 					} catch (InterruptedException e) {
 						e.printStackTrace();
 					}
-				} while (slot == null);
-
+				} while (execution == null || execution.getState() != ExecutionState.RUNNING);
+				LogicalSlot slot = execution.getAssignedResource();
 				Host host = hosts.get(slot.getTaskManagerLocation().getResourceID());
 				if (host == null) {
 					host = new Host(slot.getTaskManagerLocation().address(), 0, 0);

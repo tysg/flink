@@ -30,12 +30,14 @@ public class TaskOperatorManager {
 	public void setSyncRequestFlag(int syncFlag) throws Exception {
 		switch (syncFlag){
 			case NEED_SYNC_REQUEST:
+				System.out.println("prepare to synchronize");
 				break;
 			case NEED_RESUME_REQUEST:
+				System.out.println("task resuming...");
 				this.getPauseActionController().resume();
 				break;
 			default:
-				throw new Exception("unknow flag");
+				throw new Exception("unknown flag");
 		}
 		hasSyncRequest.set(syncFlag);
 	}

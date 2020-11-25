@@ -156,8 +156,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		this.jobGraphRescaler = new StreamJobGraphRescaler(jobGraph, userCodeLoader);
 
 		/* now the policy is temporary hard coded added */
-		this.controlPolicyList.add(new FlinkStreamSwitchAdaptor(this, jobGraph));
-		this.controlPolicyList.add(new TestingCFManager(this));
+//		this.controlPolicyList.add(new FlinkStreamSwitchAdaptor(this, jobGraph));
+//		this.controlPolicyList.add(new TestingCFManager(this));
 		this.controlPolicyList.add(new TestingControlPolicy(this));
 	}
 

@@ -28,6 +28,7 @@ import org.apache.flink.runtime.executiongraph.ExecutionJobVertex;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobgraph.OperatorInstanceID;
 import org.apache.flink.runtime.rescale.JobRescalePartitionAssignment;
+import org.apache.flink.runtime.rescale.reconfigure.ReconfigureCoordinator;
 import org.apache.flink.runtime.state.*;
 import org.apache.flink.util.Preconditions;
 
@@ -63,7 +64,7 @@ public class StateAssignmentOperation {
 	private final boolean allowNonRestoredState;
 
 	private boolean isForceRescale;
-	private JobRescalePartitionAssignment jobRescalePartitionAssignment;
+	private ReconfigureCoordinator.RemappingAssignment jobRescalePartitionAssignment;
 
 	public StateAssignmentOperation(
 		long restoreCheckpointId,
@@ -81,8 +82,12 @@ public class StateAssignmentOperation {
 		this.isForceRescale = isForceRescale;
 	}
 
-	public void setRedistributeStrategy(JobRescalePartitionAssignment jobRescalePartitionAssignment) {
+	public void setRedistributeStrategy(ReconfigureCoordinator.RemappingAssignment jobRescalePartitionAssignment) {
 		this.jobRescalePartitionAssignment = jobRescalePartitionAssignment;
+	}
+
+	public void setRedistributeStrategy(JobRescalePartitionAssignment jobRescalePartitionAssignment) {
+//		this.jobRescalePartitionAssignment = jobRescalePartitionAssignment;
 	}
 
 	public void assignStates() {

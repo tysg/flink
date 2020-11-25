@@ -19,10 +19,10 @@ mvn=/home/hya/software/ideaIU-2019.2.3/idea-IU-192.6817.14/plugins/maven/lib/mav
 
 
 cd flink-core || exit
-$mvn clean install -Dcheckstyle.skip -DskipTests -Dmaven.javadoc.skip
-cd ../flink-filesystems || exit
-$mvn clean install -Dcheckstyle.skip -DskipTests -Dmaven.javadoc.skip
+#$mvn clean install -Dcheckstyle.skip -DskipTests -Dmaven.javadoc.skip
+#cd ../flink-filesystems || exit
+#$mvn clean install -Dcheckstyle.skip -DskipTests -Dmaven.javadoc.skip
 cd ../flink-runtime || exit
-$mvn clean install -Dcheckstyle.skip -DskipTests -Dmaven.javadoc.skip
+$mvn install -Dcheckstyle.skip -DskipTests -Dmaven.javadoc.skip
 cd ../flink-streaming-java || exit
-$mvn clean install -Dcheckstyle.skip -DskipTests -Dmaven.javadoc.skip
+$mvn  install -Dcheckstyle.skip -DskipTests -Dmaven.javadoc.skip

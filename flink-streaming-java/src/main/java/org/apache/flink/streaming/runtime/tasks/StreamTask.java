@@ -1216,6 +1216,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 
 			reconnect();
 		} catch (Exception e) {
+			e.printStackTrace();
 			LOG.info("++++++ error", e);
 		} finally {
 			rescaleManager.finish();

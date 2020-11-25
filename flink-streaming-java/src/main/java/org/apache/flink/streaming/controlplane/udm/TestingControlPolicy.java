@@ -24,8 +24,6 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 		new Thread(
 			() -> {
 				try {
-					Thread.sleep(5);
-
 					StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
 					for (Iterator<OperatorDescriptor> it = streamJobState.getAllOperatorDescriptor(); it.hasNext(); ) {
 						OperatorDescriptor descriptor = it.next();
@@ -34,27 +32,35 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 						System.out.println("key state allocation" + streamJobState.getKeyStateAllocation(descriptor.getOperatorID()));
 						System.out.println("-------------------");
 					}
+					Thread.sleep(15);
 					int testingID = findOperatorByName("Splitter Flatap (but name filter)");
+					// just show how to defined customize operations
+//					System.out.println("start synchronize test...");
+//					getInstructionSet().callCustomizeOperations(
+//						enforcement -> FutureUtils.completedVoidFuture()
+//							.thenCompose(o -> enforcement.synchronizePauseTasks(Collections.singletonList(Tuple2.of(testingID, 1))))
+//							.thenCompose(o -> enforcement.resumeTasks(Collections.singletonList(Tuple2.of(testingID, 1))))
+//							.thenAccept(o -> {
+//								synchronized (object) {
+//									object.notify();
+//								}
+//							})
+//					);
+//					synchronized (object) {
+//						object.wait();
+//					}
+					System.out.println("start rebalance test...");
 					Map<Integer, List<List<Integer>>> map = streamJobState.getKeyStateAllocation(testingID);
 					List<List<Integer>> keySet = map.values().iterator().next();
 
-					List<List<Integer>> newKeySet =keySet.stream()
+					List<List<Integer>> newKeySet = keySet.stream()
 						.map(ArrayList::new)
 						.collect(Collectors.toList());
-					List<Integer> oddKeys = newKeySet.get(0).stream().filter(i -> i % 2 == 0).collect(Collectors.toList());
-					newKeySet.get(1).addAll(oddKeys);
-					newKeySet.get(0).removeAll(oddKeys);
+					List<Integer> oddKeys = newKeySet.get(1).stream().filter(i -> i % 2 == 0).collect(Collectors.toList());
+					newKeySet.get(0).addAll(oddKeys);
+					newKeySet.get(1).removeAll(oddKeys);
 					getInstructionSet().rebalance(testingID, newKeySet, this);
 
-					synchronized (object){
-						object.wait();
-					}
-					// just show how to defined customize operations
-					getInstructionSet().callCustomizeOperations(
-						enforcement -> FutureUtils.completedVoidFuture()
-							.thenCompose(o -> enforcement.synchronizePauseTasks(Collections.singletonList(Tuple2.of(testingID, 1))))
-							.thenCompose(o -> enforcement.resumeTasks(Collections.singletonList(Tuple2.of(testingID, 1))))
-					);
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
@@ -65,26 +71,11 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 	@Override
 	public void stopControllers() {
 		System.out.println("Testing TestingControlPolicy is stopping...");
-		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
-		for (Iterator<OperatorDescriptor> it = streamJobState.getAllOperatorDescriptor(); it.hasNext(); ) {
-			OperatorDescriptor descriptor = it.next();
-			try {
-				System.out.println(descriptor);
-				System.out.println("key mapping:" + streamJobState.getKeyMapping(descriptor.getOperatorID()));
-				System.out.println("key state allocation" + streamJobState.getKeyStateAllocation(descriptor.getOperatorID()));
-				System.out.println("-------------------");
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-		}
 	}
 
 	@Override
 	public synchronized void onChangeCompleted(Integer jobVertexID) {
 		System.out.println("my self defined instruction finished??");
-		synchronized (object){
-			object.notify();
-		}
 	}
 
 }
