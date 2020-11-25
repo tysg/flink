@@ -12,7 +12,7 @@ import java.util.stream.Collectors;
 public class TestingControlPolicy extends AbstractControlPolicy {
 
 	private final Object object = new Object();
-	private TestingThread testingThread;
+	private final TestingThread testingThread;
 
 	public TestingControlPolicy(ReconfigurationAPI reconfigurationAPI) {
 		super(reconfigurationAPI);
@@ -63,10 +63,13 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 					}
 				})
 		);
+		// wait for operation completed
+		synchronized (object){
+			object.wait();
+		}
 	}
 
-	private void testRebalance(int testingOpID, boolean stateful){
-		System.out.println("start stateful rebalance test...");
+	private void testRebalance(int testingOpID, boolean stateful) throws InterruptedException {
 		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
 		Map<Integer, List<List<Integer>>> map = streamJobState.getKeyStateAllocation(testingOpID);
 		// we assume that each operator only have one input now
@@ -79,6 +82,10 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 		newKeySet.get(0).addAll(oddKeys);
 		newKeySet.get(1).removeAll(oddKeys);
 		getInstructionSet().rebalance(testingOpID, newKeySet, stateful, this);
+		// wait for operation completed
+		synchronized (object){
+			object.wait();
+		}
 	}
 
 	private class TestingThread extends Thread {
@@ -90,21 +97,15 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 			try {
 				showOperatorInfo();
 				Thread.sleep(10);
+				System.out.println("start testCustomizeAPI test...");
 				testCustomizeAPI(statefulOpID);
-				// wait for operation completed
-				synchronized (object){
-					object.wait();
-				}
+
+				System.out.println("start stateful rebalance test...");
 				testRebalance(statefulOpID, true);
-				// wait for operation completed
-				synchronized (object){
-					object.wait();
-				}
+
+				System.out.println("start stateless rebalance test...");
 				testRebalance(statelessOpID, false);
-				// wait for operation completed
-				synchronized (object){
-					object.wait();
-				}
+				// todo show test chained and non-chained case
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
