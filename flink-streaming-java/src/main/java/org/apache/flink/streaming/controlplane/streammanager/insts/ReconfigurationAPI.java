@@ -44,7 +44,7 @@ public interface ReconfigurationAPI {
 
 	void rescale(int operatorID, int newParallelism, List<List<Integer>> keyStateAllocation, ControlPolicy waitingController);
 
-	void rebalance(int operatorID, List<List<Integer>> keyStateAllocation, ControlPolicy waitingController);
+	void rebalance(int operatorID, List<List<Integer>> keyStateAllocation, boolean stateful, ControlPolicy waitingController);
 
 	/**
 	 * Use to notify job master that some operator inside job vertex changed,

@@ -376,7 +376,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	}
 
 	@Override
-	public void rebalance(int operatorID, List<List<Integer>> keyStateAllocation, ControlPolicy waitingController) {
+	public void rebalance(int operatorID, List<List<Integer>> keyStateAllocation, boolean stateful, ControlPolicy waitingController) {
 		try {
 			// typically, the target operator should contain key state,
 			// todo if keyStateAllocation is null, means it is stateless operator, but not support now
@@ -392,38 +392,62 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			affectedTasks.add(Tuple2.of(operatorID, -1));
 
 			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
-			runAsync(() -> jobMasterGateway.callOperations(
-				enforcement -> FutureUtils.completedVoidFuture()
-					.thenCompose(
-						o -> enforcement.prepareExecutionPlan(jobExecutionPlan))
-					.thenCompose(
-						o -> enforcement.synchronizePauseTasks(affectedTasks))
-					.thenCompose(
-						o -> CompletableFuture.allOf(
-							targetDescriptor.getParents()
-								.stream()
-								.map(d -> enforcement.updateMapping(d.getOperatorID(), operatorID))
-								.toArray(CompletableFuture[]::new)
-						)
-					).thenCompose(
-						o -> CompletableFuture.allOf(
-							targetDescriptor.getParents()
-								.stream()
-								.map(d -> enforcement.updateState(d.getOperatorID(), operatorID, -1))
-								.toArray(CompletableFuture[]::new)
-						))
-					.thenCompose(
-						o -> enforcement.resumeTasks(affectedTasks))
-					.thenAccept(
-						(acknowledge) -> {
-							try {
-								this.jobExecutionPlan.notifyUpdateFinished(operatorID);
-							} catch (Exception e) {
-								e.printStackTrace();
+			if(stateful) {
+				runAsync(() -> jobMasterGateway.callOperations(
+					enforcement -> FutureUtils.completedVoidFuture()
+						.thenCompose(
+							o -> enforcement.prepareExecutionPlan(jobExecutionPlan))
+						.thenCompose(
+							o -> enforcement.synchronizePauseTasks(affectedTasks))
+						.thenCompose(
+							o -> CompletableFuture.allOf(
+								targetDescriptor.getParents()
+									.stream()
+									.map(d -> enforcement.updateMapping(d.getOperatorID(), operatorID))
+									.toArray(CompletableFuture[]::new)
+							)
+						).thenCompose(
+							o -> CompletableFuture.allOf(
+								targetDescriptor.getParents()
+									.stream()
+									.map(d -> enforcement.updateState(d.getOperatorID(), operatorID, -1))
+									.toArray(CompletableFuture[]::new)
+							))
+						.thenCompose(
+							o -> enforcement.resumeTasks(affectedTasks))
+						.thenAccept(
+							(acknowledge) -> {
+								try {
+									this.jobExecutionPlan.notifyUpdateFinished(operatorID);
+								} catch (Exception e) {
+									e.printStackTrace();
+								}
 							}
-						}
-					)
-			));
+						)
+				));
+			}else {
+				runAsync(() -> jobMasterGateway.callOperations(
+					enforcement -> FutureUtils.completedVoidFuture()
+						.thenCompose(
+							o -> enforcement.prepareExecutionPlan(jobExecutionPlan))
+						.thenCompose(
+							o -> CompletableFuture.allOf(
+								targetDescriptor.getParents()
+									.stream()
+									.map(d -> enforcement.updateMapping(d.getOperatorID(), operatorID))
+									.toArray(CompletableFuture[]::new)
+							)
+						).thenAccept(
+							(acknowledge) -> {
+								try {
+									this.jobExecutionPlan.notifyUpdateFinished(operatorID);
+								} catch (Exception e) {
+									e.printStackTrace();
+								}
+							}
+						)
+				));
+			}
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
