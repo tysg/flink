@@ -383,8 +383,12 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			this.jobExecutionPlan.setStateUpdatingFlag(waitingController);
 
 			OperatorDescriptor targetDescriptor = jobExecutionPlan.getOperatorDescriptorByID(operatorID);
-			targetDescriptor.setKeyStateAllocationFrom(-1, keyStateAllocation);
 
+			// we assume that each operator only have one input now
+			for(OperatorDescriptor parent: targetDescriptor.getParents()){
+				parent.setKeyMappingTo(operatorID, keyStateAllocation);
+				break;
+			}
 			List<Tuple2<Integer, Integer>> affectedTasks = targetDescriptor.getParents()
 				.stream()
 				.map(d -> Tuple2.of(d.getOperatorID(), -1))

@@ -29,6 +29,7 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 	@Override
 	public void stopControllers() {
 		System.out.println("Testing TestingControlPolicy is stopping...");
+		showOperatorInfo();
 	}
 
 	@Override
@@ -64,12 +65,12 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 				})
 		);
 		// wait for operation completed
-		synchronized (object){
+		synchronized (object) {
 			object.wait();
 		}
 	}
 
-	private void testRebalance(int testingOpID, boolean stateful) throws InterruptedException {
+	private void testRebalanceStateful(int testingOpID) throws InterruptedException {
 		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
 		Map<Integer, List<List<Integer>>> map = streamJobState.getKeyStateAllocation(testingOpID);
 		// we assume that each operator only have one input now
@@ -81,10 +82,32 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 		List<Integer> oddKeys = newKeySet.get(1).stream().filter(i -> i % 2 == 0).collect(Collectors.toList());
 		newKeySet.get(0).addAll(oddKeys);
 		newKeySet.get(1).removeAll(oddKeys);
-		getInstructionSet().rebalance(testingOpID, newKeySet, stateful, this);
+		getInstructionSet().rebalance(testingOpID, newKeySet, true, this);
 		// wait for operation completed
-		synchronized (object){
+		synchronized (object) {
 			object.wait();
+		}
+	}
+
+	private void testRebalanceStateless(int testingOpID) throws InterruptedException {
+		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
+		Set<OperatorDescriptor> parents = streamJobState.getOperatorDescriptorByID(testingOpID).getParents();
+		// we assume that each operator only have one input now
+		for (OperatorDescriptor parent : parents) {
+			List<List<Integer>> newKeySet = parent.getKeyMapping()
+				.get(testingOpID)
+				.stream()
+				.map(ArrayList::new)
+				.collect(Collectors.toList());
+			List<Integer> oddKeys = newKeySet.get(1).stream().filter(i -> i % 2 == 0).collect(Collectors.toList());
+			newKeySet.get(0).addAll(oddKeys);
+			newKeySet.get(1).removeAll(oddKeys);
+			getInstructionSet().rebalance(testingOpID, newKeySet, false, this);
+			// wait for operation completed
+			synchronized (object) {
+				object.wait();
+			}
+			break;
 		}
 	}
 
@@ -92,8 +115,13 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 
 		@Override
 		public void run() {
+			// the testing jobGraph (workload) is in TestingWorkload.java, see that file to know how to use it.
 			int statefulOpID = findOperatorByName("Splitter Flatmap");
 			int statelessOpID = findOperatorByName("filter");
+			if (statefulOpID == -1 || statelessOpID == -1) {
+				System.out.println("can not found operator with given name, corrupt");
+				return;
+			}
 			try {
 				showOperatorInfo();
 				Thread.sleep(10);
@@ -101,11 +129,11 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 				testCustomizeAPI(statefulOpID);
 
 				System.out.println("start stateful rebalance test...");
-				testRebalance(statefulOpID, true);
+				testRebalanceStateful(statefulOpID);
 
 				System.out.println("start stateless rebalance test...");
-				testRebalance(statelessOpID, false);
-				// todo show test chained and non-chained case
+				testRebalanceStateless(statelessOpID);
+				// todo should test chained and non-chained case
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
