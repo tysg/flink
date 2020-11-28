@@ -11,9 +11,12 @@ import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.messages.Acknowledge;
+import org.apache.flink.util.Preconditions;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.IntFunction;
+import java.util.stream.Collectors;
 
 
 public abstract class AbstractCoordinator implements PrimitiveOperation {
@@ -98,6 +101,15 @@ public abstract class AbstractCoordinator implements PrimitiveOperation {
 				}
 			}
 		}
+		final StreamJobExecutionPlan executionPlan = getHeldExecutionPlanCopy();
+		for (Iterator<OperatorDescriptor> it = executionPlan.getAllOperatorDescriptor(); it.hasNext(); ) {
+			OperatorDescriptor descriptor = it.next();
+			OperatorDescriptor held = heldExecutionPlan.getOperatorDescriptorByID(descriptor.getOperatorID());
+			for (ChangedPosition changedPosition : analyzeOperatorDifference(held, descriptor)) {
+				System.out.println("change no work:" + changedPosition);
+				return FutureUtils.completedExceptionally(new Exception("change no work:"+changedPosition));
+			}
+		}
 		return CompletableFuture.completedFuture(null);
 	}
 
@@ -123,7 +135,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation {
 		if (compare(self.getKeyStateAllocation(), modified.getKeyStateAllocation())) {
 			results.add(ChangedPosition.KEY_STATE_ALLOCATION);
 		}
-		if(compare(self.getKeyMapping(), modified.getKeyMapping())){
+		if (compare(self.getKeyMapping(), modified.getKeyMapping())) {
 			results.add(ChangedPosition.KEY_MAPPING);
 		}
 		return results;
@@ -163,12 +175,9 @@ public abstract class AbstractCoordinator implements PrimitiveOperation {
 		if (list1.size() != list2.size()) {
 			return true;
 		}
-		for (int i = 0; i < list1.size(); i++) {
-			if (!list1.get(i).equals(list2.get(i))) {
-				return true;
-			}
-		}
-		return false;
+		return !Arrays.equals(
+			list1.stream().sorted().toArray(),
+			list2.stream().sorted().toArray());
 	}
 
 	@Override

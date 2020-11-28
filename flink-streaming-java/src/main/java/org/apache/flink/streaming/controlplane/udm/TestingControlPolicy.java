@@ -79,9 +79,9 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 		List<List<Integer>> newKeySet = keySet.stream()
 			.map(ArrayList::new)
 			.collect(Collectors.toList());
-		List<Integer> oddKeys = newKeySet.get(1).stream().filter(i -> i % 2 == 0).collect(Collectors.toList());
-		newKeySet.get(0).addAll(oddKeys);
-		newKeySet.get(1).removeAll(oddKeys);
+		List<Integer> oddKeys = newKeySet.get(0).stream().filter(i -> i % 2 == 0).collect(Collectors.toList());
+		newKeySet.get(0).removeAll(oddKeys);
+		newKeySet.get(1).addAll(oddKeys);
 		getInstructionSet().rebalance(testingOpID, newKeySet, true, this);
 		// wait for operation completed
 		synchronized (object) {
@@ -99,9 +99,9 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 				.stream()
 				.map(ArrayList::new)
 				.collect(Collectors.toList());
-			List<Integer> oddKeys = newKeySet.get(1).stream().filter(i -> i % 2 == 0).collect(Collectors.toList());
-			newKeySet.get(0).addAll(oddKeys);
-			newKeySet.get(1).removeAll(oddKeys);
+			List<Integer> oddKeys = newKeySet.get(0).stream().filter(i -> i % 2 == 0).collect(Collectors.toList());
+			newKeySet.get(0).removeAll(oddKeys);
+			newKeySet.get(1).addAll(oddKeys);
 			getInstructionSet().rebalance(testingOpID, newKeySet, false, this);
 			// wait for operation completed
 			synchronized (object) {
@@ -128,11 +128,11 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 				System.out.println("start testCustomizeAPI test...");
 				testCustomizeAPI(statefulOpID);
 
-				System.out.println("start stateful rebalance test...");
-				testRebalanceStateful(statefulOpID);
-
 				System.out.println("start stateless rebalance test...");
 				testRebalanceStateless(statelessOpID);
+
+//				System.out.println("start stateful rebalance test...");
+//				testRebalanceStateful(statefulOpID);
 				// todo should test chained and non-chained case
 			} catch (InterruptedException e) {
 				e.printStackTrace();

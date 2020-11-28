@@ -134,6 +134,7 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 			JobVertexID srcJobVertexID = rawVertexIDToJobVertexID(srcOpID);
 			ExecutionJobVertex srcJobVertex = executionGraph.getJobVertex(srcJobVertexID);
 			Preconditions.checkNotNull(srcJobVertex, "can not found this execution job vertex");
+			srcJobVertex.cleanBeforeRescale();
 			for (ExecutionVertex vertex : srcJobVertex.getTaskVertices()) {
 				Execution execution = vertex.getCurrentExecutionAttempt();
 				execution.updateProducedPartitions(rescaleID);
@@ -173,10 +174,6 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 	@Override
 	public CompletableFuture<Void> updateState(int keySenderID, int operatorID, int offset) {
 		System.out.println("update state...");
-		if( keySenderID > 0){
-			return CompletableFuture.completedFuture(null);
-		}
-
 		final RescaleID rescaleID = currentSyncOp.rescaleID;
 		JobVertexID jobVertexID = rawVertexIDToJobVertexID(operatorID);
 
