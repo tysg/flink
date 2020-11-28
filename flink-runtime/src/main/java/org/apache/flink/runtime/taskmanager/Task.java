@@ -97,6 +97,7 @@ import java.net.URL;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
@@ -1262,15 +1263,18 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 	}
 
 	public void assignNewState(KeyGroupRange keyGroupRange, int idInModel, JobManagerTaskRestore taskRestore) {
-		((TaskStateManagerImpl) taskStateManager).updateTaskRestore(taskRestore);
+		taskStateManager.updateTaskRestore(taskRestore);
 
 		invokable.reinitializeState(keyGroupRange, idInModel);
+		taskRescaleManager.finish();
 	}
 
 	public void updateKeyGroupRange(KeyGroupRange keyGroupRange) {
 		// it is better to keep those two be consistent.
 		this.keyGroupRange = keyGroupRange;
 		invokable.updateKeyGroupRange(keyGroupRange);
+		// make sure always call finish in Task
+		taskRescaleManager.finish();
 //		throw new IllegalArgumentException("assignNewState is not suppported now.");
 	}
 

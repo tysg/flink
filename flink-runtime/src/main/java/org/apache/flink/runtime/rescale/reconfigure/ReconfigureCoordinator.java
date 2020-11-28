@@ -205,7 +205,7 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 						rescaleCandidatesFutures.add(
 							executionVertex.getCurrentExecutionAttempt().scheduleRescale(
 								rescaleID,
-								RescaleOptions.RESCALE_REDISTRIBUTE,
+								RescaleOptions.RESCALE_STATE_ONLY,
 								remappingAssignment.getAlignedKeyGroupRange(offset)
 							));
 					} else {
@@ -214,7 +214,7 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 							Execution execution = vertex.getCurrentExecutionAttempt();
 							rescaleCandidatesFutures.add(execution.scheduleRescale(
 								rescaleID,
-								RescaleOptions.RESCALE_REDISTRIBUTE,
+								RescaleOptions.RESCALE_STATE_ONLY,
 								remappingAssignment.getAlignedKeyGroupRange(i)
 							));
 						}

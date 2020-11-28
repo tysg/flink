@@ -60,6 +60,8 @@ public class RescaleOptions implements Serializable {
 
 	public final static RescaleOptions RESCALE_REDISTRIBUTE = new RescaleOptions(true, true, true, false);
 
+	public final static RescaleOptions RESCALE_STATE_ONLY = new RescaleOptions(false, false, true, false);
+
 	public final static RescaleOptions RESCALE_KEYGROUP_RANGE_ONLY = new RescaleOptions(false, false, false, true);
 
 	@Override

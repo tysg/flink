@@ -1245,13 +1245,12 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
-			return;
 		}
 
 		// add a timer for measuring blocking time
 		//System.out.println(this.toString() + " received checkpoint: " + System.currentTimeMillis());
-
-		initReconnect();
+		// do not need now
+//		initReconnect();
 	}
 
 	@Override
@@ -1264,8 +1263,8 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 //				this.idInModel = idInModel;
 
 				initializeStateAndOpen();
-
-				initReconnect();
+// we don't need to reconnect since we have separate api called resume
+//				initReconnect();
 			});
 		} catch (Exception e) {
 			LOG.info("++++++ error", e);
@@ -1278,7 +1277,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 	public void updateKeyGroupRange(KeyGroupRange keyGroupRange) {
 		LOG.info("++++++ updateKeyGroupRange: "  + this.toString() + "  " + keyGroupRange);
 
-		TaskRescaleManager rescaleManager = ((RuntimeEnvironment) getEnvironment()).taskRescaleManager;
+//		TaskRescaleManager rescaleManager = ((RuntimeEnvironment) getEnvironment()).taskRescaleManager;
 
 		actionExecutor.runThrowing(() -> {
 			this.assignedKeyGroupRange.update(keyGroupRange);
@@ -1286,7 +1285,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 			// not only update keygroup range, but also the offset in statetable.
 			updateKeyGroupOffset();
 
-			rescaleManager.finish();
+//			rescaleManager.finish();
 		});
 
 //		throw new IllegalArgumentException("updateKeyGroupRange is not suppported now.");

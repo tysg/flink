@@ -131,8 +131,8 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 				System.out.println("start stateless rebalance test...");
 				testRebalanceStateless(statelessOpID);
 
-//				System.out.println("start stateful rebalance test...");
-//				testRebalanceStateful(statefulOpID);
+				System.out.println("start stateful rebalance test...");
+				testRebalanceStateful(statefulOpID);
 				// todo should test chained and non-chained case
 			} catch (InterruptedException e) {
 				e.printStackTrace();
