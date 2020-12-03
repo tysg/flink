@@ -21,7 +21,6 @@ import org.apache.flink.annotation.Internal;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.metrics.Counter;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.SimpleCounter;
@@ -352,19 +351,91 @@ public class OperatorChain<OUT, OP extends StreamOperator<OUT>> implements Strea
 			operatorMap.put(operator.getOperatorID(), operator);
 		}
 
+		Map<Integer, WatermarkGaugeExposingOutput<StreamRecord<T>>> watermarkGaugeExposingOutputMap = new HashMap<>();
 		for (StreamConfig operatorConfig : chainedConfigs.values()) {
 			@SuppressWarnings("unchecked")
 			StreamOperator<T> operator = (StreamOperator<T>) operatorMap.get(operatorConfig.getOperatorID());
 
-			for (StreamEdge edge : operatorConfig.getNonChainedOutputs(userCodeClassloader)) {
-				@SuppressWarnings("unchecked")
-				RecordWriterOutput<T> output = (RecordWriterOutput<T>) streamOutputMap.get(edge);
-				operator.updateOutput(containingTask, output);
-				// TODO scaling : what if multiple output
-			}
+//			for (StreamEdge edge : operatorConfig.getNonChainedOutputs(userCodeClassloader)) {
+//				@SuppressWarnings("unchecked")
+//				RecordWriterOutput<T> output = (RecordWriterOutput<T>) streamOutputMap.get(edge);
+//				operator.updateOutput(containingTask, output);
+//				// TODO scaling : what if multiple output, this is a problem!!!! @hya
+//			}
+			WatermarkGaugeExposingOutput<StreamRecord<T>> output =
+					generateOutputBaseExistOperator(containingTask, operatorConfig, streamOutputMap, watermarkGaugeExposingOutputMap);
+			watermarkGaugeExposingOutputMap.put(operatorConfig.getVertexID(), output);
+			operator.updateOutput(containingTask, output);
 		}
 
 		return oldStreamOutputCopies;
+	}
+
+	private <T> WatermarkGaugeExposingOutput<StreamRecord<T>> generateOutputBaseExistOperator(
+		StreamTask<?, ?> containingTask,
+		StreamConfig operatorConfig,
+		Map<StreamEdge, RecordWriterOutput<?>> streamOutputs,
+		Map<Integer, WatermarkGaugeExposingOutput<StreamRecord<T>>> watermarkGaugeExposingOutputMap){
+
+		List<Tuple2<WatermarkGaugeExposingOutput<StreamRecord<T>>, StreamEdge>> allOutputs = new ArrayList<>(4);
+
+		ClassLoader userCodeClassloader = containingTask.getUserCodeClassLoader();
+		// create collectors for the network outputs
+		for (StreamEdge outputEdge : operatorConfig.getNonChainedOutputs(userCodeClassloader)) {
+			@SuppressWarnings("unchecked")
+			RecordWriterOutput<T> output = (RecordWriterOutput<T>) streamOutputs.get(outputEdge);
+
+			allOutputs.add(new Tuple2<>(output, outputEdge));
+		}
+
+		// Create collectors for the chained outputs
+		for (StreamEdge outputEdge : operatorConfig.getChainedOutputs(userCodeClassloader)) {
+			int outputId = outputEdge.getTargetId();
+			WatermarkGaugeExposingOutput<StreamRecord<T>> exposingOutput = watermarkGaugeExposingOutputMap.get(outputId);
+			checkNotNull(exposingOutput, "the output collect have not been created for operator id: " + outputId);
+			allOutputs.add(new Tuple2<>(exposingOutput, outputEdge));
+		}
+		// if there are multiple outputs, or the outputs are directed, we need to
+		// wrap them as one output
+
+		List<OutputSelector<T>> selectors = operatorConfig.getOutputSelectors(userCodeClassloader);
+
+		if (selectors == null || selectors.isEmpty()) {
+			// simple path, no selector necessary
+			if (allOutputs.size() == 1) {
+				return allOutputs.get(0).f0;
+			}
+			else {
+				// send to N outputs. Note that this includes the special case
+				// of sending to zero outputs
+				@SuppressWarnings({"unchecked", "rawtypes"})
+				Output<StreamRecord<T>>[] asArray = new Output[allOutputs.size()];
+				for (int i = 0; i < allOutputs.size(); i++) {
+					asArray[i] = allOutputs.get(i).f0;
+				}
+
+				// This is the inverse of creating the normal ChainingOutput.
+				// If the chaining output does not copy we need to copy in the broadcast output,
+				// otherwise multi-chaining would not work correctly.
+				if (containingTask.getExecutionConfig().isObjectReuseEnabled()) {
+					return new CopyingBroadcastingOutputCollector<>(asArray, this);
+				} else  {
+					return new BroadcastingOutputCollector<>(asArray, this);
+				}
+			}
+		}
+		else {
+			// selector present, more complex routing necessary
+
+			// This is the inverse of creating the normal ChainingOutput.
+			// If the chaining output does not copy we need to copy in the broadcast output,
+			// otherwise multi-chaining would not work correctly.
+			if (containingTask.getExecutionConfig().isObjectReuseEnabled()) {
+				return new CopyingDirectedOutput<>(selectors, allOutputs);
+			} else {
+				return new DirectedOutput<>(selectors, allOutputs);
+			}
+		}
 	}
 
 	// ------------------------------------------------------------------------

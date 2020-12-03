@@ -118,21 +118,26 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 			// the testing jobGraph (workload) is in TestingWorkload.java, see that file to know how to use it.
 			int statefulOpID = findOperatorByName("Splitter Flatmap");
 			int statelessOpID = findOperatorByName("filter");
-			if (statefulOpID == -1 || statelessOpID == -1) {
-				System.out.println("can not found operator with given name, corrupt");
+			// this operator is the downstream of actual source operator
+			int nearSourceOp = findOperatorByName("near source Flatmap");
+			if (statefulOpID == -1 || statelessOpID == -1 || nearSourceOp == -1) {
+				System.out.println("can not find operator with given name, corrupt");
 				return;
 			}
 			try {
 				showOperatorInfo();
 				Thread.sleep(10);
-				System.out.println("start testCustomizeAPI test...");
-				testCustomizeAPI(statefulOpID);
-
-				System.out.println("start stateless rebalance test...");
+//				System.out.println("\nstart testCustomizeAPI test...");
+//				testCustomizeAPI(statefulOpID);
+////
+				System.out.println("\nstart stateless rebalance test...");
 				testRebalanceStateless(statelessOpID);
+//
+//				System.out.println("\nstart stateful rebalance test...");
+//				testRebalanceStateful(statefulOpID);
 
-				System.out.println("start stateful rebalance test...");
-				testRebalanceStateful(statefulOpID);
+//				System.out.println("\nstart source near stateless operator rebalance test...");
+//				testRebalanceStateful(nearSourceOp);
 				// todo should test chained and non-chained case
 			} catch (InterruptedException e) {
 				e.printStackTrace();
