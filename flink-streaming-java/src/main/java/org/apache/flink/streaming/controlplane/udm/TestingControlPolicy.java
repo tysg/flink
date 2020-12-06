@@ -111,6 +111,29 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 		}
 	}
 
+	private void testPauseSource(int sourceID) throws InterruptedException {
+		getInstructionSet().callCustomizeOperations(
+			enforcement -> FutureUtils.completedVoidFuture()
+				.thenCompose(o -> enforcement.synchronizePauseTasks(Collections.singletonList(Tuple2.of(sourceID, -1))))
+				.thenCompose(o -> {
+					System.out.print("type anything to resume:");
+					Scanner scanner = new Scanner(System.in);
+					String in = scanner.next();
+					return enforcement.resumeTasks(Collections.singletonList(Tuple2.of(sourceID, -1)));
+				})
+				.thenAccept(o -> {
+					synchronized (object) {
+						object.notify();
+					}
+				})
+		);
+		// wait for operation completed
+		synchronized (object) {
+			object.wait();
+			System.out.println("pause source successful?");
+		}
+	}
+
 	private class TestingThread extends Thread {
 
 		@Override
@@ -120,25 +143,28 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 			int statelessOpID = findOperatorByName("filter");
 			// this operator is the downstream of actual source operator
 			int nearSourceOp = findOperatorByName("near source Flatmap");
-			if (statefulOpID == -1 || statelessOpID == -1 || nearSourceOp == -1) {
+			int sourceOp = findOperatorByName("Source: source");
+			if (statefulOpID == -1 || statelessOpID == -1 || nearSourceOp == -1 || sourceOp == -1) {
 				System.out.println("can not find operator with given name, corrupt");
 				return;
 			}
 			try {
 				showOperatorInfo();
 				Thread.sleep(10);
-//				System.out.println("\nstart testCustomizeAPI test...");
-//				testCustomizeAPI(statefulOpID);
-////
+				System.out.println("\nstart testCustomizeAPI test...");
+				testCustomizeAPI(statefulOpID);
+
 				System.out.println("\nstart stateless rebalance test...");
 				testRebalanceStateless(statelessOpID);
-//
-//				System.out.println("\nstart stateful rebalance test...");
-//				testRebalanceStateful(statefulOpID);
 
-//				System.out.println("\nstart source near stateless operator rebalance test...");
+				System.out.println("\nstart stateful rebalance test...");
+				testRebalanceStateful(statefulOpID);
+
+				System.out.println("\nstart synchronize source test...");
+				testPauseSource(sourceOp);
+
+//				System.out.println("\nstart source near stateful operator rebalance test...");
 //				testRebalanceStateful(nearSourceOp);
-				// todo should test chained and non-chained case
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}

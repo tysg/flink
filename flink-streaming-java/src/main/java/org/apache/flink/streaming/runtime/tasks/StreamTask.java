@@ -1197,21 +1197,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 
 			// update output (writers)
 			if (rescaleManager.isScalingPartitions()) {
-				ResultPartitionWriter[] oldWriterCopies =
-					rescaleManager.substituteResultPartitions(getEnvironment().getAllWriters());
-
-				recordWriter = createRecordWriterDelegate(configuration, getEnvironment());
-
-				RecordWriterOutput[] oldStreamOutputCopies =
-					operatorChain.substituteRecordWriter(this, recordWriter);
-
-				//  close old output and unregister partitions
-				for (RecordWriterOutput<?> streamOutput : oldStreamOutputCopies) {
-					streamOutput.flush();
-					streamOutput.close();
-				}
-
-				rescaleManager.unregisterPartitions(oldWriterCopies);
+				replaceResultPartitions(rescaleManager);
 			}
 
 			reconnect();
@@ -1227,7 +1213,25 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 		}
 	}
 
-	private void checkRescalePoint(
+	protected void replaceResultPartitions(TaskRescaleManager rescaleManager) throws IOException {
+		ResultPartitionWriter[] oldWriterCopies =
+			rescaleManager.substituteResultPartitions(getEnvironment().getAllWriters());
+
+		recordWriter = createRecordWriterDelegate(configuration, getEnvironment());
+
+		RecordWriterOutput<?>[] oldStreamOutputCopies =
+			operatorChain.substituteRecordWriter(this, recordWriter);
+
+		//  close old output and unregister partitions
+		for (RecordWriterOutput<?> streamOutput : oldStreamOutputCopies) {
+			streamOutput.flush();
+			streamOutput.close();
+		}
+
+		rescaleManager.unregisterPartitions(oldWriterCopies);
+	}
+
+	protected void checkRescalePoint(
 		CheckpointMetaData checkpointMetaData,
 		CheckpointOptions checkpointOptions,
 		CheckpointMetrics checkpointMetrics) {

@@ -659,6 +659,10 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 					tdd.getProducedPartitions(),
 					tdd.getInputGates());
 
+				if(RescaleOptions.PREPARE_ONLY.equals(rescaleOptions)){
+					return CompletableFuture.completedFuture(Acknowledge.get());
+				}
+
 				if (rescaleOptions.isScalingPartitions()) {
 					task.createNewResultPartitions();
 				}
