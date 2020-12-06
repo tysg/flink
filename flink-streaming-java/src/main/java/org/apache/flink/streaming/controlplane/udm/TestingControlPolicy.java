@@ -7,6 +7,7 @@ import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
 import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 public class TestingControlPolicy extends AbstractControlPolicy {
@@ -115,12 +116,7 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 		getInstructionSet().callCustomizeOperations(
 			enforcement -> FutureUtils.completedVoidFuture()
 				.thenCompose(o -> enforcement.synchronizePauseTasks(Collections.singletonList(Tuple2.of(sourceID, -1))))
-				.thenCompose(o -> {
-					System.out.print("type anything to resume:");
-					Scanner scanner = new Scanner(System.in);
-					String in = scanner.next();
-					return enforcement.resumeTasks(Collections.singletonList(Tuple2.of(sourceID, -1)));
-				})
+				.thenCompose(o -> enforcement.resumeTasks(Collections.singletonList(Tuple2.of(sourceID, -1))))
 				.thenAccept(o -> {
 					synchronized (object) {
 						object.notify();
@@ -130,7 +126,7 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 		// wait for operation completed
 		synchronized (object) {
 			object.wait();
-			System.out.println("pause source successful?");
+			System.out.println("pause source successful");
 		}
 	}
 
@@ -157,14 +153,17 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 				System.out.println("\nstart stateless rebalance test...");
 				testRebalanceStateless(statelessOpID);
 
-				System.out.println("\nstart stateful rebalance test...");
+				System.out.println("\nstart stateful rebalance test1...");
+				testRebalanceStateful(statefulOpID);
+
+				System.out.println("\nstart stateful rebalance test2...");
 				testRebalanceStateful(statefulOpID);
 
 				System.out.println("\nstart synchronize source test...");
 				testPauseSource(sourceOp);
 
-//				System.out.println("\nstart source near stateful operator rebalance test...");
-//				testRebalanceStateful(nearSourceOp);
+				System.out.println("\nstart source near stateful operator rebalance test...");
+				testRebalanceStateful(nearSourceOp);
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
