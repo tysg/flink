@@ -116,7 +116,14 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 		getInstructionSet().callCustomizeOperations(
 			enforcement -> FutureUtils.completedVoidFuture()
 				.thenCompose(o -> enforcement.synchronizePauseTasks(Collections.singletonList(Tuple2.of(sourceID, -1))))
-				.thenCompose(o -> enforcement.resumeTasks(Collections.singletonList(Tuple2.of(sourceID, -1))))
+				.thenCompose(o -> {
+					try {
+						Thread.sleep(3);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+					return enforcement.resumeTasks(Collections.singletonList(Tuple2.of(sourceID, -1)));
+				})
 				.thenAccept(o -> {
 					synchronized (object) {
 						object.notify();
@@ -137,10 +144,13 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 			// the testing jobGraph (workload) is in TestingWorkload.java, see that file to know how to use it.
 			int statefulOpID = findOperatorByName("Splitter Flatmap");
 			int statelessOpID = findOperatorByName("filter");
-			// this operator is the downstream of actual source operator
-			int nearSourceOp = findOperatorByName("near source Flatmap");
 			int sourceOp = findOperatorByName("Source: source");
-			if (statefulOpID == -1 || statelessOpID == -1 || nearSourceOp == -1 || sourceOp == -1) {
+			// this operator is the downstream of actual source operator
+			int nearSourceMap = findOperatorByName("near source Flatmap");
+			int nearSourceFilter = findOperatorByName("source filter");
+			if (statefulOpID == -1 || statelessOpID == -1
+				|| nearSourceMap == -1 || nearSourceFilter == -1
+				|| sourceOp == -1) {
 				System.out.println("can not find operator with given name, corrupt");
 				return;
 			}
@@ -163,7 +173,10 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 				testPauseSource(sourceOp);
 
 				System.out.println("\nstart source near stateful operator rebalance test...");
-				testRebalanceStateful(nearSourceOp);
+				testRebalanceStateful(nearSourceMap);
+
+				System.out.println("\nstart source near stateless operator rebalance test...");
+				testRebalanceStateless(nearSourceFilter);
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
