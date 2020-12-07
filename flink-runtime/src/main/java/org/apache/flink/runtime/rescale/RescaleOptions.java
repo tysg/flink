@@ -64,6 +64,8 @@ public class RescaleOptions implements Serializable {
 
 	public final static RescaleOptions RESCALE_KEYGROUP_RANGE_ONLY = new RescaleOptions(false, false, false, true);
 
+	public final static RescaleOptions PREPARE_ONLY = new RescaleOptions(false, false, false, false);
+
 	@Override
 	public int hashCode() {
 		return (Boolean.hashCode(scalingPartitions) << 11 + Boolean.hashCode(scalingGates)) << 11 + Boolean.hashCode(repartition);
@@ -77,7 +79,8 @@ public class RescaleOptions implements Serializable {
 			final RescaleOptions that = (RescaleOptions) obj;
 			return this.scalingPartitions == that.scalingPartitions &&
 				this.scalingGates == that.scalingGates &&
-				this.repartition == that.repartition;
+				this.repartition == that.repartition &&
+				this.updateKeyGroupRange == that.updateKeyGroupRange;
 		} else {
 			return false;
 		}

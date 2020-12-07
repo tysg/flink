@@ -7,6 +7,7 @@ import org.apache.flink.runtime.checkpoint.PendingCheckpoint;
 import org.apache.flink.runtime.checkpoint.StateAssignmentOperation;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
+import org.apache.flink.runtime.execution.ExecutionState;
 import org.apache.flink.runtime.executiongraph.*;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
@@ -41,10 +42,14 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 	 * Synchronize the tasks in the list by inject barrier from source operator.
 	 * When those tasks received barrier, they should stop processing and wait next instruction.
 	 * <p>
-	 * To pause processing, one solution is using the pause controller to stop reading message on the mailProcessor
-	 * Another solution is to substitute the input channel.
+	 * To pause processing, one solution is using the pause controller
+	 * For non-source operator tasks, we use pause controller to stop reading message on the mailProcessor.
 	 * <p>
-	 * Todo how and when to resume the operator processing? Resumed by special primitiveOperation?
+	 * Regard as source stream tasks, since it does not have input, we will recreate its partitions with new configuration,
+	 * thus its children stream task will temporarily not receive input from this source task until they update their input gates.
+	 * Here we assume that the prepare api has been called before, so the execution graph already has the latest configuration.
+	 * This is to prevent that down stream task received data that does not belongs to their key set.
+	 * <p>
 	 *
 	 * @param taskList The list of task id, each id is a tuple which the first element is operator id and the second element is offset
 	 * @return A future that representing  synchronize is successful
@@ -53,7 +58,7 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 	public CompletableFuture<Void> synchronizePauseTasks(List<Tuple2<Integer, Integer>> taskList) {
 		// we should first check if the tasks is stateless
 		// if stateless, do not need to synchronize,
-		System.out.println("start synchronizing..."+taskList);
+		System.out.println("start synchronizing..." + taskList);
 		// stateful tasks, inject barrier
 		List<Tuple2<JobVertexID, Integer>> vertexIDList = taskList.stream()
 			.map(t -> Tuple2.of(rawVertexIDToJobVertexID(t.f0), t.f1))
@@ -68,7 +73,7 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 				System.out.println("synchronizeTasks successful");
 				LOG.debug("synchronizeTasks successful");
 			});
-		}catch (Exception e){
+		} catch (Exception e) {
 			return FutureUtils.completedExceptionally(e);
 		}
 	}
@@ -84,27 +89,9 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 	 */
 	@Override
 	public CompletableFuture<Void> resumeTasks(List<Tuple2<Integer, Integer>> taskList) {
-
-		System.out.println("resuming... "+taskList);
-		List<CompletableFuture<Void>> affectedExecutionPrepareSyncFutures = new LinkedList<>();
-		for (Tuple2<Integer, Integer> taskID : taskList) {
-			JobVertexID vertexID = rawVertexIDToJobVertexID(taskID.f0);
-			ExecutionJobVertex executionJobVertex = executionGraph.getJobVertex(vertexID);
-			checkNotNull(executionJobVertex);
-			int offset = taskID.f1;
-			if (offset < 0) {
-				for (ExecutionVertex executionVertex : executionJobVertex.getTaskVertices()) {
-					affectedExecutionPrepareSyncFutures.add(
-						executionVertex.getCurrentExecutionAttempt().scheduleForInterTaskSync(TaskOperatorManager.NEED_RESUME_REQUEST));
-				}
-			} else {
-				checkArgument(offset < executionJobVertex.getParallelism(), "offset out of boundary");
-				Execution targetExecution = executionJobVertex.getTaskVertices()[offset].getCurrentExecutionAttempt();
-				affectedExecutionPrepareSyncFutures.add(targetExecution.scheduleForInterTaskSync(TaskOperatorManager.NEED_RESUME_REQUEST));
-			}
-		}
-		// make affected task resume
-		return FutureUtils.completeAll(affectedExecutionPrepareSyncFutures).thenAccept(o -> currentSyncOp = null);
+		System.out.println("resuming... " + taskList);
+		checkNotNull(currentSyncOp, "have you call sync op before?");
+		return currentSyncOp.resumeTasks(taskList).thenAccept(o -> currentSyncOp = null);
 	}
 
 	@Override
@@ -142,9 +129,9 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 				rescaleCandidatesFutures.add(execution.scheduleRescale(rescaleID, RescaleOptions.RESCALE_PARTITIONS_ONLY, null));
 			}
 			// update input gates in child stream of source op
-			for(OperatorDescriptor child : heldExecutionPlan.getOperatorDescriptorByID(srcOpID).getChildren()){
+			for (OperatorDescriptor child : heldExecutionPlan.getOperatorDescriptorByID(srcOpID).getChildren()) {
 				JobVertexID childID = rawVertexIDToJobVertexID(child.getOperatorID());
-				updateGates(childID, rescaleID, rescaleCandidatesFutures);
+				updateGates(childID, rescaleCandidatesFutures);
 			}
 			JobVertexID destJobVertexID = rawVertexIDToJobVertexID(destOpID);
 			ExecutionJobVertex destJobVertex = executionGraph.getJobVertex(destJobVertexID);
@@ -168,14 +155,14 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 		return FutureUtils.completeAll(rescaleCandidatesFutures);
 	}
 
-	private void updateGates(JobVertexID jobVertexID, RescaleID rescaleID, List<CompletableFuture<Void>> futureList) throws ExecutionGraphException {
+	private void updateGates(JobVertexID jobVertexID, List<CompletableFuture<Void>> futureList) throws ExecutionGraphException {
 		ExecutionJobVertex jobVertex = executionGraph.getJobVertex(jobVertexID);
 		Preconditions.checkNotNull(jobVertex, "can not found this execution job vertex");
-//		jobVertex.cleanBeforeRescale();
-		for (ExecutionVertex vertex: jobVertex.getTaskVertices()) {
+		for (ExecutionVertex vertex : jobVertex.getTaskVertices()) {
 			Execution execution = vertex.getCurrentExecutionAttempt();
-//			execution.updateProducedPartitions(rescaleID);
-			futureList.add(execution.scheduleRescale(null, RescaleOptions.RESCALE_GATES_ONLY, null));
+			if (execution != null && execution.getState() == ExecutionState.RUNNING) {
+				futureList.add(execution.scheduleRescale(null, RescaleOptions.RESCALE_GATES_ONLY, null));
+			}
 		}
 	}
 
@@ -211,33 +198,25 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 				stateAssignmentOperation.assignStates();
 			}
 		);
-		return assignStateFuture.thenCompose(
-			o -> {
-				final List<CompletableFuture<Void>> rescaleCandidatesFutures = new ArrayList<>();
-				try {
-					if (offset >= 0) {
-						Preconditions.checkArgument(offset < executionJobVertex.getParallelism(), "offset out of boundary");
-						ExecutionVertex executionVertex = executionJobVertex.getTaskVertices()[offset];
-						rescaleCandidatesFutures.add(
-							executionVertex.getCurrentExecutionAttempt().scheduleRescale(
-								null,
-								RescaleOptions.RESCALE_STATE_ONLY,
-								remappingAssignment.getAlignedKeyGroupRange(offset)
-							));
-					} else {
-						for (int i = 0; i < executionJobVertex.getParallelism(); i++) {
-							ExecutionVertex vertex = executionJobVertex.getTaskVertices()[i];
-							Execution execution = vertex.getCurrentExecutionAttempt();
-							rescaleCandidatesFutures.add(execution.scheduleRescale(
-								null,
-								RescaleOptions.RESCALE_STATE_ONLY,
-								remappingAssignment.getAlignedKeyGroupRange(i)
-							));
-						}
-					}
-				} catch (ExecutionGraphException e) {
-					e.printStackTrace();
-				}
+		return assignStateFuture.thenCompose(o -> {
+				List<ExecutionVertex> operatedVertex = getOperatedVertex(executionJobVertex, offset);
+				final List<CompletableFuture<?>> rescaleCandidatesFutures =
+					operatedVertex.stream()
+						.map(ExecutionVertex::getCurrentExecutionAttempt)
+						.filter(execution -> execution != null && execution.getState() == ExecutionState.RUNNING)
+						.map(execution -> {
+								try {
+									return execution.scheduleRescale(
+										null,
+										RescaleOptions.RESCALE_STATE_ONLY,
+										remappingAssignment.getAlignedKeyGroupRange(execution.getParallelSubtaskIndex())
+									);
+								} catch (Exception e) {
+									e.printStackTrace();
+									return FutureUtils.completedExceptionally(e);
+								}
+							}
+						).collect(Collectors.toList());
 				return FutureUtils.completeAll(rescaleCandidatesFutures);
 			}
 		);
@@ -259,20 +238,32 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 		ExecutionJobVertex executionJobVertex = executionGraph.getJobVertex(jobVertexID);
 		Preconditions.checkNotNull(executionJobVertex, "can not found this execution job vertex");
 
-		if (offset >= 0) {
-			Preconditions.checkArgument(offset < executionJobVertex.getParallelism(), "offset out of boundary");
-			ExecutionVertex executionVertex = executionJobVertex.getTaskVertices()[offset];
-			return executionVertex.getCurrentExecutionAttempt()
-				.scheduleOperatorUpdate(operatorID)
-				.thenApply(o -> Acknowledge.get());
-		}
+		List<ExecutionVertex> operatedVertex = getOperatedVertex(executionJobVertex, offset);
+		final List<CompletableFuture<?>> resultFutures =
+			operatedVertex.stream()
+				.map(ExecutionVertex::getCurrentExecutionAttempt)
+				.filter(execution -> execution != null && execution.getState() == ExecutionState.RUNNING)
+				.map(execution -> {
+						try {
+							return execution.scheduleOperatorUpdate(operatorID);
+						} catch (Exception e) {
+							e.printStackTrace();
+							return FutureUtils.completedExceptionally(e);
+						}
+					}
+				).collect(Collectors.toList());
+		return FutureUtils.completeAll(resultFutures).thenApply(o -> Acknowledge.get());
+	}
 
-		ArrayList<CompletableFuture<Void>> futures = new ArrayList<>(executionJobVertex.getTaskVertices().length);
-		for (ExecutionVertex vertex : executionJobVertex.getTaskVertices()) {
-			Execution execution = vertex.getCurrentExecutionAttempt();
-			futures.add(execution.scheduleOperatorUpdate(operatorID));
+	private static List<ExecutionVertex> getOperatedVertex(ExecutionJobVertex executionJobVertex, int offset) {
+		List<ExecutionVertex> executionVertices = new ArrayList<>();
+		if (offset < 0) {
+			executionVertices.addAll(Arrays.asList(executionJobVertex.getTaskVertices()));
+		} else {
+			checkArgument(offset < executionJobVertex.getParallelism(), "offset out of boundary");
+			executionVertices.add(executionJobVertex.getTaskVertices()[offset]);
 		}
-		return FutureUtils.completeAll(futures).thenApply(o -> Acknowledge.get());
+		return executionVertices;
 	}
 
 	// temporary use RescalepointAcknowledgeListener
@@ -284,6 +275,7 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 		private final Object lock = new Object();
 
 		private final CompletableFuture<Map<OperatorID, OperatorState>> finishedFuture;
+		final RescaleID rescaleID = RescaleID.generateNextID();
 
 		private long checkpointId;
 
@@ -292,25 +284,25 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 			finishedFuture = new CompletableFuture<>();
 		}
 
-		private CompletableFuture<Map<OperatorID, OperatorState>> sync() {
-
+		private CompletableFuture<Map<OperatorID, OperatorState>> sync() throws ExecutionGraphException {
 			// add needed acknowledge tasks
 			List<CompletableFuture<Void>> affectedExecutionPrepareSyncFutures = new LinkedList<>();
 			for (Tuple2<JobVertexID, Integer> taskID : vertexIdList) {
 				ExecutionJobVertex executionJobVertex = executionGraph.getJobVertex(taskID.f0);
 				checkNotNull(executionJobVertex);
-				int offset = taskID.f1;
-				if (offset < 0) {
-					for (ExecutionVertex executionVertex : executionJobVertex.getTaskVertices()) {
-						affectedExecutionPrepareSyncFutures.add(
-							executionVertex.getCurrentExecutionAttempt().scheduleForInterTaskSync(TaskOperatorManager.NEED_SYNC_REQUEST));
-						notYetAcknowledgedTasks.add(executionVertex.getCurrentExecutionAttempt().getAttemptId());
-					}
+				List<ExecutionVertex> operatedVertex = getOperatedVertex(executionJobVertex, taskID.f1);
+				if (executionJobVertex.getInputs().isEmpty()) {
+					// this is source task vertex
+					affectedExecutionPrepareSyncFutures.add(pauseSourceStreamTask(executionJobVertex, operatedVertex));
 				} else {
-					checkArgument(offset < executionJobVertex.getParallelism(), "offset out of boundary");
-					Execution targetExecution = executionJobVertex.getTaskVertices()[offset].getCurrentExecutionAttempt();
-					affectedExecutionPrepareSyncFutures.add(targetExecution.scheduleForInterTaskSync(TaskOperatorManager.NEED_SYNC_REQUEST));
-					notYetAcknowledgedTasks.add(targetExecution.getAttemptId());
+					operatedVertex.stream()
+						.map(ExecutionVertex::getCurrentExecutionAttempt)
+						.filter(execution -> execution != null && execution.getState() == ExecutionState.RUNNING)
+						.forEach(execution -> {
+								affectedExecutionPrepareSyncFutures.add(execution.scheduleForInterTaskSync(TaskOperatorManager.NEED_SYNC_REQUEST));
+								notYetAcknowledgedTasks.add(execution.getAttemptId());
+							}
+						);
 				}
 			}
 			// make affected task prepare synchronization
@@ -335,6 +327,74 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 			return finishedFuture;
 		}
 
+		private CompletableFuture<Void> pauseSourceStreamTask(
+			ExecutionJobVertex executionJobVertex,
+			List<ExecutionVertex> operatedVertex) throws ExecutionGraphException {
+
+			List<CompletableFuture<Void>> futureList = new ArrayList<>();
+			executionJobVertex.cleanBeforeRescale();
+			for (ExecutionVertex executionVertex : operatedVertex) {
+				Execution execution = executionVertex.getCurrentExecutionAttempt();
+				if (execution != null && execution.getState() == ExecutionState.RUNNING) {
+					execution.updateProducedPartitions(rescaleID);
+					futureList.add(execution.scheduleRescale(null, RescaleOptions.PREPARE_ONLY, null));
+					notYetAcknowledgedTasks.add(execution.getAttemptId());
+				}
+			}
+			return FutureUtils.completeAll(futureList);
+		}
+
+		private CompletableFuture<Void> resumeSourceStreamTask(
+			int rawSourceVertexId,
+			List<ExecutionVertex> operatedVertex) throws ExecutionGraphException {
+
+			List<CompletableFuture<Void>> futureList = new ArrayList<>();
+			for (ExecutionVertex executionVertex : operatedVertex) {
+				// means has been resumed before
+				if(!executionVertex.getRescaleId().equals(rescaleID)){
+					// all execution vertex of same job vertex has the same rescale id
+					return FutureUtils.completedVoidFuture();
+				}
+			}
+			for (OperatorDescriptor child : heldExecutionPlan.getOperatorDescriptorByID(rawSourceVertexId).getChildren()) {
+				JobVertexID childID = rawVertexIDToJobVertexID(child.getOperatorID());
+				try {
+					updateGates(childID, futureList);
+				} catch (ExecutionGraphException e) {
+					e.printStackTrace();
+				}
+			}
+			return FutureUtils.completeAll(futureList);
+		}
+
+		private CompletableFuture<Void> resumeTasks(List<Tuple2<Integer, Integer>> taskList) {
+			List<CompletableFuture<Void>> affectedExecutionPrepareSyncFutures = new LinkedList<>();
+			for (Tuple2<Integer, Integer> taskID : taskList) {
+				JobVertexID jobVertexID = rawVertexIDToJobVertexID(taskID.f0);
+				ExecutionJobVertex executionJobVertex = executionGraph.getJobVertex(jobVertexID);
+				checkNotNull(executionJobVertex);
+				List<ExecutionVertex> operatedVertex = getOperatedVertex(executionJobVertex, taskID.f1);
+
+				if (executionJobVertex.getInputs().isEmpty()) {
+					// resume source stream task
+					// update input gates in child stream of source op
+					try {
+						affectedExecutionPrepareSyncFutures.add(resumeSourceStreamTask(taskID.f0, operatedVertex));
+					} catch (ExecutionGraphException e) {
+						e.printStackTrace();
+					}
+				} else {
+					operatedVertex.stream()
+						.map(ExecutionVertex::getCurrentExecutionAttempt)
+						.filter(execution -> execution != null && execution.getState() == ExecutionState.RUNNING)
+						.forEach(execution ->
+							affectedExecutionPrepareSyncFutures.add(execution.scheduleForInterTaskSync(TaskOperatorManager.NEED_RESUME_REQUEST))
+						);
+				}
+			}
+			// make affected task resume
+			return FutureUtils.completeAll(affectedExecutionPrepareSyncFutures);
+		}
 
 		@Override
 		public void onReceiveRescalepointAcknowledge(ExecutionAttemptID attemptID, PendingCheckpoint checkpoint) {

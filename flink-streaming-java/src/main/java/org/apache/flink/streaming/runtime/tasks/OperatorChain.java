@@ -366,6 +366,7 @@ public class OperatorChain<OUT, OP extends StreamOperator<OUT>> implements Strea
 					generateOutputBaseExistOperator(containingTask, operatorConfig, streamOutputMap, watermarkGaugeExposingOutputMap);
 			watermarkGaugeExposingOutputMap.put(operatorConfig.getVertexID(), output);
 			operator.updateOutput(containingTask, output);
+			// todo not update chainEntryPoint
 		}
 
 		return oldStreamOutputCopies;
