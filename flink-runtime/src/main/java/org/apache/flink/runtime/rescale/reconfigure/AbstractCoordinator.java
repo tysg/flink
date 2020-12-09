@@ -6,12 +6,14 @@ import org.apache.flink.runtime.controlplane.StreamRelatedInstanceFactory;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
 import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
 import org.apache.flink.runtime.executiongraph.ExecutionGraph;
+import org.apache.flink.runtime.executiongraph.ExecutionJobVertex;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.util.Preconditions;
+import scala.Int;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -76,7 +78,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation {
 			int operatorID = descriptor.getOperatorID();
 			OperatorDescriptor heldDescriptor = heldExecutionPlan.getOperatorDescriptorByID(operatorID);
 			// loop until all change in this operator has been detected and sync
-			for (ChangedPosition changedPosition : analyzeOperatorDifference(heldDescriptor, descriptor)) {
+			for (int changedPosition : analyzeOperatorDifference(heldDescriptor, descriptor)) {
 				try {
 					switch (changedPosition) {
 						case UDF:
@@ -89,9 +91,16 @@ public abstract class AbstractCoordinator implements PrimitiveOperation {
 							break;
 						case PARALLELISM:
 							heldDescriptor.setParallelism(descriptor.getParallelism());
-							// next update job graph and execution graph
+							// next update job graph
+							JobVertexID jobVertexID = rawVertexIDToJobVertexID(heldDescriptor.getOperatorID());
+							JobVertex vertex = jobGraph.findVertexByID(jobVertexID);
+							int oldParallelism = heldDescriptor.getParallelism();
+							vertex.setParallelism(heldDescriptor.getParallelism());
+							// update execution graph
+							rescaleExecutionGraph(heldDescriptor.getOperatorID(), oldParallelism);
 							break;
 						case KEY_MAPPING:
+							// update key set will indirectly update key mapping, so we ignore this type of detected change here
 							break;
 						case NO_CHANGE:
 					}
@@ -105,12 +114,33 @@ public abstract class AbstractCoordinator implements PrimitiveOperation {
 		for (Iterator<OperatorDescriptor> it = executionPlan.getAllOperatorDescriptor(); it.hasNext(); ) {
 			OperatorDescriptor descriptor = it.next();
 			OperatorDescriptor held = heldExecutionPlan.getOperatorDescriptorByID(descriptor.getOperatorID());
-			for (ChangedPosition changedPosition : analyzeOperatorDifference(held, descriptor)) {
+			for (int changedPosition : analyzeOperatorDifference(held, descriptor)) {
 				System.out.println("change no work:" + changedPosition);
-				return FutureUtils.completedExceptionally(new Exception("change no work:"+changedPosition));
+				return FutureUtils.completedExceptionally(new Exception("change no work:" + changedPosition));
 			}
 		}
 		return CompletableFuture.completedFuture(null);
+	}
+
+	private void rescaleExecutionGraph(int rawVertexID, int oldParallelism) {
+		// scale up given ejv, update involved edges & partitions
+		ExecutionJobVertex targetVertex = executionGraph.getJobVertex(rawVertexIDToJobVertexID(rawVertexID));
+		Preconditions.checkNotNull(targetVertex, "can not found target vertex");
+		// todo how about scale in
+		if (oldParallelism < targetVertex.getParallelism()) {
+			targetVertex.scaleOut(executionGraph.getRpcTimeout(), executionGraph.getGlobalModVersion(), System.currentTimeMillis());
+		}
+		List<JobVertexID> updatedDownstream = heldExecutionPlan.getOperatorDescriptorByID(rawVertexID)
+			.getChildren().stream()
+			.map(child -> rawVertexIDToJobVertexID(child.getOperatorID()))
+			.collect(Collectors.toList());
+		for (JobVertexID downstreamID : updatedDownstream) {
+			ExecutionJobVertex downstream = executionGraph.getJobVertex(downstreamID);
+			if (downstream != null) {
+				downstream.reconnectWithUpstream(targetVertex.getProducedDataSets());
+			}
+		}
+		executionGraph.updateNumOfTotalVertices();
 	}
 
 	private void updateKeyset(OperatorDescriptor heldDescriptor) {
@@ -120,24 +150,26 @@ public abstract class AbstractCoordinator implements PrimitiveOperation {
 				partionAssignment.put(i, one.get(i));
 			}
 			updater.repartition(rawVertexIDToJobVertexID(heldDescriptor.getOperatorID()), partionAssignment);
+			// we think each operator will only have one key set
 			break;
 		}
 	}
 
-	private List<ChangedPosition> analyzeOperatorDifference(OperatorDescriptor self, OperatorDescriptor modified) {
-		List<ChangedPosition> results = new LinkedList<>();
+	private List<Integer> analyzeOperatorDifference(OperatorDescriptor self, OperatorDescriptor modified) {
+		List<Integer> results = new LinkedList<>();
 		if (self.getUdf() != modified.getUdf()) {
-			results.add(ChangedPosition.UDF);
+			results.add(UDF);
 		}
 		if (self.getParallelism() != modified.getParallelism()) {
-			results.add(ChangedPosition.PARALLELISM);
+			results.add(PARALLELISM);
 		}
 		if (compare(self.getKeyStateAllocation(), modified.getKeyStateAllocation())) {
-			results.add(ChangedPosition.KEY_STATE_ALLOCATION);
+			results.add(KEY_STATE_ALLOCATION);
 		}
 		if (compare(self.getKeyMapping(), modified.getKeyMapping())) {
-			results.add(ChangedPosition.KEY_MAPPING);
+			results.add(KEY_MAPPING);
 		}
+		Collections.sort(results);
 		return results;
 	}
 
@@ -186,12 +218,11 @@ public abstract class AbstractCoordinator implements PrimitiveOperation {
 		throw new UnsupportedOperationException();
 	}
 
-	enum ChangedPosition {
-		UDF,
-		KEY_MAPPING,
-		KEY_STATE_ALLOCATION,
-		PARALLELISM,
-		NO_CHANGE
-	}
+	// the value means priority, the higher, the later should be resolve
+	private static final int UDF = 0;
+	private static final int KEY_STATE_ALLOCATION = 1;
+	private static final int PARALLELISM = 2;
+	private static final int KEY_MAPPING = 3;
+	private static final int NO_CHANGE = 4;
 
 }
