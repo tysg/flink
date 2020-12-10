@@ -37,12 +37,15 @@ import org.apache.flink.runtime.jobmaster.LogicalSlot;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.graph.StreamEdge;
 import org.apache.flink.streaming.api.operators.SimpleUdfStreamOperatorFactory;
+import org.apache.flink.streaming.api.operators.StreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
+import org.apache.flink.streaming.runtime.operators.windowing.WindowOperator;
 import org.apache.flink.streaming.runtime.partitioner.AssignedKeyGroupStreamPartitioner;
 import org.apache.flink.streaming.runtime.partitioner.KeyGroupStreamPartitioner;
 import org.apache.flink.streaming.runtime.partitioner.StreamPartitioner;
 import org.apache.flink.util.Preconditions;
 
+import java.lang.reflect.Field;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -111,10 +114,15 @@ public final class StreamJobExecutionPlanImpl implements StreamJobExecutionPlan 
 		// finished other field
 		for (OperatorDescriptor descriptor : allOperatorsById.values()) {
 			StreamConfig streamConfig = streamConfigMap.get(descriptor.getOperatorID());
-			Function function = getUserFunction(streamConfigMap.get(descriptor.getOperatorID()), userCodeLoader);
-			Map<Integer, List<List<Integer>>> keyStateAllocation = getKeyStateAllocation(streamConfig, userCodeLoader, descriptor.getParallelism());
-			descriptor.setUdf(function);
+			// add workload dimension info
+			List<List<Integer>> keyStateAllocation = getKeyStateAllocation(streamConfig, userCodeLoader, descriptor.getParallelism());
 			descriptor.setKeyStateAllocation(keyStateAllocation);
+			// add execution logic info
+			try {
+				attachAppLogicToOperatorDescriptor(descriptor, streamConfigMap.get(descriptor.getOperatorID()), userCodeLoader);
+			} catch (IllegalAccessException e) {
+				e.printStackTrace();
+			}
 		}
 		return heads.toArray(new OperatorDescriptor[0]);
 	}
@@ -130,7 +138,7 @@ public final class StreamJobExecutionPlanImpl implements StreamJobExecutionPlan 
 	}
 
 	@Override
-	public Map<Integer, List<List<Integer>>> getKeyStateAllocation(Integer operatorID) {
+	public List<List<Integer>> getKeyStateAllocation(Integer operatorID) {
 		return allOperatorsById.get(operatorID).getKeyStateAllocation();
 	}
 
@@ -197,22 +205,55 @@ public final class StreamJobExecutionPlanImpl implements StreamJobExecutionPlan 
 		return operatorTaskListMap.get(operatorID).get(offset);
 	}
 
-	private static Function getUserFunction(StreamConfig config, ClassLoader userCodeLoader) {
+	private static void attachAppLogicToOperatorDescriptor(
+		OperatorDescriptor descriptor,
+		StreamConfig config,
+		ClassLoader userCodeLoader) throws IllegalAccessException {
+
 		StreamOperatorFactory<?> factory = config.getStreamOperatorFactory(userCodeLoader);
 		if (factory instanceof SimpleUdfStreamOperatorFactory) {
-			return ((SimpleUdfStreamOperatorFactory<?>) factory).getUserFunction();
+			Function function = ((SimpleUdfStreamOperatorFactory<?>) factory).getUserFunction();
+			descriptor.setUdf(function);
+			StreamOperator<?> streamOperator = ((SimpleUdfStreamOperatorFactory<?>) factory).getOperator();
+//			if (streamOperator instanceof WindowOperator) {
+//				descriptor.setControlAttribute("windowTrigger", ((WindowOperator<?, ?, ?, ?, ?>) streamOperator).getTrigger());
+//				descriptor.setControlAttribute("windowAssigner", ((WindowOperator<?, ?, ?, ?, ?>) streamOperator).getWindowAssigner());
+//			}
+			// todo use reflection to get control attribute
+			Class<?> streamOperatorClass = streamOperator.getClass();
+			List<Field> fieldList = new LinkedList<>();
+			do {
+				fieldList.addAll(
+					Arrays.stream(streamOperatorClass.getDeclaredFields())
+						.filter(field -> field.isAnnotationPresent(ControlAttribute.class))
+						.collect(Collectors.toList())
+				);
+				streamOperatorClass = streamOperatorClass.getSuperclass();
+			} while (streamOperatorClass != null);
+			for (Field field : fieldList) {
+				ControlAttribute attribute = field.getAnnotation(ControlAttribute.class);
+				boolean accessible = field.isAccessible();
+				// temporary set true
+				field.setAccessible(true);
+				descriptor.setControlAttribute(attribute.name(), field.get(streamOperator));
+				field.setAccessible(accessible);
+			}
 		}
-		return null;
 	}
 
-	private static Map<Integer, List<List<Integer>>> getKeyStateAllocation(StreamConfig config, ClassLoader userCodeLoader, int parallelism) {
+	private static List<List<Integer>> getKeyStateAllocation(StreamConfig config, ClassLoader userCodeLoader, int parallelism) {
 		Map<Integer, List<List<Integer>>> res = new HashMap<>();
 		// very strange that some operator's out physical edge may not be completed
 		List<StreamEdge> inPhysicalEdges = config.getInPhysicalEdges(userCodeLoader);
 		for (StreamEdge edge : inPhysicalEdges) {
 			res.put(edge.getSourceId(), getKeyMessage(edge, parallelism));
 		}
-		return res;
+		if (res.isEmpty()) {
+			return Collections.emptyList();
+		} else {
+			// todo, check all key set is same
+			return res.values().iterator().next();
+		}
 	}
 
 	private static List<List<Integer>> getKeyMessage(StreamEdge streamEdge, int parallelism) {

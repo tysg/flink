@@ -86,7 +86,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation {
 							updater.updateOperator(operatorID, descriptor.getUdf());
 							break;
 						case KEY_STATE_ALLOCATION:
-							heldDescriptor.setKeyStateAllocation(descriptor.getKeyStateAllocation());
+							heldDescriptor.setKeySet(descriptor.getKeyStateAllocation());
 							updateKeyset(heldDescriptor);
 							break;
 						case PARALLELISM:
@@ -145,14 +145,11 @@ public abstract class AbstractCoordinator implements PrimitiveOperation {
 
 	private void updateKeyset(OperatorDescriptor heldDescriptor) {
 		Map<Integer, List<Integer>> partionAssignment = new HashMap<>();
-		for (List<List<Integer>> one : heldDescriptor.getKeyStateAllocation().values()) {
-			for (int i = 0; i < one.size(); i++) {
-				partionAssignment.put(i, one.get(i));
-			}
-			updater.repartition(rawVertexIDToJobVertexID(heldDescriptor.getOperatorID()), partionAssignment);
-			// we think each operator will only have one key set
-			break;
+		List<List<Integer>> one = heldDescriptor.getKeyStateAllocation();
+		for (int i = 0; i < one.size(); i++) {
+			partionAssignment.put(i, one.get(i));
 		}
+		updater.repartition(rawVertexIDToJobVertexID(heldDescriptor.getOperatorID()), partionAssignment);
 	}
 
 	private List<Integer> analyzeOperatorDifference(OperatorDescriptor self, OperatorDescriptor modified) {

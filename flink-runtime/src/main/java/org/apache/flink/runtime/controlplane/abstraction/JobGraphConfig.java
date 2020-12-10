@@ -27,7 +27,7 @@ public interface JobGraphConfig {
 	 * representing the output channel with its assigned keys.
 	 * @throws Exception
 	 */
-	Map<Integer, List<List<Integer>>> getKeyStateAllocation(Integer operatorID);
+	List<List<Integer>> getKeyStateAllocation(Integer operatorID);
 
 	/**
 	 * Return how the key mapping to down stream operator.

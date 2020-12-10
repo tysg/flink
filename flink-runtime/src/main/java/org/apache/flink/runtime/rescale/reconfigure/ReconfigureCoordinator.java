@@ -183,7 +183,7 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 		Preconditions.checkNotNull(executionJobVertex, "can not found this execution job vertex");
 
 		RemappingAssignment remappingAssignment = new RemappingAssignment(
-			heldExecutionPlan.getKeyMapping(keySenderID).get(operatorID)
+			heldExecutionPlan.getKeyStateAllocation(operatorID)
 		);
 		checkNotNull(currentSyncOp, "no state collected currently, have you synchronized first?");
 		CompletableFuture<Void> assignStateFuture = currentSyncOp.finishedFuture.thenAccept(

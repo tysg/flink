@@ -73,9 +73,8 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 
 	private void testRebalanceStateful(int testingOpID) throws InterruptedException {
 		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
-		Map<Integer, List<List<Integer>>> map = streamJobState.getKeyStateAllocation(testingOpID);
+		List<List<Integer>> keySet = streamJobState.getKeyStateAllocation(testingOpID);
 		// we assume that each operator only have one input now
-		List<List<Integer>> keySet = map.values().iterator().next();
 
 		List<List<Integer>> newKeySet = keySet.stream()
 			.map(ArrayList::new)

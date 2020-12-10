@@ -54,11 +54,12 @@ public class OperatorDescriptor {
 	}
 
 	public Function getUdf() {
-		return Preconditions.checkNotNull(payload.udf);
+		Object functionObject = payload.applicationLogic.attributeMap.get(ApplicationLogic.UDF);
+		return (Function) Preconditions.checkNotNull(functionObject);
 	}
 
-	public Map<Integer, List<List<Integer>>> getKeyStateAllocation() {
-		return Collections.unmodifiableMap(payload.keyStateAllocation);
+	public List<List<Integer>> getKeyStateAllocation() {
+		return Collections.unmodifiableList(payload.keyStateAllocation);
 	}
 
 	public Map<Integer, List<List<Integer>>> getKeyMapping() {
@@ -70,27 +71,39 @@ public class OperatorDescriptor {
 	}
 
 	public void setUdf(Function udf) {
-		payload.udf = udf;
+		setControlAttribute(ApplicationLogic.UDF, udf);
+	}
+
+	public void setControlAttribute(String name, Object obj) {
+		payload.applicationLogic.attributeMap.put(name, obj);
 	}
 
 	@Internal
-	public void setKeyStateAllocation(Map<Integer, List<List<Integer>>> keyStateAllocation) {
-		Map<Integer, List<List<Integer>>> unmodifiable = convertToUnmodifiable(keyStateAllocation);
-		payload.keyStateAllocation.putAll(unmodifiable);
+	public void setKeyStateAllocation(List<List<Integer>> keyStateAllocation) {
+		List<List<Integer>> unmodifiableKeys = Collections.unmodifiableList(
+			keyStateAllocation.stream()
+				.map(Collections::unmodifiableList)
+				.collect(Collectors.toList())
+		);
+		payload.keyStateAllocation.clear();
+		payload.keyStateAllocation.addAll(unmodifiableKeys);
 		for (OperatorDescriptor parent : parents) {
-			parent.payload.keyMapping.put(operatorID, unmodifiable.get(parent.operatorID));
+			parent.payload.keyMapping.put(operatorID, unmodifiableKeys);
 		}
 		// stateless operator should not be allocated  key set
 		stateful = !payload.keyStateAllocation.isEmpty();
 	}
 
+	@Deprecated
 	@Internal
 	public void setKeyMapping(Map<Integer, List<List<Integer>>> keyMapping) {
 		Map<Integer, List<List<Integer>>> unmodifiable = convertToUnmodifiable(keyMapping);
 		payload.keyMapping.putAll(unmodifiable);
 		for (OperatorDescriptor child : children) {
 			if (child.stateful) {
-				child.payload.keyStateAllocation.put(operatorID, unmodifiable.get(child.operatorID));
+				// todo two inputs?
+				child.payload.keyStateAllocation.clear();
+				child.payload.keyStateAllocation.addAll(unmodifiable.get(child.operatorID));
 			}
 		}
 	}
@@ -115,26 +128,23 @@ public class OperatorDescriptor {
 	 * @param keyStateAllocation
 	 */
 	@PublicEvolving
-	public void setKeyStateAllocationFrom(int upstreamOperatorID, List<List<Integer>> keyStateAllocation) {
-		if (parents.size() != 1) {
+	public void setKeySet(List<List<Integer>> keyStateAllocation) {
+		if (parents.size() != 1 || !stateful) {
 			System.out.println("not support now");
 			return;
 		}
 		try {
-			OperatorDescriptor parent;
-			if (upstreamOperatorID < 0) {
-				parent = (OperatorDescriptor) parents.toArray()[0];
-			} else {
-				parent = checkOperatorIDExistInSet(upstreamOperatorID, parents);
-			}
 			List<List<Integer>> unmodifiableKeys = Collections.unmodifiableList(
 				keyStateAllocation.stream()
 					.map(Collections::unmodifiableList)
 					.collect(Collectors.toList())
 			);
-			payload.keyStateAllocation.put(parent.operatorID, unmodifiableKeys);
+			payload.keyStateAllocation.clear();
+			payload.keyStateAllocation.addAll(unmodifiableKeys);
 			// sync with parent's key mapping
-			parent.payload.keyMapping.put(operatorID, unmodifiableKeys);
+			for(OperatorDescriptor parent: parents) {
+				parent.payload.keyMapping.put(operatorID, unmodifiableKeys);
+			}
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -160,7 +170,8 @@ public class OperatorDescriptor {
 			);
 			payload.keyMapping.put(targetOperatorID, unmodifiableKeys);
 			if (child.stateful) {
-				child.payload.keyStateAllocation.put(operatorID, unmodifiableKeys);
+				child.payload.keyStateAllocation.clear();
+				child.payload.keyStateAllocation.addAll(unmodifiableKeys);
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -215,15 +226,25 @@ public class OperatorDescriptor {
 
 	private static class OperatorPayload {
 		int parallelism;
-		Function udf;
-
+		ApplicationLogic applicationLogic;
 		/* for stateful one input stream task, the key state allocation item is always one */
-		final Map<Integer, List<List<Integer>>> keyStateAllocation = new HashMap<>();
-		final Map<Integer, List<List<Integer>>> keyMapping = new HashMap<>();
+		final List<List<Integer>> keyStateAllocation;
+		final Map<Integer, List<List<Integer>>> keyMapping;
 
 		OperatorPayload(int parallelism) {
 			this.parallelism = parallelism;
+			keyStateAllocation = new ArrayList<>(parallelism);
+			keyMapping = new HashMap<>();
+			applicationLogic = new ApplicationLogic();
 		}
+	}
+
+	private static class ApplicationLogic{
+
+		private static final String UDF = "UDF";
+
+		private final Map<String, Object> attributeMap = new HashMap<>();
+
 	}
 
 }
