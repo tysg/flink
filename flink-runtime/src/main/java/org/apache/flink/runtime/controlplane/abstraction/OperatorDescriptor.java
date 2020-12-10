@@ -78,8 +78,12 @@ public class OperatorDescriptor {
 		payload.applicationLogic.attributeMap.put(name, obj);
 	}
 
+	public Map<String, Object> getControlAttributeMap() {
+		return Collections.unmodifiableMap(payload.applicationLogic.attributeMap);
+	}
+
 	@Internal
-	public void setKeyStateAllocation(List<List<Integer>> keyStateAllocation) {
+	void setKeyStateAllocation(List<List<Integer>> keyStateAllocation) {
 		List<List<Integer>> unmodifiableKeys = Collections.unmodifiableList(
 			keyStateAllocation.stream()
 				.map(Collections::unmodifiableList)
@@ -94,9 +98,8 @@ public class OperatorDescriptor {
 		stateful = !payload.keyStateAllocation.isEmpty();
 	}
 
-	@Deprecated
 	@Internal
-	public void setKeyMapping(Map<Integer, List<List<Integer>>> keyMapping) {
+	void setKeyMapping(Map<Integer, List<List<Integer>>> keyMapping) {
 		Map<Integer, List<List<Integer>>> unmodifiable = convertToUnmodifiable(keyMapping);
 		payload.keyMapping.putAll(unmodifiable);
 		for (OperatorDescriptor child : children) {
@@ -192,7 +195,7 @@ public class OperatorDescriptor {
 	 * @param childEdges       the list of pair of parent id and child id to represent the relationship between operator
 	 * @param allOperatorsById
 	 */
-	public void addChildren(List<Tuple2<Integer, Integer>> childEdges, Map<Integer, OperatorDescriptor> allOperatorsById) {
+	void addChildren(List<Tuple2<Integer, Integer>> childEdges, Map<Integer, OperatorDescriptor> allOperatorsById) {
 		// f0 is parent operator id, f1 is child operator id
 		for (Tuple2<Integer, Integer> edge : childEdges) {
 			Preconditions.checkArgument(allOperatorsById.get(edge.f0) == this, "edge source is wrong matched");
@@ -207,7 +210,7 @@ public class OperatorDescriptor {
 	 * @param parentEdges      the list of pair of parent id and child id to represent the relationship between operator
 	 * @param allOperatorsById
 	 */
-	public void addParent(List<Tuple2<Integer, Integer>> parentEdges, Map<Integer, OperatorDescriptor> allOperatorsById) {
+	void addParent(List<Tuple2<Integer, Integer>> parentEdges, Map<Integer, OperatorDescriptor> allOperatorsById) {
 		// f0 is parent operator id, f1 is child operator id
 		for (Tuple2<Integer, Integer> edge : parentEdges) {
 			Preconditions.checkArgument(allOperatorsById.get(edge.f1) == this, "edge source is wrong matched");

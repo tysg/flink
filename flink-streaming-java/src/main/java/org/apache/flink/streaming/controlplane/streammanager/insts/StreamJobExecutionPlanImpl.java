@@ -24,6 +24,7 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionGraphConfig;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
+import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptorBuilder;
 import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
 import org.apache.flink.runtime.execution.ExecutionState;
 import org.apache.flink.runtime.executiongraph.Execution;
@@ -95,13 +96,13 @@ public final class StreamJobExecutionPlanImpl implements StreamJobExecutionPlan 
 				.stream()
 				.map(e -> Tuple2.of(e.getSourceId(), e.getTargetId()))
 				.collect(Collectors.toList());
-			descriptor.addChildren(outEdges, allOperatorsById);
+			OperatorDescriptorBuilder.attachOperator(descriptor).addChildren(outEdges, allOperatorsById);
 
 			List<Tuple2<Integer, Integer>> inEdges = config.getInPhysicalEdges(userCodeLoader)
 				.stream()
 				.map(e -> Tuple2.of(e.getSourceId(), e.getTargetId()))
 				.collect(Collectors.toList());
-			descriptor.addParent(inEdges, allOperatorsById);
+			OperatorDescriptorBuilder.attachOperator(descriptor).addParent(inEdges, allOperatorsById);
 		}
 		// find head
 		List<OperatorDescriptor> heads = new ArrayList<>();
@@ -116,7 +117,7 @@ public final class StreamJobExecutionPlanImpl implements StreamJobExecutionPlan 
 			StreamConfig streamConfig = streamConfigMap.get(descriptor.getOperatorID());
 			// add workload dimension info
 			List<List<Integer>> keyStateAllocation = getKeyStateAllocation(streamConfig, userCodeLoader, descriptor.getParallelism());
-			descriptor.setKeyStateAllocation(keyStateAllocation);
+			OperatorDescriptorBuilder.attachOperator(descriptor).setKeyStateAllocation(keyStateAllocation);
 			// add execution logic info
 			try {
 				attachAppLogicToOperatorDescriptor(descriptor, streamConfigMap.get(descriptor.getOperatorID()), userCodeLoader);
