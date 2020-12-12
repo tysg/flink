@@ -98,14 +98,13 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 	@Override
 	public CompletableFuture<Void> deployTasks(int operatorID, int oldParallelism) {
 		System.out.println("deploying... tasks of " + operatorID);
-		// TODO: update result partition (Not finished)
 		JobVertexID srcJobVertexID = rawVertexIDToJobVertexID(operatorID);
 		ExecutionJobVertex srcJobVertex = executionGraph.getJobVertex(srcJobVertexID);
 		Preconditions.checkNotNull(srcJobVertex, "can not found this execution job vertex");
 		srcJobVertex.cleanBeforeRescale();
 
 		Collection<CompletableFuture<Execution>> allocateSlotFutures =
-				new ArrayList<>(srcJobVertex.getParallelism()-oldParallelism);
+			new ArrayList<>(srcJobVertex.getParallelism() - oldParallelism);
 
 		ExecutionVertex[] taskVertices = srcJobVertex.getTaskVertices();
 		for (int i = oldParallelism; i < srcJobVertex.getParallelism(); i++) {
@@ -113,35 +112,36 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 			allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(currentSyncOp.rescaleID));
 		}
 
-		Collection<CompletableFuture<Acknowledge>> deployFutures =
-				new ArrayList<>(srcJobVertex.getParallelism()-oldParallelism);
-
 		return FutureUtils.combineAll(allocateSlotFutures)
-			.whenComplete(((executions, throwable) -> {
-				if (throwable != null) {
-					throwable.printStackTrace();
-					throw new CompletionException(throwable);
-				}
-				System.out.println("allocated resource for net tasks of" + operatorID);
-
-				for (Execution execution: executions) {
-					try {
-						deployFutures.add(execution.deploy());
-					} catch (JobException e) {
-						e.printStackTrace();
+			.whenComplete((executions, throwable) -> {
+					if (throwable != null) {
+						throwable.printStackTrace();
+						throw new CompletionException(throwable);
 					}
+					System.out.println("allocated resource for new tasks of " + operatorID);
 				}
-			}))
-			.thenCompose((executions) -> FutureUtils.waitForAll(deployFutures))
-			.thenCompose((executions) -> {
-				OperatorDescriptor operatorDescriptor = heldExecutionPlan.getOperatorDescriptorByID(operatorID);
-				return FutureUtils.waitForAll(operatorDescriptor
-						.getChildren()
-						.stream()
-						.map(child->updateMapping(operatorID,child.getOperatorID()))
-						.collect(Collectors.toList()));
+			).thenCompose(executions -> {
+					Collection<CompletableFuture<Acknowledge>> deployFutures =
+						new ArrayList<>(srcJobVertex.getParallelism() - oldParallelism);
+					for (Execution execution : executions) {
+						try {
+							deployFutures.add(execution.deploy());
+						} catch (JobException e) {
+							e.printStackTrace();
+						}
+					}
+					return FutureUtils.waitForAll(deployFutures);
+				}
+			).thenCompose(executions -> {
+				try {
+					final List<CompletableFuture<Void>> finishedFutureList = new ArrayList<>();
+					updatePartitionAndDownStreamGates(operatorID, finishedFutureList);
+					return FutureUtils.waitForAll(finishedFutureList);
+				} catch (ExecutionGraphException e) {
+					e.printStackTrace();
+					return FutureUtils.completedExceptionally(e);
+				}
 			});
-
 	}
 
 	@Override
@@ -160,31 +160,13 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 	@Override
 	public CompletableFuture<Void> updateMapping(int srcOpID, int destOpID) {
 		System.out.println("update mapping...");
-		final RescaleID rescaleID = RescaleID.generateNextID();
 		final List<CompletableFuture<Void>> rescaleCandidatesFutures = new ArrayList<>();
 		try {
-			// update result partition
-			JobVertexID srcJobVertexID = rawVertexIDToJobVertexID(srcOpID);
-			ExecutionJobVertex srcJobVertex = executionGraph.getJobVertex(srcJobVertexID);
-			Preconditions.checkNotNull(srcJobVertex, "can not found this execution job vertex");
-			srcJobVertex.cleanBeforeRescale();
-			for (ExecutionVertex vertex : srcJobVertex.getTaskVertices()) {
-				Execution execution = vertex.getCurrentExecutionAttempt();
-				if (execution != null && execution.getState() == ExecutionState.RUNNING) {
-					execution.updateProducedPartitions(rescaleID);
-					rescaleCandidatesFutures.add(execution.scheduleRescale(rescaleID, RescaleOptions.RESCALE_PARTITIONS_ONLY, null));
-				}
-			}
-			// update input gates in child stream of source op
-			for (OperatorDescriptor child : heldExecutionPlan.getOperatorDescriptorByID(srcOpID).getChildren()) {
-				JobVertexID childID = rawVertexIDToJobVertexID(child.getOperatorID());
-				updateGates(childID, rescaleCandidatesFutures);
-			}
+			updatePartitionAndDownStreamGates(srcOpID, rescaleCandidatesFutures);
+			// update key group range in target stream
 			JobVertexID destJobVertexID = rawVertexIDToJobVertexID(destOpID);
 			ExecutionJobVertex destJobVertex = executionGraph.getJobVertex(destJobVertexID);
 			Preconditions.checkNotNull(destJobVertex, "can not found this execution job vertex");
-			// update key group range in target stream
-//			updateGates(destJobVertexID, rescaleID, rescaleCandidatesFutures);
 			RemappingAssignment remappingAssignment = new RemappingAssignment(
 				heldExecutionPlan.getKeyMapping(srcOpID).get(destOpID)
 			);
@@ -193,9 +175,9 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 				Execution execution = vertex.getCurrentExecutionAttempt();
 				if (execution != null && execution.getState() == ExecutionState.RUNNING) {
 					rescaleCandidatesFutures.add(execution.scheduleRescale(
-							rescaleID,
-							RescaleOptions.RESCALE_KEYGROUP_RANGE_ONLY,
-							remappingAssignment.getAlignedKeyGroupRange(i)));
+						null,
+						RescaleOptions.RESCALE_KEYGROUP_RANGE_ONLY,
+						remappingAssignment.getAlignedKeyGroupRange(i)));
 				} else {
 					vertex.assignKeyGroupRange(remappingAssignment.getAlignedKeyGroupRange(i));
 				}
@@ -204,6 +186,27 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 			return FutureUtils.completedExceptionally(e);
 		}
 		return FutureUtils.completeAll(rescaleCandidatesFutures);
+	}
+
+	private void updatePartitionAndDownStreamGates(int srcOpID, List<CompletableFuture<Void>> rescaleCandidatesFutures) throws ExecutionGraphException {
+		final RescaleID rescaleID = RescaleID.generateNextID();
+		// update result partition
+		JobVertexID srcJobVertexID = rawVertexIDToJobVertexID(srcOpID);
+		ExecutionJobVertex srcJobVertex = executionGraph.getJobVertex(srcJobVertexID);
+		Preconditions.checkNotNull(srcJobVertex, "can not found this execution job vertex");
+		srcJobVertex.cleanBeforeRescale();
+		for (ExecutionVertex vertex : srcJobVertex.getTaskVertices()) {
+			Execution execution = vertex.getCurrentExecutionAttempt();
+			if (execution != null && execution.getState() == ExecutionState.RUNNING) {
+				execution.updateProducedPartitions(rescaleID);
+				rescaleCandidatesFutures.add(execution.scheduleRescale(null, RescaleOptions.RESCALE_PARTITIONS_ONLY, null));
+			}
+		}
+		// update input gates in child stream of source op
+		for (OperatorDescriptor child : heldExecutionPlan.getOperatorDescriptorByID(srcOpID).getChildren()) {
+			JobVertexID childID = rawVertexIDToJobVertexID(child.getOperatorID());
+			updateGates(childID, rescaleCandidatesFutures);
+		}
 	}
 
 	private void updateGates(JobVertexID jobVertexID, List<CompletableFuture<Void>> futureList) throws ExecutionGraphException {
@@ -402,7 +405,7 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 			List<CompletableFuture<Void>> futureList = new ArrayList<>();
 			for (ExecutionVertex executionVertex : operatedVertex) {
 				// means has been resumed before
-				if(!executionVertex.getRescaleId().equals(rescaleID)){
+				if (!executionVertex.getRescaleId().equals(rescaleID)) {
 					// all execution vertex of same job vertex has the same rescale id
 					return FutureUtils.completedVoidFuture();
 				}

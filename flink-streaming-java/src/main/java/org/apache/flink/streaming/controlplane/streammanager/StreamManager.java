@@ -345,7 +345,6 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			}
 
 			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
-//			runAsync(() -> jobMasterGateway.triggerOperatorUpdate(this.jobGraph, jobVertexId, operatorID));
 			runAsync(() -> jobMasterGateway.callOperations(
 				enforcement -> FutureUtils.completedVoidFuture()
 					.thenCompose(
@@ -360,15 +359,14 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 								.toArray(CompletableFuture[]::new)
 						))
 					.thenCompose(
-						o -> enforcement.deployTasks(operatorID, oldParallelism))
-					.thenCompose(
 						o -> CompletableFuture.allOf(
 							targetDescriptor.getParents()
 								.stream()
 								.map(d -> enforcement.updateState(d.getOperatorID(), operatorID, -1))
 								.toArray(CompletableFuture[]::new)
 						))
-
+					.thenCompose(
+						o -> enforcement.deployTasks(operatorID, oldParallelism))
 					.thenCompose(
 						o -> enforcement.resumeTasks(affectedTasks))
 					.thenAccept(
