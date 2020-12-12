@@ -353,14 +353,14 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					.thenCompose(
 						o -> enforcement.synchronizePauseTasks(affectedTasks))
 					.thenCompose(
-						o -> enforcement.deployTasks(operatorID, oldParallelism))
-					.thenCompose(
 						o -> CompletableFuture.allOf(
 							targetDescriptor.getParents()
 								.stream()
 								.map(d -> enforcement.updateMapping(d.getOperatorID(), operatorID))
 								.toArray(CompletableFuture[]::new)
 						))
+					.thenCompose(
+						o -> enforcement.deployTasks(operatorID, oldParallelism))
 					.thenCompose(
 						o -> CompletableFuture.allOf(
 							targetDescriptor.getParents()

@@ -97,7 +97,7 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 
 	@Override
 	public CompletableFuture<Void> deployTasks(int operatorID, int oldParallelism) {
-		System.out.println("deploying... tasks of" + operatorID);
+		System.out.println("deploying... tasks of " + operatorID);
 		// TODO: update result partition (Not finished)
 		JobVertexID srcJobVertexID = rawVertexIDToJobVertexID(operatorID);
 		ExecutionJobVertex srcJobVertex = executionGraph.getJobVertex(srcJobVertexID);
@@ -113,16 +113,35 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 			allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(currentSyncOp.rescaleID));
 		}
 
-		return CompletableFuture.allOf(FutureUtils
-				.combineAll(allocateSlotFutures)
-				.whenComplete(((executions, throwable) -> {
-					if (throwable != null) {
-						throwable.printStackTrace();
-						throw new CompletionException(throwable);
-					}
-					System.out.println("allocated resource for net tasks of" + operatorID);
+		Collection<CompletableFuture<Acknowledge>> deployFutures =
+				new ArrayList<>(srcJobVertex.getParallelism()-oldParallelism);
 
-				})));
+		return FutureUtils.combineAll(allocateSlotFutures)
+			.whenComplete(((executions, throwable) -> {
+				if (throwable != null) {
+					throwable.printStackTrace();
+					throw new CompletionException(throwable);
+				}
+				System.out.println("allocated resource for net tasks of" + operatorID);
+
+				for (Execution execution: executions) {
+					try {
+						deployFutures.add(execution.deploy());
+					} catch (JobException e) {
+						e.printStackTrace();
+					}
+				}
+			}))
+			.thenCompose((executions) -> FutureUtils.waitForAll(deployFutures))
+			.thenCompose((executions) -> {
+				OperatorDescriptor operatorDescriptor = heldExecutionPlan.getOperatorDescriptorByID(operatorID);
+				return FutureUtils.waitForAll(operatorDescriptor
+						.getChildren()
+						.stream()
+						.map(child->updateMapping(operatorID,child.getOperatorID()))
+						.collect(Collectors.toList()));
+			});
+
 	}
 
 	@Override
@@ -151,8 +170,10 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 			srcJobVertex.cleanBeforeRescale();
 			for (ExecutionVertex vertex : srcJobVertex.getTaskVertices()) {
 				Execution execution = vertex.getCurrentExecutionAttempt();
-				execution.updateProducedPartitions(rescaleID);
-				rescaleCandidatesFutures.add(execution.scheduleRescale(rescaleID, RescaleOptions.RESCALE_PARTITIONS_ONLY, null));
+				if (execution != null && execution.getState() == ExecutionState.RUNNING) {
+					execution.updateProducedPartitions(rescaleID);
+					rescaleCandidatesFutures.add(execution.scheduleRescale(rescaleID, RescaleOptions.RESCALE_PARTITIONS_ONLY, null));
+				}
 			}
 			// update input gates in child stream of source op
 			for (OperatorDescriptor child : heldExecutionPlan.getOperatorDescriptorByID(srcOpID).getChildren()) {
@@ -170,22 +191,13 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 			for (int i = 0; i < destJobVertex.getParallelism(); i++) {
 				ExecutionVertex vertex = destJobVertex.getTaskVertices()[i];
 				Execution execution = vertex.getCurrentExecutionAttempt();
-				if (execution.getState() != ExecutionState.RUNNING) {
-					// TODO: not natural to do the deploy here instead of in deployTasks()
-					try {
-						System.out.println("deploying new created task");
-						execution.deploy().thenCompose(acknowledge -> {
-							System.out.println("deploy new created task successfully");
-							return null;
-						});
-					} catch (JobException e) {
-						e.printStackTrace();
-					}
-				} else {
+				if (execution != null && execution.getState() == ExecutionState.RUNNING) {
 					rescaleCandidatesFutures.add(execution.scheduleRescale(
 							rescaleID,
 							RescaleOptions.RESCALE_KEYGROUP_RANGE_ONLY,
 							remappingAssignment.getAlignedKeyGroupRange(i)));
+				} else {
+					vertex.assignKeyGroupRange(remappingAssignment.getAlignedKeyGroupRange(i));
 				}
 			}
 		} catch (ExecutionGraphException e) {
