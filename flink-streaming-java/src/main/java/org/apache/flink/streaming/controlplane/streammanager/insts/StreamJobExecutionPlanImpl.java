@@ -163,6 +163,7 @@ public final class StreamJobExecutionPlanImpl implements StreamJobExecutionPlan 
 			for (ExecutionVertex vertex : jobVertex.getTaskVertices()) {
 				Execution execution;
 				do {
+					// TODO: special check for scale out, which must have null execution
 					execution = vertex.getCurrentExecutionAttempt();
 					try {
 						Thread.sleep(100);

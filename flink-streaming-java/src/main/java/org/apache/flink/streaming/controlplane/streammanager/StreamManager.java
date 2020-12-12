@@ -333,6 +333,17 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 				.collect(Collectors.toList());
 			affectedTasks.add(Tuple2.of(operatorID, -1));
 
+			int oldParallelism = targetDescriptor.getParallelism();
+			// update the parallelism
+			targetDescriptor.setParallelism(newParallelism);
+
+			// update the key set
+			// we assume that each operator only have one input now
+			for(OperatorDescriptor parent: targetDescriptor.getParents()){
+				parent.setKeyMappingTo(operatorID, keyStateAllocation);
+				break;
+			}
+
 			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
 //			runAsync(() -> jobMasterGateway.triggerOperatorUpdate(this.jobGraph, jobVertexId, operatorID));
 			runAsync(() -> jobMasterGateway.callOperations(
@@ -342,14 +353,14 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					.thenCompose(
 						o -> enforcement.synchronizePauseTasks(affectedTasks))
 					.thenCompose(
+						o -> enforcement.deployTasks(operatorID, oldParallelism))
+					.thenCompose(
 						o -> CompletableFuture.allOf(
 							targetDescriptor.getParents()
 								.stream()
 								.map(d -> enforcement.updateMapping(d.getOperatorID(), operatorID))
 								.toArray(CompletableFuture[]::new)
 						))
-					.thenCompose(
-						o -> enforcement.deployTasks(operatorID, newParallelism))
 					.thenCompose(
 						o -> CompletableFuture.allOf(
 							targetDescriptor.getParents()
