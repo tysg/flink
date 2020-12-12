@@ -1,6 +1,7 @@
 package org.apache.flink.runtime.rescale.reconfigure;
 
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.runtime.JobException;
 import org.apache.flink.runtime.checkpoint.CheckpointCoordinator;
 import org.apache.flink.runtime.checkpoint.OperatorState;
 import org.apache.flink.runtime.checkpoint.PendingCheckpoint;
@@ -95,8 +96,33 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 	}
 
 	@Override
-	public CompletableFuture<Void> deployTasks(int operatorID, int offset) {
-		return CompletableFuture.completedFuture(null);
+	public CompletableFuture<Void> deployTasks(int operatorID, int oldParallelism) {
+		System.out.println("deploying... tasks of" + operatorID);
+		// TODO: update result partition (Not finished)
+		JobVertexID srcJobVertexID = rawVertexIDToJobVertexID(operatorID);
+		ExecutionJobVertex srcJobVertex = executionGraph.getJobVertex(srcJobVertexID);
+		Preconditions.checkNotNull(srcJobVertex, "can not found this execution job vertex");
+		srcJobVertex.cleanBeforeRescale();
+
+		Collection<CompletableFuture<Execution>> allocateSlotFutures =
+				new ArrayList<>(srcJobVertex.getParallelism()-oldParallelism);
+
+		ExecutionVertex[] taskVertices = srcJobVertex.getTaskVertices();
+		for (int i = oldParallelism; i < srcJobVertex.getParallelism(); i++) {
+			Execution executionAttempt = taskVertices[i].getCurrentExecutionAttempt();
+			allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(currentSyncOp.rescaleID));
+		}
+
+		return CompletableFuture.allOf(FutureUtils
+				.combineAll(allocateSlotFutures)
+				.whenComplete(((executions, throwable) -> {
+					if (throwable != null) {
+						throwable.printStackTrace();
+						throw new CompletionException(throwable);
+					}
+					System.out.println("allocated resource for net tasks of" + operatorID);
+
+				})));
 	}
 
 	@Override
@@ -144,10 +170,23 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 			for (int i = 0; i < destJobVertex.getParallelism(); i++) {
 				ExecutionVertex vertex = destJobVertex.getTaskVertices()[i];
 				Execution execution = vertex.getCurrentExecutionAttempt();
-				rescaleCandidatesFutures.add(execution.scheduleRescale(
-					rescaleID,
-					RescaleOptions.RESCALE_KEYGROUP_RANGE_ONLY,
-					remappingAssignment.getAlignedKeyGroupRange(i)));
+				if (execution.getState() != ExecutionState.RUNNING) {
+					// TODO: not natural to do the deploy here instead of in deployTasks()
+					try {
+						System.out.println("deploying new created task");
+						execution.deploy().thenCompose(acknowledge -> {
+							System.out.println("deploy new created task successfully");
+							return null;
+						});
+					} catch (JobException e) {
+						e.printStackTrace();
+					}
+				} else {
+					rescaleCandidatesFutures.add(execution.scheduleRescale(
+							rescaleID,
+							RescaleOptions.RESCALE_KEYGROUP_RANGE_ONLY,
+							remappingAssignment.getAlignedKeyGroupRange(i)));
+				}
 			}
 		} catch (ExecutionGraphException e) {
 			return FutureUtils.completedExceptionally(e);

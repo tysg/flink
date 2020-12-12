@@ -89,6 +89,36 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 		}
 	}
 
+	private void testScaleOutStateful(int testingOpID) throws InterruptedException {
+		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
+		Map<Integer, List<List<Integer>>> map = streamJobState.getKeyStateAllocation(testingOpID);
+
+		int oldParallelism = streamJobState.getParallelism(testingOpID);
+		System.out.println(oldParallelism);
+
+		List<List<Integer>> keySet = map.values().iterator().next();
+
+		assert oldParallelism == keySet.size() : "old parallelism does not match the key set";
+
+		List<List<Integer>> newKeySet = keySet.stream()
+				.map(ArrayList::new)
+				.collect(Collectors.toList());
+
+		List<Integer> smallHalf = newKeySet.get(oldParallelism-1).stream()
+			.filter(i -> i < 63) // hardcoded
+			.collect(Collectors.toList());
+		newKeySet.get(oldParallelism-1).removeAll(smallHalf);
+		newKeySet.add(smallHalf);
+
+		System.out.println(newKeySet);
+
+		getInstructionSet().rescale(testingOpID, oldParallelism+1, newKeySet, this);
+
+		synchronized (object) {
+			object.wait();
+		}
+	}
+
 	private void testRebalanceStateless(int testingOpID) throws InterruptedException {
 		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
 		Set<OperatorDescriptor> parents = streamJobState.getOperatorDescriptorByID(testingOpID).getParents();
@@ -156,26 +186,29 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 			try {
 				showOperatorInfo();
 				Thread.sleep(10);
-				System.out.println("\nstart testCustomizeAPI test...");
-				testCustomizeAPI(statefulOpID);
-
-				System.out.println("\nstart stateless rebalance test...");
-				testRebalanceStateless(statelessOpID);
+//				System.out.println("\nstart testCustomizeAPI test...");
+//				testCustomizeAPI(statefulOpID);
+//
+//				System.out.println("\nstart stateless rebalance test...");
+//				testRebalanceStateless(statelessOpID);
 
 				System.out.println("\nstart stateful rebalance test1...");
 				testRebalanceStateful(statefulOpID);
 
-				System.out.println("\nstart stateful rebalance test2...");
-				testRebalanceStateful(statefulOpID);
+//				System.out.println("\nstart stateful rebalance test2...");
+//				testRebalanceStateful(statefulOpID);
 
-				System.out.println("\nstart synchronize source test...");
-				testPauseSource(sourceOp);
-
-				System.out.println("\nstart source near stateful operator rebalance test...");
-				testRebalanceStateful(nearSourceMap);
-
-				System.out.println("\nstart source near stateless operator rebalance test...");
-				testRebalanceStateless(nearSourceFilter);
+				System.out.println("\nstart stateful scale out test");
+				testScaleOutStateful(statefulOpID);
+//
+//				System.out.println("\nstart synchronize source test...");
+//				testPauseSource(sourceOp);
+//
+//				System.out.println("\nstart source near stateful operator rebalance test...");
+//				testRebalanceStateful(nearSourceMap);
+//
+//				System.out.println("\nstart source near stateless operator rebalance test...");
+//				testRebalanceStateless(nearSourceFilter);
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
