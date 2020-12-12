@@ -221,11 +221,11 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 				System.out.println("\nstart stateful scale out test");
 				testScaleOutStateful(statefulOpID);
 
-				System.out.println("\nstart source near stateful operator rebalance test...");
-				testRebalanceStateful(nearSourceMap);
-
-				System.out.println("\nstart source near stateless operator rebalance test...");
-				testRebalanceStateless(nearSourceFilter);
+//				System.out.println("\nstart source near stateful operator rebalance test...");
+//				testRebalanceStateful(nearSourceMap);
+//
+//				System.out.println("\nstart source near stateless operator rebalance test...");
+//				testRebalanceStateless(nearSourceFilter);
 
 				Thread.sleep(10);
 
