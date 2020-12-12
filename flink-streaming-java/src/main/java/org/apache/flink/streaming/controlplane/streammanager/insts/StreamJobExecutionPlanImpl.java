@@ -22,10 +22,7 @@ import org.apache.flink.annotation.Internal;
 import org.apache.flink.api.common.functions.Function;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
-import org.apache.flink.runtime.controlplane.abstraction.ExecutionGraphConfig;
-import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
-import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptorBuilder;
-import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
+import org.apache.flink.runtime.controlplane.abstraction.*;
 import org.apache.flink.runtime.execution.ExecutionState;
 import org.apache.flink.runtime.executiongraph.Execution;
 import org.apache.flink.runtime.executiongraph.ExecutionGraph;
@@ -40,7 +37,6 @@ import org.apache.flink.streaming.api.graph.StreamEdge;
 import org.apache.flink.streaming.api.operators.SimpleUdfStreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.StreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
-import org.apache.flink.streaming.runtime.operators.windowing.WindowOperator;
 import org.apache.flink.streaming.runtime.partitioner.AssignedKeyGroupStreamPartitioner;
 import org.apache.flink.streaming.runtime.partitioner.KeyGroupStreamPartitioner;
 import org.apache.flink.streaming.runtime.partitioner.StreamPartitioner;
@@ -96,13 +92,13 @@ public final class StreamJobExecutionPlanImpl implements StreamJobExecutionPlan 
 				.stream()
 				.map(e -> Tuple2.of(e.getSourceId(), e.getTargetId()))
 				.collect(Collectors.toList());
-			OperatorDescriptorBuilder.attachOperator(descriptor).addChildren(outEdges, allOperatorsById);
+			OperatorDescriptorVisitor.attachOperator(descriptor).addChildren(outEdges, allOperatorsById);
 
 			List<Tuple2<Integer, Integer>> inEdges = config.getInPhysicalEdges(userCodeLoader)
 				.stream()
 				.map(e -> Tuple2.of(e.getSourceId(), e.getTargetId()))
 				.collect(Collectors.toList());
-			OperatorDescriptorBuilder.attachOperator(descriptor).addParent(inEdges, allOperatorsById);
+			OperatorDescriptorVisitor.attachOperator(descriptor).addParent(inEdges, allOperatorsById);
 		}
 		// find head
 		List<OperatorDescriptor> heads = new ArrayList<>();
@@ -117,7 +113,7 @@ public final class StreamJobExecutionPlanImpl implements StreamJobExecutionPlan 
 			StreamConfig streamConfig = streamConfigMap.get(descriptor.getOperatorID());
 			// add workload dimension info
 			List<List<Integer>> keyStateAllocation = getKeyStateAllocation(streamConfig, userCodeLoader, descriptor.getParallelism());
-			OperatorDescriptorBuilder.attachOperator(descriptor).setKeyStateAllocation(keyStateAllocation);
+			OperatorDescriptorVisitor.attachOperator(descriptor).setKeyStateAllocation(keyStateAllocation);
 			// add execution logic info
 			try {
 				attachAppLogicToOperatorDescriptor(descriptor, streamConfigMap.get(descriptor.getOperatorID()), userCodeLoader);
@@ -217,12 +213,8 @@ public final class StreamJobExecutionPlanImpl implements StreamJobExecutionPlan 
 			Function function = ((SimpleUdfStreamOperatorFactory<?>) factory).getUserFunction();
 			descriptor.setUdf(function);
 			StreamOperator<?> streamOperator = ((SimpleUdfStreamOperatorFactory<?>) factory).getOperator();
-//			if (streamOperator instanceof WindowOperator) {
-//				descriptor.setControlAttribute("windowTrigger", ((WindowOperator<?, ?, ?, ?, ?>) streamOperator).getTrigger());
-//				descriptor.setControlAttribute("windowAssigner", ((WindowOperator<?, ?, ?, ?, ?>) streamOperator).getWindowAssigner());
-//			}
-			// todo use reflection to get control attribute
 			Class<?> streamOperatorClass = streamOperator.getClass();
+			descriptor.setControlAttribute(OperatorDescriptor.ApplicationLogic.OPERATOR_TYPE, streamOperatorClass);
 			List<Field> fieldList = new LinkedList<>();
 			do {
 				fieldList.addAll(
@@ -230,16 +222,9 @@ public final class StreamJobExecutionPlanImpl implements StreamJobExecutionPlan 
 						.filter(field -> field.isAnnotationPresent(ControlAttribute.class))
 						.collect(Collectors.toList())
 				);
-				streamOperatorClass = streamOperatorClass.getSuperclass();
+ 				streamOperatorClass = streamOperatorClass.getSuperclass();
 			} while (streamOperatorClass != null);
-			for (Field field : fieldList) {
-				ControlAttribute attribute = field.getAnnotation(ControlAttribute.class);
-				boolean accessible = field.isAccessible();
-				// temporary set true
-				field.setAccessible(true);
-				descriptor.setControlAttribute(attribute.name(), field.get(streamOperator));
-				field.setAccessible(accessible);
-			}
+			OperatorDescriptorVisitor.attachOperator(descriptor).setAttributeField(streamOperator, fieldList);
 		}
 	}
 

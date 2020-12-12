@@ -3,17 +3,18 @@ package org.apache.flink.runtime.controlplane.abstraction;
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.api.java.tuple.Tuple2;
 
+import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
 
 @Internal
-public class OperatorDescriptorBuilder {
+public class OperatorDescriptorVisitor {
 
 	private OperatorDescriptor operatorDescriptor;
 
-	private final static OperatorDescriptorBuilder INSTANCE = new OperatorDescriptorBuilder();
+	private final static OperatorDescriptorVisitor INSTANCE = new OperatorDescriptorVisitor();
 
-	public static OperatorDescriptorBuilder attachOperator(OperatorDescriptor operatorDescriptor) {
+	public static OperatorDescriptorVisitor attachOperator(OperatorDescriptor operatorDescriptor) {
 		INSTANCE.operatorDescriptor = operatorDescriptor;
 		return INSTANCE;
 	}
@@ -32,5 +33,13 @@ public class OperatorDescriptorBuilder {
 
 	public void setKeyMapping(Map<Integer, List<List<Integer>>> keyMapping) {
 		operatorDescriptor.setKeyMapping(keyMapping);
+	}
+
+	public void setAttributeField(Object object, List<Field> fieldList) throws IllegalAccessException {
+		operatorDescriptor.setAttributeField(object, fieldList);
+	}
+
+	public OperatorDescriptor.ApplicationLogic getApplicationLogic() {
+		return operatorDescriptor.getApplicationLogic();
 	}
 }

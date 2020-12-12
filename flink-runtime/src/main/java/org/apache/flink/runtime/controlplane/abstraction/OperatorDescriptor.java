@@ -8,6 +8,7 @@ import org.apache.flink.api.common.functions.Function;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.util.Preconditions;
 
+import java.lang.reflect.Field;
 import java.util.*;
 import java.util.function.Supplier;
 import java.util.stream.Collector;
@@ -74,7 +75,7 @@ public class OperatorDescriptor {
 		setControlAttribute(ApplicationLogic.UDF, udf);
 	}
 
-	public void setControlAttribute(String name, Object obj) {
+	public final void setControlAttribute(String name, Object obj) {
 		payload.applicationLogic.attributeMap.put(name, obj);
 	}
 
@@ -109,6 +110,11 @@ public class OperatorDescriptor {
 				child.payload.keyStateAllocation.addAll(unmodifiable.get(child.operatorID));
 			}
 		}
+	}
+
+	@Internal
+	ApplicationLogic getApplicationLogic(){
+		return payload.applicationLogic;
 	}
 
 	private Map<Integer, List<List<Integer>>> convertToUnmodifiable(Map<Integer, List<List<Integer>>> keyStateAllocation) {
@@ -229,7 +235,7 @@ public class OperatorDescriptor {
 
 	private static class OperatorPayload {
 		int parallelism;
-		ApplicationLogic applicationLogic;
+		final ApplicationLogic applicationLogic;
 		/* for stateful one input stream task, the key state allocation item is always one */
 		final List<List<Integer>> keyStateAllocation;
 		final Map<Integer, List<List<Integer>>> keyMapping;
@@ -242,12 +248,56 @@ public class OperatorDescriptor {
 		}
 	}
 
-	private static class ApplicationLogic{
+	void setAttributeField(Object object, List<Field> fieldList) throws IllegalAccessException {
+		payload.applicationLogic.operator = object;
+		for(Field field: fieldList) {
+			ControlAttribute attribute = field.getAnnotation(ControlAttribute.class);
+			boolean accessible = field.isAccessible();
+			// temporary set true
+			field.setAccessible(true);
+			this.setControlAttribute(attribute.name(), field.get(object));
+			payload.applicationLogic.fields.put(attribute.name(), field);
+			field.setAccessible(accessible);
+		}
+	}
 
-		private static final String UDF = "UDF";
+	public static class ApplicationLogic{
+
+		public static final String UDF = "UDF";
+		public static final String OPERATOR_TYPE = "OPERATOR_TYPE";
 
 		private final Map<String, Object> attributeMap = new HashMap<>();
+		private final Map<String, Field> fields = new HashMap<>();
 
+		@VisibleForTesting
+		private Object operator;
+
+		@Override
+		public boolean equals(Object o) {
+			if (this == o) return true;
+			if (o == null || getClass() != o.getClass()) return false;
+			ApplicationLogic that = (ApplicationLogic) o;
+			return attributeMap.equals(that.attributeMap);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(attributeMap);
+		}
+
+		public ApplicationLogic copyTo(ApplicationLogic that){
+			that.attributeMap.clear();
+			that.attributeMap.putAll(attributeMap);
+			return that;
+		}
+
+		public Map<String, Object> getControlAttributeMap() {
+			return Collections.unmodifiableMap(attributeMap);
+		}
+
+		public Map<String, Field> getControlAttributeFieldMap() {
+			return Collections.unmodifiableMap(fields);
+		}
 	}
 
 }

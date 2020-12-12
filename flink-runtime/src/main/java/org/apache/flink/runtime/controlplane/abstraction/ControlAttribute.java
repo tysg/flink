@@ -1,4 +1,4 @@
-package org.apache.flink.streaming.controlplane.streammanager.insts;
+package org.apache.flink.runtime.controlplane.abstraction;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

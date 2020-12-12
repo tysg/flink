@@ -4,6 +4,7 @@ import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.controlplane.PrimitiveOperation;
 import org.apache.flink.runtime.controlplane.StreamRelatedInstanceFactory;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
+import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptorVisitor;
 import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
 import org.apache.flink.runtime.executiongraph.ExecutionGraph;
 import org.apache.flink.runtime.executiongraph.ExecutionJobVertex;
@@ -52,8 +53,12 @@ public abstract class AbstractCoordinator implements PrimitiveOperation {
 		for (Iterator<OperatorDescriptor> it = executionPlan.getAllOperatorDescriptor(); it.hasNext(); ) {
 			OperatorDescriptor descriptor = it.next();
 			OperatorDescriptor heldDescriptor = heldExecutionPlan.getOperatorDescriptorByID(descriptor.getOperatorID());
-			// make sure udf share the same reference so we could identity the change if any
-			descriptor.setUdf(heldDescriptor.getUdf());
+			// make sure udf and other control attributes share the same reference so we could identity the change if any
+			OperatorDescriptor.ApplicationLogic heldAppLogic =
+				OperatorDescriptorVisitor.attachOperator(heldDescriptor).getApplicationLogic();
+			OperatorDescriptor.ApplicationLogic appLogicCopy =
+				OperatorDescriptorVisitor.attachOperator(descriptor).getApplicationLogic();
+			heldAppLogic.copyTo(appLogicCopy);
 		}
 		return executionPlan;
 	}
@@ -84,8 +89,12 @@ public abstract class AbstractCoordinator implements PrimitiveOperation {
 				try {
 					switch (changedPosition) {
 						case UDF:
-							heldDescriptor.setUdf(descriptor.getUdf());
-							updater.updateOperator(operatorID, descriptor.getUdf());
+							OperatorDescriptor.ApplicationLogic heldAppLogic =
+								OperatorDescriptorVisitor.attachOperator(heldDescriptor).getApplicationLogic();
+							OperatorDescriptor.ApplicationLogic modifiedAppLogic =
+								OperatorDescriptorVisitor.attachOperator(descriptor).getApplicationLogic();
+							modifiedAppLogic.copyTo(heldAppLogic);
+							updater.updateOperator(operatorID, heldAppLogic);
 							break;
 						case PARALLELISM:
 							heldDescriptor.setParallelism(descriptor.getParallelism());
@@ -159,7 +168,11 @@ public abstract class AbstractCoordinator implements PrimitiveOperation {
 
 	private List<Integer> analyzeOperatorDifference(OperatorDescriptor self, OperatorDescriptor modified) {
 		List<Integer> results = new LinkedList<>();
-		if (self.getUdf() != modified.getUdf()) {
+		OperatorDescriptor.ApplicationLogic heldAppLogic =
+			OperatorDescriptorVisitor.attachOperator(self).getApplicationLogic();
+		OperatorDescriptor.ApplicationLogic modifiedAppLogic =
+			OperatorDescriptorVisitor.attachOperator(modified).getApplicationLogic();
+		if (!heldAppLogic.equals(modifiedAppLogic)) {
 			results.add(UDF);
 		}
 		if (self.getParallelism() != modified.getParallelism()) {

@@ -4,10 +4,12 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
 import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
+import org.apache.flink.streaming.api.windowing.triggers.CountTrigger;
+import org.apache.flink.streaming.api.windowing.triggers.PurgingTrigger;
 import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
+import org.apache.flink.streaming.runtime.operators.windowing.WindowOperator;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 public class TestingControlPolicy extends AbstractControlPolicy {
@@ -52,25 +54,6 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 		}
 	}
 
-	private void testCustomizeAPI(int testingOpID) throws InterruptedException {
-		//	 just show how to defined customize operations
-		System.out.println("start synchronize test...");
-		getInstructionSet().callCustomizeOperations(
-			enforcement -> FutureUtils.completedVoidFuture()
-				.thenCompose(o -> enforcement.synchronizePauseTasks(Collections.singletonList(Tuple2.of(testingOpID, 1))))
-				.thenCompose(o -> enforcement.resumeTasks(Collections.singletonList(Tuple2.of(testingOpID, 1))))
-				.thenAccept(o -> {
-					synchronized (object) {
-						object.notify();
-					}
-				})
-		);
-		// wait for operation completed
-		synchronized (object) {
-			object.wait();
-		}
-	}
-
 	private void testRebalanceStateful(int testingOpID) throws InterruptedException {
 		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
 		List<List<Integer>> keySet = streamJobState.getKeyStateAllocation(testingOpID);
@@ -91,12 +74,11 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 
 	private void testScaleOutStateful(int testingOpID) throws InterruptedException {
 		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
-		Map<Integer, List<List<Integer>>> map = streamJobState.getKeyStateAllocation(testingOpID);
 
 		int oldParallelism = streamJobState.getParallelism(testingOpID);
 		System.out.println(oldParallelism);
 
-		List<List<Integer>> keySet = map.values().iterator().next();
+		List<List<Integer>> keySet = streamJobState.getKeyStateAllocation(testingOpID);
 
 		assert oldParallelism == keySet.size() : "old parallelism does not match the key set";
 
@@ -166,6 +148,42 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 		}
 	}
 
+	private void testCustomizeWindowUpdateAPI() throws InterruptedException {
+		//	 an example shows how to defined customize operations
+		int windowOpID = findOperatorByName("counting window reduce");
+		if (windowOpID != -1) {
+			OperatorDescriptor descriptor = getInstructionSet().getJobExecutionPlan().getOperatorDescriptorByID(windowOpID);
+			Map<String, Object> attributeMap = descriptor.getControlAttributeMap();
+			PurgingTrigger<?, ?> trigger = (PurgingTrigger<?, ?>) attributeMap.get("trigger");
+			long oldWindowSize = ((CountTrigger<?>) trigger.getNestedTrigger()).getMaxCount();
+			System.out.println("update window size from " + oldWindowSize + " to " + (oldWindowSize + 1));
+			updateCountingWindowSize(windowOpID, oldWindowSize + 1);
+		}
+	}
+
+	// self customize high level reconfiguration api
+	private void updateCountingWindowSize(int rawVertexID, long newWindowSize) throws InterruptedException {
+		// update abstraction in stream manager execution plan
+		CountTrigger<?> trigger = CountTrigger.of(newWindowSize);
+		OperatorDescriptor descriptor = getInstructionSet().getJobExecutionPlan().getOperatorDescriptorByID(rawVertexID);
+		descriptor.setControlAttribute("trigger", PurgingTrigger.of(trigger));
+		getInstructionSet().callCustomizeOperations(
+			enforcement -> FutureUtils.completedVoidFuture()
+				.thenCompose(o -> enforcement.synchronizePauseTasks(Collections.singletonList(Tuple2.of(rawVertexID, -1))))
+				.thenCompose(o -> enforcement.updateFunction(rawVertexID, -1))
+				.thenCompose(o -> enforcement.resumeTasks(Collections.singletonList(Tuple2.of(rawVertexID, -1))))
+				.thenAccept(o -> {
+					synchronized (object) {
+						object.notify();
+					}
+				})
+		);
+		// wait for operation completed
+		synchronized (object) {
+			object.wait();
+		}
+	}
+
 	private class TestingThread extends Thread {
 
 		@Override
@@ -176,7 +194,7 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 			int sourceOp = findOperatorByName("Source: source");
 			// this operator is the downstream of actual source operator
 			int nearSourceMap = findOperatorByName("near source Flatmap");
-			int nearSourceFilter = findOperatorByName("source filter");
+			int nearSourceFilter = findOperatorByName("source stateless map");
 			if (statefulOpID == -1 || statelessOpID == -1
 				|| nearSourceMap == -1 || nearSourceFilter == -1
 				|| sourceOp == -1) {
@@ -186,29 +204,30 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 			try {
 				showOperatorInfo();
 				Thread.sleep(10);
-//				System.out.println("\nstart testCustomizeAPI test...");
-//				testCustomizeAPI(statefulOpID);
-//
-//				System.out.println("\nstart stateless rebalance test...");
-//				testRebalanceStateless(statelessOpID);
+
+				System.out.println("\nstart stateless rebalance test...");
+				testRebalanceStateless(statelessOpID);
 
 				System.out.println("\nstart stateful rebalance test1...");
 				testRebalanceStateful(statefulOpID);
 
-//				System.out.println("\nstart stateful rebalance test2...");
-//				testRebalanceStateful(statefulOpID);
+				System.out.println("\nstart stateful rebalance test2...");
+				testRebalanceStateful(statefulOpID);
 
-				System.out.println("\nstart stateful scale out test");
-				testScaleOutStateful(statefulOpID);
-//
 //				System.out.println("\nstart synchronize source test...");
 //				testPauseSource(sourceOp);
+
+				System.out.println("\nstart source near stateful operator rebalance test...");
+				testRebalanceStateful(nearSourceMap);
+
+				System.out.println("\nstart source near stateless operator rebalance test...");
+				testRebalanceStateless(nearSourceFilter);
+
+//				System.out.println("\nstart update function related test...");
+//				testCustomizeWindowUpdateAPI();
 //
-//				System.out.println("\nstart source near stateful operator rebalance test...");
-//				testRebalanceStateful(nearSourceMap);
-//
-//				System.out.println("\nstart source near stateless operator rebalance test...");
-//				testRebalanceStateless(nearSourceFilter);
+//				System.out.println("\nstart stateful scale out test");
+//				testScaleOutStateful(statefulOpID);
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}

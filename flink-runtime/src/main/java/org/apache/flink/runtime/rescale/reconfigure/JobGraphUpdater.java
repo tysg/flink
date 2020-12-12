@@ -1,6 +1,6 @@
 package org.apache.flink.runtime.rescale.reconfigure;
 
-import org.apache.flink.api.common.functions.Function;
+import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 
@@ -11,12 +11,11 @@ public interface JobGraphUpdater extends JobGraphRescaler{
 	/**
 	 *
 	 * @param operatorID
-	 * @param function
 	 * @param <OUT>
 	 * @return
 	 * @throws Exception
 	 */
-	<OUT> JobVertexID updateOperator(int operatorID, Function function) throws Exception;
+	<OUT> JobVertexID updateOperator(int operatorID, OperatorDescriptor.ApplicationLogic applicationLogic) throws Exception;
 
 	Map<Integer, OperatorID> getOperatorIDMap();
 }

@@ -4,11 +4,15 @@ import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.functions.Function;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.streaming.api.graph.StreamConfig;
+import org.apache.flink.streaming.api.operators.SimpleOperatorFactory;
+import org.apache.flink.streaming.api.operators.SimpleUdfStreamOperatorFactory;
+import org.apache.flink.streaming.api.operators.StreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
 import org.apache.flink.runtime.rescale.reconfigure.JobGraphRescaler;
 import org.apache.flink.runtime.rescale.reconfigure.JobGraphUpdater;
@@ -16,6 +20,7 @@ import org.apache.flink.streaming.controlplane.reconfigure.operator.ControlFunct
 import org.apache.flink.streaming.controlplane.reconfigure.operator.ControlOperatorFactory;
 import org.apache.flink.streaming.controlplane.rescale.StreamJobGraphRescaler;
 
+import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -64,13 +69,17 @@ public class StreamJobGraphUpdater implements JobGraphRescaler, JobGraphUpdater 
 	}
 
 	@Override
-	public <OUT> JobVertexID updateOperator(int vertexId, Function function) throws Exception {
+	public <OUT> JobVertexID updateOperator(int vertexId, OperatorDescriptor.ApplicationLogic applicationLogic) throws Exception {
 		OperatorID operatorID = operatorIDMap.get(vertexId);
-		if(function instanceof ControlFunction){
-			ControlOperatorFactory<?, ?> factory = new ControlOperatorFactory<>(
-				vertexId, (ControlFunction) function
-			);
-			return this.updateOperator(operatorID, factory);
+		StreamConfig config = findStreamConfig(operatorID);
+		StreamOperatorFactory<?> factory = config.getStreamOperatorFactory(userClassLoader);
+		if(factory instanceof SimpleOperatorFactory){
+			StreamOperator<?> operator = ((SimpleOperatorFactory<?>) factory).getOperator();
+			Map<String, Field> fieldMap = applicationLogic.getControlAttributeFieldMap();
+			for(Map.Entry<String, Object> entry : applicationLogic.getControlAttributeMap().entrySet()){
+				fieldMap.get(entry.getKey()).set(operator, entry.getValue());
+			}
+			return this.updateOperator(operatorID, SimpleOperatorFactory.of(operator));
 		}
 		throw new Exception("only support substitue control function now");
 	}
@@ -117,7 +126,6 @@ public class StreamJobGraphUpdater implements JobGraphRescaler, JobGraphUpdater 
 		throw new Exception("do not found target stream config with this operator id");
 	}
 
-	@VisibleForTesting
 	private StreamConfig findStreamConfig(OperatorID operatorID) throws Exception {
 		for (JobVertex vertex : jobGraph.getVertices()) {
 			StreamConfig streamConfig = new StreamConfig(vertex.getConfiguration());
