@@ -214,7 +214,6 @@ public final class StreamJobExecutionPlanImpl implements StreamJobExecutionPlan 
 			descriptor.setUdf(function);
 			StreamOperator<?> streamOperator = ((SimpleUdfStreamOperatorFactory<?>) factory).getOperator();
 			Class<?> streamOperatorClass = streamOperator.getClass();
-			descriptor.setControlAttribute(OperatorDescriptor.ApplicationLogic.OPERATOR_TYPE, streamOperatorClass);
 			List<Field> fieldList = new LinkedList<>();
 			do {
 				fieldList.addAll(

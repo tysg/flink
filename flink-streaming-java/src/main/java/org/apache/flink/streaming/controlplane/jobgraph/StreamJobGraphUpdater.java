@@ -77,7 +77,11 @@ public class StreamJobGraphUpdater implements JobGraphRescaler, JobGraphUpdater 
 			StreamOperator<?> operator = ((SimpleOperatorFactory<?>) factory).getOperator();
 			Map<String, Field> fieldMap = applicationLogic.getControlAttributeFieldMap();
 			for(Map.Entry<String, Object> entry : applicationLogic.getControlAttributeMap().entrySet()){
-				fieldMap.get(entry.getKey()).set(operator, entry.getValue());
+				Field field = fieldMap.get(entry.getKey());
+				boolean access = field.isAccessible();
+				field.setAccessible(true);
+				field.set(operator, entry.getValue());
+				field.setAccessible(access);
 			}
 			return this.updateOperator(operatorID, SimpleOperatorFactory.of(operator));
 		}

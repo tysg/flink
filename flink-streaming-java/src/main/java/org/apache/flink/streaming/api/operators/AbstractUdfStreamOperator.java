@@ -24,6 +24,8 @@ import org.apache.flink.api.common.functions.Function;
 import org.apache.flink.api.common.functions.util.FunctionUtils;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.runtime.controlplane.abstraction.ControlAttribute;
+import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
 import org.apache.flink.runtime.state.CheckpointListener;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
@@ -55,6 +57,7 @@ public abstract class AbstractUdfStreamOperator<OUT, F extends Function>
 
 
 	/** The user function. */
+	@ControlAttribute(name = OperatorDescriptor.ApplicationLogic.UDF)
 	protected final F userFunction;
 
 	/** Flag to prevent duplicate function.close() calls in close() and dispose(). */

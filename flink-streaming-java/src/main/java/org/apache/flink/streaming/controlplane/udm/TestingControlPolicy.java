@@ -156,8 +156,8 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 			Map<String, Object> attributeMap = descriptor.getControlAttributeMap();
 			PurgingTrigger<?, ?> trigger = (PurgingTrigger<?, ?>) attributeMap.get("trigger");
 			long oldWindowSize = ((CountTrigger<?>) trigger.getNestedTrigger()).getMaxCount();
-			System.out.println("update window size from " + oldWindowSize + " to " + (oldWindowSize + 1));
-			updateCountingWindowSize(windowOpID, oldWindowSize + 1);
+			System.out.println("update window size from " + oldWindowSize + " to " + (oldWindowSize / 2));
+			updateCountingWindowSize(windowOpID, oldWindowSize / 2);
 		}
 	}
 
@@ -169,6 +169,7 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 		descriptor.setControlAttribute("trigger", PurgingTrigger.of(trigger));
 		getInstructionSet().callCustomizeOperations(
 			enforcement -> FutureUtils.completedVoidFuture()
+				.thenCompose(o -> enforcement.prepareExecutionPlan(getInstructionSet().getJobExecutionPlan()))
 				.thenCompose(o -> enforcement.synchronizePauseTasks(Collections.singletonList(Tuple2.of(rawVertexID, -1))))
 				.thenCompose(o -> enforcement.updateFunction(rawVertexID, -1))
 				.thenCompose(o -> enforcement.resumeTasks(Collections.singletonList(Tuple2.of(rawVertexID, -1))))
@@ -222,12 +223,14 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 
 				System.out.println("\nstart source near stateless operator rebalance test...");
 				testRebalanceStateless(nearSourceFilter);
-
-//				System.out.println("\nstart update function related test...");
-//				testCustomizeWindowUpdateAPI();
 //
 //				System.out.println("\nstart stateful scale out test");
 //				testScaleOutStateful(statefulOpID);
+
+				Thread.sleep(10);
+
+				System.out.println("\nstart update function related test...");
+				testCustomizeWindowUpdateAPI();
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
