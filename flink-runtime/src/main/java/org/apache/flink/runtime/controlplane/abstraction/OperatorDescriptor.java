@@ -72,7 +72,7 @@ public class OperatorDescriptor {
 	}
 
 	public void setUdf(Function udf) {
-		setControlAttribute(ApplicationLogic.UDF, udf);
+		payload.applicationLogic.udf = udf;
 	}
 
 	public final void setControlAttribute(String name, Object obj) {
@@ -268,6 +268,7 @@ public class OperatorDescriptor {
 
 		private final Map<String, Object> attributeMap = new HashMap<>();
 		private final Map<String, Field> fields = new HashMap<>();
+		private Function udf;
 
 		@VisibleForTesting
 		private Object operator;
