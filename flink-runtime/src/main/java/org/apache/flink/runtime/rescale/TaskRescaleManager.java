@@ -194,6 +194,15 @@ public class TaskRescaleManager {
 		InputGateDeploymentDescriptor igdd = rescaleMeta.getMatchedInputGateDescriptor(inputGate);
 		ShuffleDescriptor[] shuffleDescriptors = checkNotNull(igdd.getShuffleDescriptors());
 
+		for(ShuffleDescriptor shuffleDescriptor: shuffleDescriptors){
+			for(InputChannel channel: inputGate.getInputChannels().values()){
+				if(channel.getPartitionId().equals(shuffleDescriptor.getResultPartitionID())){
+					// we should not request same partition twice
+					return;
+				}
+			}
+		}
+
 		inputGate.reset(shuffleDescriptors.length);
 
 		createChannels(inputGate, shuffleDescriptors);

@@ -66,6 +66,7 @@ public interface PrimitiveOperation {
 	 * @param taskList The list of task id, each id is a tuple which the first element is operator id and the second element is offset
 	 * @return
 	 */
+	@Deprecated
 	CompletableFuture<Void> resumeTasks(List<Tuple2<Integer, Integer>> taskList);
 
 	/**
@@ -87,23 +88,21 @@ public interface PrimitiveOperation {
 	CompletableFuture<Void> cancelTasks(int operatorID, int offset);
 
 	/**
-	 * Update key mappings between srcOp and destOp
+	 * Update key mappings between destOp and its parents
 	 *
-	 * @param srcOpID the operator id of source operator
 	 * @param destOpID the operator id of destination operator
 	 * @return
 	 */
-	CompletableFuture<Void> updateMapping(int srcOpID, int destOpID);
+	CompletableFuture<Void> updateUpstreamKeyMapping(int destOpID);
 
 	/**
 	 * update the key state in destination operator
 	 *
-	 * @param keySenderID the id of which operator send keys to destination operator
 	 * @param operatorID the id of operator that need to update state
 	 * @param offset  the sub-operator offset of update stated needed operator
 	 * @return
 	 */
-	CompletableFuture<Void> updateState(int keySenderID, int operatorID, int offset);
+	CompletableFuture<Void> updateState(int operatorID, int offset);
 
 	/**
 	 * @param vertexID the operator id of this operator

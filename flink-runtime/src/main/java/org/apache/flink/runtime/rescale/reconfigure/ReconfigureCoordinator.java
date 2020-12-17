@@ -107,9 +107,10 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 			new ArrayList<>(srcJobVertex.getParallelism() - oldParallelism);
 
 		ExecutionVertex[] taskVertices = srcJobVertex.getTaskVertices();
+		RescaleID rescaleID = RescaleID.generateNextID();
 		for (int i = oldParallelism; i < srcJobVertex.getParallelism(); i++) {
 			Execution executionAttempt = taskVertices[i].getCurrentExecutionAttempt();
-			allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(currentSyncOp.rescaleID));
+			allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(rescaleID));
 		}
 
 		return FutureUtils.combineAll(allocateSlotFutures)
@@ -135,7 +136,7 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 			).thenCompose(executions -> {
 				try {
 					final List<CompletableFuture<Void>> finishedFutureList = new ArrayList<>();
-					updatePartitionAndDownStreamGates(operatorID, finishedFutureList);
+					updatePartitionAndDownStreamGates(operatorID, rescaleID, finishedFutureList);
 					return FutureUtils.waitForAll(finishedFutureList);
 				} catch (ExecutionGraphException e) {
 					e.printStackTrace();
@@ -153,22 +154,24 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 	 * update result partition on this operator,
 	 * update input gates, key group range on its down stream operator
 	 *
-	 * @param srcOpID  the operator id of this operator
-	 * @param destOpID represent which parallel instance of this operator, -1 means all parallel instance
 	 * @return
 	 */
 	@Override
-	public CompletableFuture<Void> updateMapping(int srcOpID, int destOpID) {
+	public CompletableFuture<Void> updateUpstreamKeyMapping(int destOpID) {
 		System.out.println("update mapping...");
 		final List<CompletableFuture<Void>> rescaleCandidatesFutures = new ArrayList<>();
 		try {
-			updatePartitionAndDownStreamGates(srcOpID, rescaleCandidatesFutures);
+			RescaleID rescaleID = RescaleID.generateNextID();
+			for(OperatorDescriptor src: heldExecutionPlan.getOperatorDescriptorByID(destOpID).getParents()){
+				// todo some partitions may not need modified, for example, broad cast partitioner
+				updatePartitionAndDownStreamGates(src.getOperatorID(), rescaleID, rescaleCandidatesFutures);
+			}
 			// update key group range in target stream
 			JobVertexID destJobVertexID = rawVertexIDToJobVertexID(destOpID);
 			ExecutionJobVertex destJobVertex = executionGraph.getJobVertex(destJobVertexID);
 			Preconditions.checkNotNull(destJobVertex, "can not found this execution job vertex");
 			RemappingAssignment remappingAssignment = new RemappingAssignment(
-				heldExecutionPlan.getKeyMapping(srcOpID).get(destOpID)
+				heldExecutionPlan.getKeyStateAllocation(destOpID)
 			);
 			for (int i = 0; i < destJobVertex.getParallelism(); i++) {
 				ExecutionVertex vertex = destJobVertex.getTaskVertices()[i];
@@ -188,8 +191,7 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 		return FutureUtils.completeAll(rescaleCandidatesFutures);
 	}
 
-	private void updatePartitionAndDownStreamGates(int srcOpID, List<CompletableFuture<Void>> rescaleCandidatesFutures) throws ExecutionGraphException {
-		final RescaleID rescaleID = RescaleID.generateNextID();
+	private void updatePartitionAndDownStreamGates(int srcOpID, RescaleID rescaleID, List<CompletableFuture<Void>> rescaleCandidatesFutures) throws ExecutionGraphException {
 		// update result partition
 		JobVertexID srcJobVertexID = rawVertexIDToJobVertexID(srcOpID);
 		ExecutionJobVertex srcJobVertex = executionGraph.getJobVertex(srcJobVertexID);
@@ -223,13 +225,12 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 	/**
 	 * update the key state in destination operator
 	 *
-	 * @param keySenderID the id of which operator send keys to destination operator
 	 * @param operatorID  the id of operator that need to update state
 	 * @param offset      the sub-operator offset of update stated needed operator
 	 * @return
 	 */
 	@Override
-	public CompletableFuture<Void> updateState(int keySenderID, int operatorID, int offset) {
+	public CompletableFuture<Void> updateState(int operatorID, int offset) {
 		System.out.println("update state...");
 		JobVertexID jobVertexID = rawVertexIDToJobVertexID(operatorID);
 

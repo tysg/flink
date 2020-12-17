@@ -51,9 +51,7 @@ import org.apache.flink.runtime.rpc.akka.AkkaRpcServiceUtils;
 import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
 import org.apache.flink.runtime.rescale.reconfigure.JobGraphRescaler;
 import org.apache.flink.streaming.controlplane.jobgraph.NormalInstantiateFactory;
-import org.apache.flink.streaming.controlplane.reconfigure.TestingCFManager;
 import org.apache.flink.streaming.controlplane.rescale.StreamJobGraphRescaler;
-import org.apache.flink.streaming.controlplane.rescale.streamswitch.FlinkStreamSwitchAdaptor;
 import org.apache.flink.streaming.controlplane.streammanager.exceptions.StreamManagerException;
 import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
 import org.apache.flink.streaming.controlplane.streammanager.insts.StreamJobExecutionPlanWithUpdatingFlag;
@@ -338,37 +336,19 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			targetDescriptor.setParallelism(newParallelism);
 
 			// update the key set
-			// we assume that each operator only have one input now
-			for(OperatorDescriptor parent: targetDescriptor.getParents()){
+			for (OperatorDescriptor parent : targetDescriptor.getParents()) {
 				parent.setKeyMappingTo(operatorID, keyStateAllocation);
-				break;
 			}
 
 			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
 			runAsync(() -> jobMasterGateway.callOperations(
 				enforcement -> FutureUtils.completedVoidFuture()
-					.thenCompose(
-						o -> enforcement.prepareExecutionPlan(jobExecutionPlan))
-					.thenCompose(
-						o -> enforcement.synchronizePauseTasks(affectedTasks))
-					.thenCompose(
-						o -> CompletableFuture.allOf(
-							targetDescriptor.getParents()
-								.stream()
-								.map(d -> enforcement.updateMapping(d.getOperatorID(), operatorID))
-								.toArray(CompletableFuture[]::new)
-						))
-					.thenCompose(
-						o -> CompletableFuture.allOf(
-							targetDescriptor.getParents()
-								.stream()
-								.map(d -> enforcement.updateState(d.getOperatorID(), operatorID, -1))
-								.toArray(CompletableFuture[]::new)
-						))
-					.thenCompose(
-						o -> enforcement.deployTasks(operatorID, oldParallelism))
-					.thenCompose(
-						o -> enforcement.resumeTasks(affectedTasks))
+					.thenCompose(o -> enforcement.prepareExecutionPlan(jobExecutionPlan))
+					.thenCompose(o -> enforcement.synchronizePauseTasks(affectedTasks))
+					.thenCompose(o -> enforcement.updateUpstreamKeyMapping(operatorID))
+					.thenCompose(o -> enforcement.updateState(operatorID, -1))
+					.thenCompose(o -> enforcement.deployTasks(operatorID, oldParallelism))
+					.thenCompose(o -> enforcement.resumeTasks(affectedTasks))
 					.thenAccept(
 						(acknowledge) -> {
 							try {
@@ -394,10 +374,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 			OperatorDescriptor targetDescriptor = jobExecutionPlan.getOperatorDescriptorByID(operatorID);
 
-			// we assume that each operator only have one input now
-			for(OperatorDescriptor parent: targetDescriptor.getParents()){
+			for (OperatorDescriptor parent : targetDescriptor.getParents()) {
 				parent.setKeyMappingTo(operatorID, keyStateAllocation);
-				break;
 			}
 			List<Tuple2<Integer, Integer>> affectedTasks = targetDescriptor.getParents()
 				.stream()
@@ -406,29 +384,14 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			affectedTasks.add(Tuple2.of(operatorID, -1));
 
 			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
-			if(stateful) {
+			if (stateful) {
 				runAsync(() -> jobMasterGateway.callOperations(
 					enforcement -> FutureUtils.completedVoidFuture()
-						.thenCompose(
-							o -> enforcement.prepareExecutionPlan(jobExecutionPlan))
-						.thenCompose(
-							o -> enforcement.synchronizePauseTasks(affectedTasks))
-						.thenCompose(
-							o -> CompletableFuture.allOf(
-								targetDescriptor.getParents()
-									.stream()
-									.map(d -> enforcement.updateMapping(d.getOperatorID(), operatorID))
-									.toArray(CompletableFuture[]::new)
-							)
-						).thenCompose(
-							o -> CompletableFuture.allOf(
-								targetDescriptor.getParents()
-									.stream()
-									.map(d -> enforcement.updateState(d.getOperatorID(), operatorID, -1))
-									.toArray(CompletableFuture[]::new)
-							))
-						.thenCompose(
-							o -> enforcement.resumeTasks(affectedTasks))
+						.thenCompose(o -> enforcement.prepareExecutionPlan(jobExecutionPlan))
+						.thenCompose(o -> enforcement.synchronizePauseTasks(affectedTasks))
+						.thenCompose(o -> enforcement.updateUpstreamKeyMapping(operatorID))
+						.thenCompose(o -> enforcement.updateState(operatorID, -1))
+						.thenCompose(o -> enforcement.resumeTasks(affectedTasks))
 						.thenAccept(
 							(acknowledge) -> {
 								try {
@@ -439,19 +402,12 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 							}
 						)
 				));
-			}else {
+			} else {
 				runAsync(() -> jobMasterGateway.callOperations(
 					enforcement -> FutureUtils.completedVoidFuture()
-						.thenCompose(
-							o -> enforcement.prepareExecutionPlan(jobExecutionPlan))
-						.thenCompose(
-							o -> CompletableFuture.allOf(
-								targetDescriptor.getParents()
-									.stream()
-									.map(d -> enforcement.updateMapping(d.getOperatorID(), operatorID))
-									.toArray(CompletableFuture[]::new)
-							)
-						).thenAccept(
+						.thenCompose(o -> enforcement.prepareExecutionPlan(jobExecutionPlan))
+						.thenCompose(o -> enforcement.updateUpstreamKeyMapping(operatorID))
+						.thenAccept(
 							(acknowledge) -> {
 								try {
 									this.jobExecutionPlan.notifyUpdateFinished(operatorID);

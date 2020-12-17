@@ -185,6 +185,35 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 		}
 	}
 
+	private void testScaleOutWindowJoin() throws InterruptedException {
+
+		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
+		int testingOpID = findOperatorByName("join1");
+
+		int oldParallelism = streamJobState.getParallelism(testingOpID);
+		System.out.println(oldParallelism);
+
+		List<List<Integer>> keySet = streamJobState.getKeyStateAllocation(testingOpID);
+
+		assert oldParallelism == keySet.size() : "old parallelism does not match the key set";
+
+		List<List<Integer>> newKeySet = keySet.stream()
+			.map(ArrayList::new)
+			.collect(Collectors.toList());
+
+		List<Integer> oddKeys = newKeySet.get(0).stream().filter(i -> i % 2 == 0).collect(Collectors.toList());
+		newKeySet.get(0).removeAll(oddKeys);
+		newKeySet.add(oddKeys);
+
+		System.out.println(newKeySet);
+
+		getInstructionSet().rescale(testingOpID, oldParallelism+1, newKeySet, this);
+
+		synchronized (object) {
+			object.wait();
+		}
+	}
+
 	private class TestingThread extends Thread {
 
 		@Override
@@ -231,6 +260,9 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 
 				System.out.println("\nstart update function related test...");
 				testCustomizeWindowUpdateAPI();
+
+				System.out.println("\nstart rescale window join test...");
+				testScaleOutWindowJoin();
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}

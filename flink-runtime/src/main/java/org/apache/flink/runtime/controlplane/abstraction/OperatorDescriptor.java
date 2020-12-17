@@ -138,7 +138,7 @@ public class OperatorDescriptor {
 	 */
 	@PublicEvolving
 	public void setKeySet(List<List<Integer>> keyStateAllocation) {
-		if (parents.size() != 1 || !stateful) {
+		if (!stateful) {
 			System.out.println("not support now");
 			return;
 		}
