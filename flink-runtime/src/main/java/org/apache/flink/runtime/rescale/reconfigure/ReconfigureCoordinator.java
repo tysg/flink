@@ -92,7 +92,8 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 	public CompletableFuture<Void> resumeTasks() {
 		checkNotNull(currentSyncOp, "have you call sync op before?");
 //		return currentSyncOp.resumeAll().thenAccept(o -> currentSyncOp = null);
-		return CompletableFuture.runAsync(() -> currentSyncOp = null);
+		currentSyncOp = null;
+		return CompletableFuture.completedFuture(null);
 	}
 
 	@Override
@@ -245,6 +246,7 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 		Map<Integer, Map<Integer, AbstractCoordinator.Diff>> diff) {
 
 		System.out.println("update state...");
+		checkNotNull(currentSyncOp, "have you call sync before");
 		JobVertexID jobVertexID = rawVertexIDToJobVertexID(operatorID);
 
 		ExecutionJobVertex executionJobVertex = executionGraph.getJobVertex(jobVertexID);
@@ -253,15 +255,24 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 //		RemappingAssignment remappingAssignment = new RemappingAssignment(
 //			heldExecutionPlan.getKeyStateAllocation(operatorID)
 //		);
-		RemappingAssignment remappingAssignment = (RemappingAssignment) diff.get(operatorID).remove(AbstractCoordinator.KEY_STATE_ALLOCATION);
-		if(remappingAssignment == null){
-			Map<Integer, Diff> diffMap = diff.get(operatorID);
-			if (diffMap.isEmpty()) {
-				checkNotNull(currentSyncOp, "have you call sync before");
+		Map<Integer, Diff> diffMap = diff.get(operatorID);
+		RemappingAssignment remappingAssignment = (RemappingAssignment) diffMap.remove(AbstractCoordinator.KEY_STATE_ALLOCATION);
+
+		if (diffMap.isEmpty()) {
+			if (remappingAssignment == null) {
 				currentSyncOp.resumeTasks(Collections.singletonList(Tuple2.of(operatorID, -1)));
+				return CompletableFuture.completedFuture(diff);
+			} else {
+				List<Tuple2<Integer, Integer>> notModifiedList =
+					Arrays.stream(executionJobVertex.getTaskVertices())
+						.map(ExecutionVertex::getParallelSubtaskIndex)
+						.filter(i -> !remappingAssignment.isTaskModified(i))
+						.map(i -> Tuple2.of(operatorID, i))
+						.collect(Collectors.toList());
+				currentSyncOp.resumeTasks(notModifiedList);
 			}
-			return CompletableFuture.completedFuture(diff);
 		}
+
 		checkNotNull(currentSyncOp, "no state collected currently, have you synchronized first?");
 		CompletableFuture<Void> assignStateFuture = currentSyncOp.finishedFuture.thenAccept(
 			state -> {
@@ -277,7 +288,6 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 		);
 		return assignStateFuture.thenCompose(o -> {
 				final List<CompletableFuture<?>> rescaleCandidatesFutures = new ArrayList<>();
-				Map<Integer, Diff> diffMap = diff.get(operatorID);
 				for (int i = 0; i < executionJobVertex.getParallelism(); i++) {
 					Execution execution = executionJobVertex.getTaskVertices()[i].getCurrentExecutionAttempt();
 					if (!remappingAssignment.isTaskModified(i)) {

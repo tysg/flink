@@ -85,7 +85,7 @@ public class StreamJobGraphUpdater implements JobGraphRescaler, JobGraphUpdater 
 			}
 			return this.updateOperator(operatorID, SimpleOperatorFactory.of(operator));
 		}
-		throw new Exception("only support substitue control function now");
+		throw new Exception("only support operator with simple factory");
 	}
 
 	public <OUT> JobVertexID updateOperator(OperatorID operatorID, StreamOperatorFactory<OUT> operatorFactory) throws Exception {

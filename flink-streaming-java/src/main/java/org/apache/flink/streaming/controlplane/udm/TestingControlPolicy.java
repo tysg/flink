@@ -157,12 +157,16 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 			PurgingTrigger<?, ?> trigger = (PurgingTrigger<?, ?>) attributeMap.get("trigger");
 			long oldWindowSize = ((CountTrigger<?>) trigger.getNestedTrigger()).getMaxCount();
 			System.out.println("update window size from " + oldWindowSize + " to " + (oldWindowSize / 2));
-			updateCountingWindowSize(windowOpID, oldWindowSize / 2);
+			try {
+				updateCountingWindowSize(windowOpID, oldWindowSize / 2);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
 		}
 	}
 
 	// self customize high level reconfiguration api
-	private void updateCountingWindowSize(int rawVertexID, long newWindowSize) throws InterruptedException {
+	private void updateCountingWindowSize(int rawVertexID, long newWindowSize) throws Exception {
 		// update abstraction in stream manager execution plan
 		CountTrigger<?> trigger = CountTrigger.of(newWindowSize);
 		OperatorDescriptor descriptor = getInstructionSet().getJobExecutionPlan().getOperatorDescriptorByID(rawVertexID);

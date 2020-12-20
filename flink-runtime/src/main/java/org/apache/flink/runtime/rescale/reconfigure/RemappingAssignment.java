@@ -50,7 +50,8 @@ public class RemappingAssignment implements AbstractCoordinator.Diff {
 	}
 
 	public boolean isTaskModified(int taskIndex){
-		if(taskIndex >= oldKeymapping.size()){
+		int minLen = Math.min(oldKeymapping.size(), keymapping.size());
+		if(taskIndex >= minLen){
 			return true;
 		}
 		return AbstractCoordinator.compareIntList(oldKeymapping.get(taskIndex), keymapping.get(taskIndex));

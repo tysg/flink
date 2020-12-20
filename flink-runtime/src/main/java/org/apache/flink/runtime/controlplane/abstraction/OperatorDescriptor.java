@@ -75,8 +75,8 @@ public class OperatorDescriptor {
 		payload.applicationLogic.udf = udf;
 	}
 
-	public final void setControlAttribute(String name, Object obj) {
-		payload.applicationLogic.attributeMap.put(name, obj);
+	public final void setControlAttribute(String name, Object obj) throws Exception {
+		payload.applicationLogic.updateField(name, obj);
 	}
 
 	public Map<String, Object> getControlAttributeMap() {
@@ -255,8 +255,8 @@ public class OperatorDescriptor {
 			boolean accessible = field.isAccessible();
 			// temporary set true
 			field.setAccessible(true);
-			this.setControlAttribute(attribute.name(), field.get(object));
 			payload.applicationLogic.fields.put(attribute.name(), field);
+			payload.applicationLogic.attributeMap.put(attribute.name(), field.get(object));
 			field.setAccessible(accessible);
 		}
 	}
@@ -298,6 +298,21 @@ public class OperatorDescriptor {
 
 		public Map<String, Field> getControlAttributeFieldMap() {
 			return Collections.unmodifiableMap(fields);
+		}
+
+		private void updateField(String name, Object obj) throws Exception {
+			Field field = fields.get(name);
+			boolean access = field.isAccessible();
+			try {
+				field.setAccessible(true);
+				field.set(operator, obj);
+				attributeMap.put(name, obj);
+			} catch (IllegalAccessException e) {
+				e.printStackTrace();
+				throw new Exception("update field fail", e);
+			}finally {
+				field.setAccessible(access);
+			}
 		}
 	}
 
