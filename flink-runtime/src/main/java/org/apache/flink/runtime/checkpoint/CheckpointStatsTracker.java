@@ -294,7 +294,9 @@ public class CheckpointStatsTracker {
 	private ConcurrentHashMap<JobVertexID, TaskStateStats> createEmptyTaskStateStatsMap() {
 		ConcurrentHashMap<JobVertexID, TaskStateStats> taskStatsMap = new ConcurrentHashMap<>(jobVertices.size());
 		for (ExecutionJobVertex vertex : jobVertices) {
-			TaskStateStats taskStats = new TaskStateStats(vertex.getJobVertexId(), vertex.getParallelism());
+			int parallelism = vertex.getOldParallelism() > vertex.getParallelism() ?
+				vertex.getOldParallelism() : vertex.getParallelism();
+			TaskStateStats taskStats = new TaskStateStats(vertex.getJobVertexId(), parallelism);
 			taskStatsMap.put(vertex.getJobVertexId(), taskStats);
 		}
 		return taskStatsMap;
