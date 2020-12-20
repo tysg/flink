@@ -22,7 +22,7 @@ import java.util.function.IntFunction;
 import java.util.stream.Collectors;
 
 
-public abstract class AbstractCoordinator implements PrimitiveOperation {
+public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Integer, Map<Integer, AbstractCoordinator.Diff>>> {
 
 	protected JobGraph jobGraph;
 	protected ExecutionGraph executionGraph;
@@ -77,7 +77,8 @@ public abstract class AbstractCoordinator implements PrimitiveOperation {
 	}
 
 	@Override
-	public final CompletableFuture<Void> prepareExecutionPlan(StreamJobExecutionPlan jobExecutionPlan) {
+	public final CompletableFuture<Map<Integer, Map<Integer, Diff>>> prepareExecutionPlan(StreamJobExecutionPlan jobExecutionPlan) {
+		Map<Integer, Map<Integer, Diff>> differenceMap = new HashMap<>();
 		for (Iterator<OperatorDescriptor> it = jobExecutionPlan.getAllOperatorDescriptor(); it.hasNext(); ) {
 			OperatorDescriptor descriptor = it.next();
 			int operatorID = descriptor.getOperatorID();
@@ -85,6 +86,8 @@ public abstract class AbstractCoordinator implements PrimitiveOperation {
 			int oldParallelism = heldDescriptor.getParallelism();
 			// loop until all change in this operator has been detected and sync
 			List<Integer> changes = analyzeOperatorDifference(heldDescriptor, descriptor);
+			Map<Integer, Diff> difference = new HashMap<>();
+			differenceMap.put(operatorID, difference);
 			for (int changedPosition : changes) {
 				try {
 					switch (changedPosition) {
@@ -95,6 +98,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation {
 								OperatorDescriptorVisitor.attachOperator(descriptor).getApplicationLogic();
 							modifiedAppLogic.copyTo(heldAppLogic);
 							updater.updateOperator(operatorID, heldAppLogic);
+							difference.put(UDF, ExecutionLogic.UDF);
 							break;
 						case PARALLELISM:
 							heldDescriptor.setParallelism(descriptor.getParallelism());
@@ -102,13 +106,19 @@ public abstract class AbstractCoordinator implements PrimitiveOperation {
 							JobVertexID jobVertexID = rawVertexIDToJobVertexID(heldDescriptor.getOperatorID());
 							JobVertex vertex = jobGraph.findVertexByID(jobVertexID);
 							vertex.setParallelism(heldDescriptor.getParallelism());
+//							difference.add(PARALLELISM);
 							break;
 						case KEY_STATE_ALLOCATION:
+							difference.put(
+								KEY_STATE_ALLOCATION,
+								new RemappingAssignment(descriptor.getKeyStateAllocation(), heldDescriptor.getKeyStateAllocation())
+							);
 							heldDescriptor.setKeySet(descriptor.getKeyStateAllocation());
 							updateKeyset(heldDescriptor);
 							break;
 						case KEY_MAPPING:
 							// update key set will indirectly update key mapping, so we ignore this type of detected change here
+							difference.put(KEY_MAPPING, ExecutionLogic.KEY_MAPPING);
 							break;
 						case NO_CHANGE:
 					}
@@ -132,7 +142,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation {
 //				return FutureUtils.completedExceptionally(new Exception("change no work:" + changedPosition));
 //			}
 //		}
-		return CompletableFuture.completedFuture(null);
+		return CompletableFuture.completedFuture(differenceMap);
 	}
 
 	private void rescaleExecutionGraph(int rawVertexID, int oldParallelism) {
@@ -218,7 +228,13 @@ public abstract class AbstractCoordinator implements PrimitiveOperation {
 		return false;
 	}
 
-	private boolean compareIntList(List<Integer> list1, List<Integer> list2) {
+	/**
+	 *
+	 * @param list1
+	 * @param list2
+	 * @return true if they are not equals
+	 */
+	static boolean compareIntList(List<Integer> list1, List<Integer> list2) {
 		if (list1.size() != list2.size()) {
 			return true;
 		}
@@ -234,10 +250,18 @@ public abstract class AbstractCoordinator implements PrimitiveOperation {
 	}
 
 	// the value means priority, the higher, the later should be resolve
-	private static final int UDF = 0;
-	private static final int PARALLELISM = 1;
-	private static final int KEY_STATE_ALLOCATION = 2;
-	private static final int KEY_MAPPING = 3;
-	private static final int NO_CHANGE = 4;
+	public static final int UDF = 0;
+	public static final int PARALLELISM = 1;
+	public static final int KEY_STATE_ALLOCATION = 2;
+	public static final int KEY_MAPPING = 3;
+	public static final int NO_CHANGE = 4;
+
+
+	public interface Diff {
+	}
+
+	enum ExecutionLogic implements Diff {
+		UDF, KEY_MAPPING
+	}
 
 }

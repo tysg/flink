@@ -502,10 +502,10 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 	}
 
 	@Override
-	public void callOperations(Function<PrimitiveOperation, CompletableFuture<?>> operationCaller){
+	public <M>void callOperations(Function<PrimitiveOperation<M>, CompletableFuture<?>> operationCaller){
 		validateRunsInMainThread();
 		JobRescaleCoordinator rescaleCoordinator = schedulerNG.getJobRescaleCoordinator();
-		operationCaller.apply(rescaleCoordinator.getOperatorUpdateCoordinator());
+		operationCaller.apply((PrimitiveOperation<M>) rescaleCoordinator.getOperatorUpdateCoordinator());
 	}
 
 

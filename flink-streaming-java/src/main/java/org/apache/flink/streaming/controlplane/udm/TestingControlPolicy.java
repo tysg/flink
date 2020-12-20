@@ -126,14 +126,14 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 	private void testPauseSource(int sourceID) throws InterruptedException {
 		getInstructionSet().callCustomizeOperations(
 			enforcement -> FutureUtils.completedVoidFuture()
-				.thenCompose(o -> enforcement.synchronizePauseTasks(Collections.singletonList(Tuple2.of(sourceID, -1))))
+				.thenCompose(o -> enforcement.synchronizePauseTasks(Collections.singletonList(Tuple2.of(sourceID, -1)), null))
 				.thenCompose(o -> {
 					try {
 						Thread.sleep(3);
 					} catch (InterruptedException e) {
 						e.printStackTrace();
 					}
-					return enforcement.resumeTasks(Collections.singletonList(Tuple2.of(sourceID, -1)));
+					return enforcement.resumeTasks();
 				})
 				.thenAccept(o -> {
 					synchronized (object) {
@@ -170,9 +170,9 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 		getInstructionSet().callCustomizeOperations(
 			enforcement -> FutureUtils.completedVoidFuture()
 				.thenCompose(o -> enforcement.prepareExecutionPlan(getInstructionSet().getJobExecutionPlan()))
-				.thenCompose(o -> enforcement.synchronizePauseTasks(Collections.singletonList(Tuple2.of(rawVertexID, -1))))
-				.thenCompose(o -> enforcement.updateFunction(rawVertexID, -1))
-				.thenCompose(o -> enforcement.resumeTasks(Collections.singletonList(Tuple2.of(rawVertexID, -1))))
+				.thenCompose(o -> enforcement.synchronizePauseTasks(Collections.singletonList(Tuple2.of(rawVertexID, -1)), o))
+				.thenCompose(o -> enforcement.updateFunction(rawVertexID, o))
+				.thenCompose(o -> enforcement.resumeTasks())
 				.thenAccept(o -> {
 					synchronized (object) {
 						object.notify();

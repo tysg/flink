@@ -21,9 +21,11 @@ package org.apache.flink.streaming.controlplane.streammanager.insts;
 import org.apache.flink.runtime.controlplane.PrimitiveOperation;
 import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
 import org.apache.flink.runtime.rescale.JobRescaleAction;
+import org.apache.flink.runtime.rescale.reconfigure.AbstractCoordinator;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
@@ -40,6 +42,7 @@ public interface ReconfigurationAPI {
 	 */
 	StreamJobExecutionPlan getJobExecutionPlan();
 
+	@Deprecated
 	void rescaleStreamJob(JobRescaleAction.RescaleParamsWrapper wrapper);
 
 	void rescale(int operatorID, int newParallelism, List<List<Integer>> keyStateAllocation, ControlPolicy waitingController);
@@ -55,9 +58,10 @@ public interface ReconfigurationAPI {
 	 * @param operatorID the id of changed operator
 	 * @param function the new operator UDF, noted this only suitable for UDFOperator
 	 */
-	void reconfigureUserFunction(int operatorID, org.apache.flink.api.common.functions.Function function, ControlPolicy waitingController);
+	void reconfigureUserFunction(int operatorID, Object function, ControlPolicy waitingController);
 
-	default void callCustomizeOperations(Function<PrimitiveOperation, CompletableFuture<?>> enforcementCall){
+	default void callCustomizeOperations(
+		Function<PrimitiveOperation<Map<Integer, Map<Integer, AbstractCoordinator.Diff>>>, CompletableFuture<?>> operationCaller){
 
 	}
 }
