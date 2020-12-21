@@ -40,6 +40,7 @@ import org.apache.flink.runtime.jobmaster.JobMasterRegistrationSuccess;
 import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.registration.RegistrationResponse;
 import org.apache.flink.runtime.rescale.JobRescaleAction;
+import org.apache.flink.runtime.rescale.reconfigure.AbstractCoordinator;
 import org.apache.flink.runtime.resourcemanager.JobLeaderIdActions;
 import org.apache.flink.runtime.resourcemanager.JobLeaderIdService;
 import org.apache.flink.runtime.resourcemanager.registration.JobManagerRegistration;
@@ -65,6 +66,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor.ApplicationLogic.UDF;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.apache.flink.util.Preconditions.checkState;
 
@@ -344,11 +346,11 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			runAsync(() -> jobMasterGateway.callOperations(
 				enforcement -> FutureUtils.completedVoidFuture()
 					.thenCompose(o -> enforcement.prepareExecutionPlan(jobExecutionPlan))
-					.thenCompose(o -> enforcement.synchronizePauseTasks(affectedTasks))
-					.thenCompose(o -> enforcement.updateUpstreamKeyMapping(operatorID))
-					.thenCompose(o -> enforcement.updateState(operatorID, -1))
+					.thenCompose(o -> enforcement.synchronizePauseTasks(affectedTasks, o))
+					.thenCompose(o -> enforcement.updateUpstreamKeyMapping(operatorID, o))
+					.thenCompose(o -> enforcement.updateState(operatorID, o))
 					.thenCompose(o -> enforcement.deployTasks(operatorID, oldParallelism))
-					.thenCompose(o -> enforcement.resumeTasks(affectedTasks))
+					.thenCompose(o -> enforcement.resumeTasks())
 					.thenAccept(
 						(acknowledge) -> {
 							try {
@@ -388,10 +390,10 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 				runAsync(() -> jobMasterGateway.callOperations(
 					enforcement -> FutureUtils.completedVoidFuture()
 						.thenCompose(o -> enforcement.prepareExecutionPlan(jobExecutionPlan))
-						.thenCompose(o -> enforcement.synchronizePauseTasks(affectedTasks))
-						.thenCompose(o -> enforcement.updateUpstreamKeyMapping(operatorID))
-						.thenCompose(o -> enforcement.updateState(operatorID, -1))
-						.thenCompose(o -> enforcement.resumeTasks(affectedTasks))
+						.thenCompose(o -> enforcement.synchronizePauseTasks(affectedTasks, o))
+						.thenCompose(o -> enforcement.updateUpstreamKeyMapping(operatorID, o))
+						.thenCompose(o -> enforcement.updateState(operatorID, o))
+						.thenCompose(o -> enforcement.resumeTasks())
 						.thenAccept(
 							(acknowledge) -> {
 								try {
@@ -406,7 +408,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 				runAsync(() -> jobMasterGateway.callOperations(
 					enforcement -> FutureUtils.completedVoidFuture()
 						.thenCompose(o -> enforcement.prepareExecutionPlan(jobExecutionPlan))
-						.thenCompose(o -> enforcement.updateUpstreamKeyMapping(operatorID))
+						.thenCompose(o -> enforcement.updateUpstreamKeyMapping(operatorID, o))
 						.thenAccept(
 							(acknowledge) -> {
 								try {
@@ -424,12 +426,12 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	}
 
 	@Override
-	public void reconfigureUserFunction(int operatorID, org.apache.flink.api.common.functions.Function function, ControlPolicy waitingController) {
+	public void reconfigureUserFunction(int operatorID, Object function, ControlPolicy waitingController) {
 		try {
 			// very similar to acquire a positive spin write lock
 			this.jobExecutionPlan.setStateUpdatingFlag(waitingController);
 			OperatorDescriptor target = jobExecutionPlan.getOperatorDescriptorByID(operatorID);
-			target.setUdf(function);
+			target.setControlAttribute(UDF, function);
 
 			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
 			runAsync(() -> jobMasterGateway.callOperations(
@@ -437,11 +439,11 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					.thenCompose(
 						o -> enforcement.prepareExecutionPlan(jobExecutionPlan))
 					.thenCompose(
-						o -> enforcement.synchronizePauseTasks(Collections.singletonList(Tuple2.of(operatorID, -1))))
+						o -> enforcement.synchronizePauseTasks(Collections.singletonList(Tuple2.of(operatorID, -1)), o))
 					.thenCompose(
-						o -> enforcement.updateFunction(operatorID, -1))
+						o -> enforcement.updateFunction(operatorID, o))
 					.thenCompose(
-						o -> enforcement.resumeTasks(Collections.singletonList(Tuple2.of(operatorID, -1))))
+						o -> enforcement.resumeTasks())
 					.thenAccept(
 						(acknowledge) -> {
 							try {
@@ -457,10 +459,9 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		}
 	}
 
-	public void callCustomizeOperations(Function<PrimitiveOperation, CompletableFuture<?>> operationCaller) {
+	public void callCustomizeOperations(Function<PrimitiveOperation<Map<Integer, Map<Integer, AbstractCoordinator.Diff>>>, CompletableFuture<?>> operationCaller) {
 		try {
 			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
-//			runAsync(() -> jobMasterGateway.triggerOperatorUpdate(this.jobGraph, jobVertexId, operatorID));
 			runAsync(() -> jobMasterGateway.callOperations(operationCaller));
 		} catch (Exception e) {
 			e.printStackTrace();

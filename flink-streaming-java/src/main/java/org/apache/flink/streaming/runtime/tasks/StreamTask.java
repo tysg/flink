@@ -655,10 +655,6 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 			return localSnapshotOperation.executeLocalSnapshot()
 				.thenApply(stateSnapshot -> {
 						try {
-							System.out.println("Start busy: " + getName());
-							long start = System.currentTimeMillis();
-							while (System.currentTimeMillis() - start < 3000) ;
-							System.out.println("Stop busy: " + getName());
 							recreateOperatorChain(stateSnapshot);
 							System.out.println(getName() + " Update Should finished at:" + System.currentTimeMillis());
 						} catch (Exception e) {

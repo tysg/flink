@@ -40,6 +40,7 @@ import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.messages.webmonitor.JobDetails;
 import org.apache.flink.runtime.registration.RegistrationResponse;
 import org.apache.flink.runtime.rescale.JobRescaleAction;
+import org.apache.flink.runtime.rescale.reconfigure.AbstractCoordinator;
 import org.apache.flink.runtime.resourcemanager.ResourceManagerId;
 import org.apache.flink.runtime.rest.handler.legacy.backpressure.OperatorBackPressureStatsResponse;
 import org.apache.flink.runtime.rpc.FencedRpcGateway;
@@ -53,6 +54,7 @@ import javax.annotation.Nullable;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
@@ -289,7 +291,7 @@ public interface JobMasterGateway extends
 	 */
 	void triggerOperatorUpdate(JobGraph jobGraph, JobVertexID targetVertexID, OperatorID operatorID);
 
-	default void callOperations(Function<PrimitiveOperation, CompletableFuture<?>> operationCaller){
+	default <M>void callOperations(Function<PrimitiveOperation<M>, CompletableFuture<?>> operationCaller){
 
 	}
 }
