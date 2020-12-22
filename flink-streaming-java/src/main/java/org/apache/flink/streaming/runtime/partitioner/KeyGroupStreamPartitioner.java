@@ -26,7 +26,9 @@ import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.util.Preconditions;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Partitioner selects the target channel based on the key group index.
@@ -66,20 +68,20 @@ public class KeyGroupStreamPartitioner<T, K> extends StreamPartitioner<T> implem
 		return KeyGroupRangeAssignment.assignKeyToParallelOperator(key, maxParallelism, numberOfChannels);
 	}
 
-	public List<List<Integer>> getKeyMappingInfo(int parallelism){
-		List<List<Integer>> keyInfo = new ArrayList<>(parallelism);
-		for(int channelIndex=0;channelIndex < parallelism;channelIndex++) {
-			KeyGroupRange range = KeyGroupRangeAssignment.computeKeyGroupRangeForOperatorIndex(maxParallelism, parallelism, channelIndex);
-			int keyGroupId = range.getStartKeyGroup();
-			int end = range.getEndKeyGroup();
-			List<Integer> thisChannelKeyInfo = new ArrayList<>(range.getNumberOfKeyGroups());
+	public Map<Integer, List<Integer>> getKeyMappingInfo(int parallelism){
+		Map<Integer, List<Integer>> keyGroupAllocation = new HashMap<>();
+		for(int channelIndex=0; channelIndex < parallelism; channelIndex++) {
+			KeyGroupRange keyGroupRange = KeyGroupRangeAssignment.computeKeyGroupRangeForOperatorIndex(maxParallelism, parallelism, channelIndex);
+			int keyGroupId = keyGroupRange.getStartKeyGroup();
+			int end = keyGroupRange.getEndKeyGroup();
+			List<Integer> thisChannelKeyInfo = new ArrayList<>(keyGroupRange.getNumberOfKeyGroups());
 			while (keyGroupId <= end){
 				thisChannelKeyInfo.add(keyGroupId);
 				keyGroupId ++;
 			}
-			keyInfo.add(thisChannelKeyInfo);
+			keyGroupAllocation.put(channelIndex, thisChannelKeyInfo);
 		}
-		return keyInfo;
+		return keyGroupAllocation;
 	}
 
 	@Override

@@ -78,12 +78,12 @@ public class StreamJobExecutionPlanWithUpdatingFlagImpl implements StreamJobExec
 	}
 
 	@Override
-	public List<List<Integer>> getKeyStateAllocation(Integer operatorID){
+	public Map<Integer, List<Integer>> getKeyStateAllocation(Integer operatorID){
 		return streamJobExecutionPlanDelegate.getKeyStateAllocation(operatorID);
 	}
 
 	@Override
-	public Map<Integer, List<List<Integer>>> getKeyMapping(Integer operatorID) {
+	public Map<Integer, Map<Integer, List<Integer>>> getKeyMapping(Integer operatorID) {
 		return streamJobExecutionPlanDelegate.getKeyMapping(operatorID);
 	}
 

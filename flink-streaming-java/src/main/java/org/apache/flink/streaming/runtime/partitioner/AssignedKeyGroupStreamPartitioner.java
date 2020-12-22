@@ -46,15 +46,15 @@ public class AssignedKeyGroupStreamPartitioner<T, K> extends StreamPartitioner<T
 		return selectedChannel;
 	}
 
-	public List<List<Integer>> getKeyMappingInfo(int parallelism){
-		List<List<Integer>> keyInfo = new ArrayList<>(parallelism);
-		for(int channelIndex=0;channelIndex < parallelism;channelIndex++) {
-			keyInfo.add(new ArrayList<>());
+	public Map<Integer, List<Integer>> getKeyMappingInfo(int parallelism){
+		Map<Integer, List<Integer>> keyStateAllocation = new HashMap<>();
+		for(int channelIndex=0; channelIndex < parallelism; channelIndex++) {
+			keyStateAllocation.put(channelIndex, new ArrayList<>());
 		}
 		for(Integer key: assignKeyToOperator.keySet()){
-			keyInfo.get(assignKeyToOperator.get(key)).add(key);
+			keyStateAllocation.get(assignKeyToOperator.get(key)).add(key);
 		}
-		return keyInfo;
+		return keyStateAllocation;
 	}
 
 	@Override

@@ -32,6 +32,8 @@ import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobmaster.LogicalSlot;
+import org.apache.flink.runtime.state.KeyGroupRange;
+import org.apache.flink.runtime.state.KeyGroupRangeAssignment;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.graph.StreamEdge;
 import org.apache.flink.streaming.api.operators.SimpleUdfStreamOperatorFactory;
@@ -112,7 +114,7 @@ public final class StreamJobExecutionPlanImpl implements StreamJobExecutionPlan 
 		for (OperatorDescriptor descriptor : allOperatorsById.values()) {
 			StreamConfig streamConfig = streamConfigMap.get(descriptor.getOperatorID());
 			// add workload dimension info
-			List<List<Integer>> keyStateAllocation = getKeyStateAllocation(streamConfig, userCodeLoader, descriptor.getParallelism());
+			Map<Integer, List<Integer>> keyStateAllocation = getKeyStateAllocation(streamConfig, userCodeLoader, descriptor.getParallelism());
 			OperatorDescriptorVisitor.attachOperator(descriptor).setKeyStateAllocation(keyStateAllocation);
 			// add execution logic info
 			try {
@@ -135,12 +137,12 @@ public final class StreamJobExecutionPlanImpl implements StreamJobExecutionPlan 
 	}
 
 	@Override
-	public List<List<Integer>> getKeyStateAllocation(Integer operatorID) {
+	public Map<Integer, List<Integer>> getKeyStateAllocation(Integer operatorID) {
 		return allOperatorsById.get(operatorID).getKeyStateAllocation();
 	}
 
 	@Override
-	public Map<Integer, List<List<Integer>>> getKeyMapping(Integer operatorID) {
+	public Map<Integer, Map<Integer, List<Integer>>> getKeyMapping(Integer operatorID) {
 		return allOperatorsById.get(operatorID).getKeyMapping();
 	}
 
@@ -227,30 +229,36 @@ public final class StreamJobExecutionPlanImpl implements StreamJobExecutionPlan 
 		}
 	}
 
-	private static List<List<Integer>> getKeyStateAllocation(StreamConfig config, ClassLoader userCodeLoader, int parallelism) {
-		Map<Integer, List<List<Integer>>> res = new HashMap<>();
+	private static Map<Integer, List<Integer>> getKeyStateAllocation(StreamConfig config, ClassLoader userCodeLoader, int parallelism) {
+		Map<Integer, Map<Integer, List<Integer>>> res = new HashMap<>();
 		// very strange that some operator's out physical edge may not be completed
 		List<StreamEdge> inPhysicalEdges = config.getInPhysicalEdges(userCodeLoader);
 		for (StreamEdge edge : inPhysicalEdges) {
 			res.put(edge.getSourceId(), getKeyMessage(edge, parallelism));
 		}
 		if (res.isEmpty()) {
-			return Collections.emptyList();
+//			throw new UnsupportedOperationException(
+//				"Non-keyed stream is not supported, please use keyBy before operating on streams.");
+			return new HashMap<>();
 		} else {
 			// todo, check all key set is same
 			return res.values().iterator().next();
 		}
 	}
 
-	private static List<List<Integer>> getKeyMessage(StreamEdge streamEdge, int parallelism) {
+	private static Map<Integer, List<Integer>> getKeyMessage(StreamEdge streamEdge, int parallelism) {
 		StreamPartitioner<?> partitioner = streamEdge.getPartitioner();
+		Map<String, List<String>> keyStateAllocation = new HashMap<>();
 		if (partitioner instanceof AssignedKeyGroupStreamPartitioner) {
 			return ((AssignedKeyGroupStreamPartitioner<?, ?>) partitioner).getKeyMappingInfo(parallelism);
 		} else if (partitioner instanceof KeyGroupStreamPartitioner) {
 			return ((KeyGroupStreamPartitioner<?, ?>) partitioner).getKeyMappingInfo(parallelism);
 		}
 		// the consumer operator may be not a key stream operator
-		return Collections.emptyList();
+		// We do not need to consider non-keyed stream, because it is hard to operate and manage and also out of our scope.
+//		throw new UnsupportedOperationException(
+//			"Non-keyed stream is not supported, please use keyBy before operating on streams.");
+		return new HashMap<>();
 	}
 
 	private static void checkRelationship(Collection<OperatorDescriptor> allOp) {
