@@ -99,8 +99,6 @@ public class TaskOperatorManager {
 		public void resume() throws Exception {
 			if (state.compareAndSet(TaskStatus.PAUSE, TaskStatus.READY)) {
 				resumeFuture.complete(Acknowledge.get());
-			}else {
-				throw new Exception("have not been paused");
 			}
 		}
 

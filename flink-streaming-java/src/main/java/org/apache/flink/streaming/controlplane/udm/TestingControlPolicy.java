@@ -101,6 +101,40 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 		}
 	}
 
+	private void testScaleOut2(int testingOpID) throws InterruptedException {
+		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
+
+		int oldParallelism = streamJobState.getParallelism(testingOpID);
+		System.out.println(oldParallelism);
+
+		List<List<Integer>> keySet = streamJobState.getKeyStateAllocation(testingOpID);
+
+		assert oldParallelism == keySet.size() : "old parallelism does not match the key set";
+
+		List<List<Integer>> newKeySet = keySet.stream()
+			.map(ArrayList::new)
+			.collect(Collectors.toList());
+
+		List<Integer> smallHalf1 = newKeySet.get(oldParallelism-1).stream()
+			.filter(i -> i < 31) // hardcoded
+			.collect(Collectors.toList());
+		newKeySet.get(oldParallelism-1).removeAll(smallHalf1);
+		newKeySet.add(smallHalf1);
+		List<Integer> smallHalf2 = newKeySet.get(oldParallelism-1).stream()
+			.filter(i -> i < 63) // hardcoded
+			.collect(Collectors.toList());
+		newKeySet.get(oldParallelism-1).removeAll(smallHalf2);
+		newKeySet.add(smallHalf2);
+
+		System.out.println(newKeySet);
+
+		getInstructionSet().rescale(testingOpID, oldParallelism+2, newKeySet, this);
+
+		synchronized (object) {
+			object.wait();
+		}
+	}
+
 	private void testRebalanceStateless(int testingOpID) throws InterruptedException {
 		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
 		Set<OperatorDescriptor> parents = streamJobState.getOperatorDescriptorByID(testingOpID).getParents();
@@ -253,6 +287,9 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 
 				System.out.println("\nstart stateful scale out test");
 				testScaleOutStateful(statefulOpID);
+
+				System.out.println("\nstart stateful scale out 2 more test");
+				testScaleOut2(statelessOpID);
 
 //				System.out.println("\nstart source near stateful operator rebalance test...");
 //				testRebalanceStateful(nearSourceMap);
