@@ -158,9 +158,9 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 	 * @return
 	 */
 	@Override
-	public CompletableFuture<Map<Integer, Map<Integer, AbstractCoordinator.Diff>>> updateUpstreamKeyMapping(
+	public CompletableFuture<Map<Integer, Map<Integer, Diff>>> updateUpstreamKeyMapping(
 		int destOpID,
-		@Nonnull Map<Integer, Map<Integer, AbstractCoordinator.Diff>> diff) {
+		@Nonnull Map<Integer, Map<Integer, Diff>> diff) {
 
 		System.out.println("update mapping...");
 		final List<CompletableFuture<Void>> rescaleCandidatesFutures = new ArrayList<>();
@@ -173,10 +173,12 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 			// update key group range in target stream
 			JobVertexID destJobVertexID = rawVertexIDToJobVertexID(destOpID);
 			ExecutionJobVertex destJobVertex = executionGraph.getJobVertex(destJobVertexID);
-			Preconditions.checkNotNull(destJobVertex, "can not found this execution job vertex");
-			RemappingAssignment remappingAssignment = new RemappingAssignment(
-				heldExecutionPlan.getKeyStateAllocation(destOpID)
-			);
+			checkNotNull(destJobVertex, "can not found this execution job vertex");
+//			RemappingAssignment remappingAssignment = new RemappingAssignment(
+//				heldExecutionPlan.getKeyStateAllocation(destOpID)
+//			);
+
+			OperatorWorkloadsAssignment remappingAssignment = workloadsAssignmentHandler.getHeldOperatorWorkloadsAssignment(destOpID);
 			for (int i = 0; i < destJobVertex.getParallelism(); i++) {
 				ExecutionVertex vertex = destJobVertex.getTaskVertices()[i];
 				Execution execution = vertex.getCurrentExecutionAttempt();
@@ -256,7 +258,7 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 //			heldExecutionPlan.getKeyStateAllocation(operatorID)
 //		);
 		Map<Integer, Diff> diffMap = diff.get(operatorID);
-		RemappingAssignment remappingAssignment = (RemappingAssignment) diffMap.remove(AbstractCoordinator.KEY_STATE_ALLOCATION);
+		OperatorWorkloadsAssignment remappingAssignment = (OperatorWorkloadsAssignment) diffMap.remove(AbstractCoordinator.KEY_STATE_ALLOCATION);
 
 		if (diffMap.isEmpty()) {
 			if (remappingAssignment == null) {

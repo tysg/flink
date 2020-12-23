@@ -11,7 +11,7 @@ import java.util.stream.Collectors;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.apache.flink.util.Preconditions.checkState;
 
-public class OperatorWorkloadsAssignment {
+public class OperatorWorkloadsAssignment implements AbstractCoordinator.Diff {
 
 	public static final int UNUSED_SUBTASK = Integer.MAX_VALUE/2;
 
@@ -36,18 +36,18 @@ public class OperatorWorkloadsAssignment {
 	private final Map<Integer, Boolean> removedSubtaskMap;
 
 	public OperatorWorkloadsAssignment(
-		Map<String, List<String>> strExecutorMapping,
-		Map<String, List<String>> strOldExecutorMapping,
+		Map<Integer, List<Integer>> executorMapping,
+		Map<Integer, List<Integer>> oldExecutorMapping,
 		OperatorWorkloadsAssignment oldRescalePA,
 		int numOpenedSubtask) {
 
 		this.numOpenedSubtask = numOpenedSubtask;
 		this.oldRescalePA = checkNotNull(oldRescalePA);
 
-		checkState(checkPartitionAssignmentValidity(strExecutorMapping),
+		checkState(checkPartitionAssignmentValidity(executorMapping),
 			"executorMapping has null or empty partition");
 
-		checkState(checkPartitionAssignmentValidity(strOldExecutorMapping),
+		checkState(checkPartitionAssignmentValidity(executorMapping),
 			"oldExecutorMapping has null or empty partition");
 
 		this.partitionAssignment = new HashMap<>();
@@ -58,8 +58,8 @@ public class OperatorWorkloadsAssignment {
 		this.removedSubtaskMap = new HashMap<>();
 
 		// here we copy and translate passed-in mapping
-		Map<Integer, List<Integer>> executorMapping = generateIntegerMap(strExecutorMapping);
-		Map<Integer, List<Integer>> oldExecutorMapping = generateIntegerMap(strOldExecutorMapping);
+//		Map<Integer, List<Integer>> executorMapping = generateIntegerMap(executorMapping);
+//		Map<Integer, List<Integer>> oldExecutorMapping = generateIntegerMap(executorMapping);
 
 		int newParallelism = executorMapping.keySet().size();
 		int oldParallelism = oldExecutorMapping.keySet().size();
@@ -78,16 +78,16 @@ public class OperatorWorkloadsAssignment {
 	}
 
 	public OperatorWorkloadsAssignment(
-		Map<String, List<String>> strExecutorMapping,
+		Map<Integer, List<Integer>> executorMapping,
 		int numOpenedSubtask) {
 
 		this.numOpenedSubtask = numOpenedSubtask;
 		this.oldRescalePA = null;
 
-		checkState(checkPartitionAssignmentValidity(strExecutorMapping),
+		checkState(checkPartitionAssignmentValidity(executorMapping),
 			"executorMapping has null or empty partition");
 
-		this.partitionAssignment = generateIntegerMap(strExecutorMapping);
+		this.partitionAssignment = executorMapping;
 		this.subtaskIndexMapping = initSubtaskIndexMap(numOpenedSubtask);
 
 		this.executorIdMapping = new HashMap<>();
@@ -297,7 +297,7 @@ public class OperatorWorkloadsAssignment {
 		return alignedKeyGroupRanges.get(subTaskIndex);
 	}
 
-	public boolean isSubtaskModified(int subtaskIndex) {
+	public boolean isTaskModified(int subtaskIndex) {
 		return modifiedSubtaskMap.getOrDefault(subtaskIndex, false);
 	}
 
@@ -311,9 +311,9 @@ public class OperatorWorkloadsAssignment {
 
 
 	private static boolean checkPartitionAssignmentValidity(
-		Map<String, List<String>> partitionAssignment) {
+		Map<Integer, List<Integer>> partitionAssignment) {
 
-		for (List<String> partitions : partitionAssignment.values()) {
+		for (List<Integer> partitions : partitionAssignment.values()) {
 			if (partitions == null || partitions.size() == 0) {
 				return false;
 			}
