@@ -90,11 +90,11 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 			newKeyStateAllocation.put(taskId, curKeyStateAllocation.get(taskId));
 		}
 
-		List<Integer> smallHalf = newKeyStateAllocation.get(oldParallelism-1).stream()
-			.filter(i -> i < 63) // hardcoded
+		List<Integer> oddKeys = newKeyStateAllocation.get(oldParallelism-1).stream()
+			.filter(i -> i % 2 == 0) // hardcoded
 			.collect(Collectors.toList());
-		newKeyStateAllocation.get(oldParallelism-1).removeAll(smallHalf);
-		newKeyStateAllocation.put(oldParallelism, smallHalf);
+		newKeyStateAllocation.get(oldParallelism-1).removeAll(oddKeys);
+		newKeyStateAllocation.put(oldParallelism, oddKeys);
 
 		System.out.println(newKeyStateAllocation);
 
@@ -268,18 +268,19 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 		@Override
 		public void run() {
 			// the testing jobGraph (workload) is in TestingWorkload.java, see that file to know how to use it.
-			int statefulOpID = findOperatorByName("Splitter Flatmap");
-			int statelessOpID = findOperatorByName("filter");
-			int sourceOp = findOperatorByName("Source: source");
-			// this operator is the downstream of actual source operator
-			int nearSourceMap = findOperatorByName("near source Flatmap");
-			int nearSourceFilter = findOperatorByName("source stateless map");
-			if (statefulOpID == -1 || statelessOpID == -1
-				|| nearSourceMap == -1 || nearSourceFilter == -1
-				|| sourceOp == -1) {
-				System.out.println("can not find operator with given name, corrupt");
-				return;
-			}
+//			int statefulOpID = findOperatorByName("Splitter Flatmap");
+			int statefulOpID = findOperatorByName("Splitter FlatMap");
+//			int statelessOpID = findOperatorByName("filter");
+//			int sourceOp = findOperatorByName("Source: source");
+//			// this operator is the downstream of actual source operator
+//			int nearSourceMap = findOperatorByName("near source Flatmap");
+//			int nearSourceFilter = findOperatorByName("source stateless map");
+//			if (statefulOpID == -1 || statelessOpID == -1
+//				|| nearSourceMap == -1 || nearSourceFilter == -1
+//				|| sourceOp == -1) {
+//				System.out.println("can not find operator with given name, corrupt");
+//				return;
+//			}
 			try {
 				showOperatorInfo();
 				Thread.sleep(10);
@@ -289,32 +290,32 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 
 				System.out.println("\nstart stateful rebalance test1...");
 				testRebalanceStateful(statefulOpID);
+//
+//				System.out.println("\nstart stateful rebalance test2...");
+//				testRebalanceStateful(statefulOpID);
+//
+//				System.out.println("\nstart synchronize source test...");
+//				testPauseSource(sourceOp);
 
-				System.out.println("\nstart stateful rebalance test2...");
-				testRebalanceStateful(statefulOpID);
+//				System.out.println("\nstart stateful scale out test");
+//				testScaleOutStateful(statefulOpID);
 
-				System.out.println("\nstart synchronize source test...");
-				testPauseSource(sourceOp);
-
-				System.out.println("\nstart stateful scale out test");
-				testScaleOutStateful(statefulOpID);
-
-				System.out.println("\nstart stateful scale out 2 more test");
-				testScaleOut2(statelessOpID);
-
-				System.out.println("\nstart source near stateful operator rebalance test...");
-				testRebalanceStateful(nearSourceMap);
-
-				System.out.println("\nstart source near stateless operator rebalance test...");
-				testRebalanceStateless(nearSourceFilter);
-
-				Thread.sleep(10);
-
-				System.out.println("\nstart update function related test...");
-				testCustomizeWindowUpdateAPI();
-
-				System.out.println("\nstart rescale window join test...");
-				testScaleOutWindowJoin();
+//				System.out.println("\nstart stateful scale out 2 more test");
+//				testScaleOut2(statelessOpID);
+//
+//				System.out.println("\nstart source near stateful operator rebalance test...");
+//				testRebalanceStateful(nearSourceMap);
+//
+//				System.out.println("\nstart source near stateless operator rebalance test...");
+//				testRebalanceStateless(nearSourceFilter);
+//
+//				Thread.sleep(10);
+//
+//				System.out.println("\nstart update function related test...");
+//				testCustomizeWindowUpdateAPI();
+//
+//				System.out.println("\nstart rescale window join test...");
+//				testScaleOutWindowJoin();
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}

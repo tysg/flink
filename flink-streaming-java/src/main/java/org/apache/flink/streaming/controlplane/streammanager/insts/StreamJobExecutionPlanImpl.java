@@ -32,8 +32,6 @@ import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobmaster.LogicalSlot;
-import org.apache.flink.runtime.state.KeyGroupRange;
-import org.apache.flink.runtime.state.KeyGroupRangeAssignment;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.graph.StreamEdge;
 import org.apache.flink.streaming.api.operators.SimpleUdfStreamOperatorFactory;
@@ -58,7 +56,7 @@ public final class StreamJobExecutionPlanImpl implements StreamJobExecutionPlan 
 
 	@Internal
 	public StreamJobExecutionPlanImpl(JobGraph jobGraph, ExecutionGraph executionGraph, ClassLoader userLoader) {
-		heads = initialOperatorGraphState(jobGraph, userLoader);
+		heads = initializeOperatorGraphState(jobGraph, userLoader);
 
 		Map<OperatorID, Integer> operatorIdToVertexId = new HashMap<>();
 		for (JobVertex vertex : jobGraph.getVertices()) {
@@ -73,7 +71,7 @@ public final class StreamJobExecutionPlanImpl implements StreamJobExecutionPlan 
 
 	// OperatorGraphState related
 	/* contains topology of this stream job */
-	private OperatorDescriptor[] initialOperatorGraphState(JobGraph jobGraph, ClassLoader userCodeLoader) {
+	private OperatorDescriptor[] initializeOperatorGraphState(JobGraph jobGraph, ClassLoader userCodeLoader) {
 		// add all nodes
 		Map<Integer, StreamConfig> streamConfigMap = new HashMap<>();
 		for (JobVertex vertex : jobGraph.getVertices()) {
