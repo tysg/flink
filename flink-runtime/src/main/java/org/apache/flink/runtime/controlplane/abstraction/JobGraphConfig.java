@@ -27,7 +27,7 @@ public interface JobGraphConfig {
 	 * representing the output channel with its assigned keys.
 	 * @throws Exception
 	 */
-	List<List<Integer>> getKeyStateAllocation(Integer operatorID);
+	Map<Integer, List<Integer>> getKeyStateAllocation(Integer operatorID);
 
 	/**
 	 * Return how the key mapping to down stream operator.
@@ -40,7 +40,7 @@ public interface JobGraphConfig {
 	 * representing the output channel with its assigned keys.
 	 * @throws Exception
 	 */
-	Map<Integer, List<List<Integer>>> getKeyMapping(Integer operatorID);
+	Map<Integer, Map<Integer, List<Integer>>> getKeyMapping(Integer operatorID);
 
 	/**
 	 * Return the parallelism of operator with given operator id

@@ -107,6 +107,8 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 							JobVertex vertex = jobGraph.findVertexByID(jobVertexID);
 							vertex.setParallelism(heldDescriptor.getParallelism());
 //							difference.add(PARALLELISM);
+							// TODO: update execution graph
+							rescaleExecutionGraph(heldDescriptor.getOperatorID(), oldParallelism);
 							break;
 						case KEY_STATE_ALLOCATION:
 							difference.put(
@@ -127,10 +129,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 					return FutureUtils.completedExceptionally(e);
 				}
 			}
-			// update execution graph
-			if (changes.contains(PARALLELISM)) {
-				rescaleExecutionGraph(heldDescriptor.getOperatorID(), oldParallelism);
-			}
+
 		}
 		// TODO: suspend checking StreamJobExecution for scale out
 //		final StreamJobExecutionPlan executionPlan = getHeldExecutionPlanCopy();
@@ -169,7 +168,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 
 	private void updateKeyset(OperatorDescriptor heldDescriptor) {
 		Map<Integer, List<Integer>> partionAssignment = new HashMap<>();
-		List<List<Integer>> one = heldDescriptor.getKeyStateAllocation();
+		Map<Integer, List<Integer>> one = heldDescriptor.getKeyStateAllocation();
 		for (int i = 0; i < one.size(); i++) {
 			partionAssignment.put(i, one.get(i));
 		}
@@ -188,10 +187,10 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 		if (self.getParallelism() != modified.getParallelism()) {
 			results.add(PARALLELISM);
 		}
-		if (compare(self.getKeyStateAllocation(), modified.getKeyStateAllocation())) {
+		if (compareKeyStateAllocation(self.getKeyStateAllocation(), modified.getKeyStateAllocation())) {
 			results.add(KEY_STATE_ALLOCATION);
 		}
-		if (compare(self.getKeyMapping(), modified.getKeyMapping())) {
+		if (compareOutputKeyMapping(self.getKeyMapping(), modified.getKeyMapping())) {
 			results.add(KEY_MAPPING);
 		}
 		Collections.sort(results);
@@ -203,25 +202,27 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 	 * @param map2
 	 * @return true if there are different
 	 */
-	private boolean compare(Map<Integer, List<List<Integer>>> map1, Map<Integer, List<List<Integer>>> map2) {
+	private boolean compareOutputKeyMapping(Map<Integer, Map<Integer, List<Integer>>> map1, Map<Integer, Map<Integer, List<Integer>>> map2) {
 		if (map1.size() != map2.size()) {
 			return true;
 		}
-		for (Integer integer : map1.keySet()) {
-			List<List<Integer>> lists = map2.get(integer);
-			if (lists == null || compare(map1.get(integer), lists)) {
+		for (Integer key : map1.keySet()) {
+			Map<Integer, List<Integer>> innerMap = map2.get(key);
+			if (innerMap == null || compareKeyStateAllocation(map1.get(key), innerMap)) {
 				return true;
 			}
 		}
 		return false;
 	}
 
-	private boolean compare(List<List<Integer>> list1, List<List<Integer>> list2) {
-		if (list1.size() != list2.size()) {
+	private boolean compareKeyStateAllocation(Map<Integer, List<Integer>> map1, Map<Integer, List<Integer>> map2) {
+		if (map1.size() != map2.size()) {
 			return true;
 		}
-		for (int i = 0; i < list1.size(); i++) {
-			if (compareIntList(list1.get(i), list2.get(i))) {
+
+		for (Integer key : map1.keySet()) {
+			List<Integer> value = map2.get(key);
+			if (value == null || compareIntList(map1.get(key), value)) {
 				return true;
 			}
 		}
