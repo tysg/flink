@@ -157,26 +157,50 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 		ExecutionJobVertex targetVertex = executionGraph.getJobVertex(rawVertexIDToJobVertexID(rawVertexID));
 		JobVertex targetJobVertex = jobGraph.findVertexByID(rawVertexIDToJobVertexID(rawVertexID));
 		Preconditions.checkNotNull(targetVertex, "can not found target vertex");
-		// todo how about scale in
-		if (oldParallelism < targetJobVertex.getParallelism()) {
-			targetVertex.scaleOut(executionGraph.getRpcTimeout(), executionGraph.getGlobalModVersion(), System.currentTimeMillis());
-		} else if (oldParallelism > targetJobVertex.getParallelism()) {
-			int removedTaskId = operatorWorkloadsAssignment.getRemovedSubtask();
-			checkState(removedTaskId >= 0);
-			targetVertex.scaleIn(removedTaskId);
-		} else {
-			throw new IllegalStateException("No need to rescale with the same parallelism");
-		}
+		// TODO: this should be found through updating the JobGraph
 		List<JobVertexID> updatedDownstream = heldExecutionPlan.getOperatorDescriptorByID(rawVertexID)
 			.getChildren().stream()
 			.map(child -> rawVertexIDToJobVertexID(child.getOperatorID()))
 			.collect(Collectors.toList());
-		for (JobVertexID downstreamID : updatedDownstream) {
-			ExecutionJobVertex downstream = executionGraph.getJobVertex(downstreamID);
-			if (downstream != null) {
+
+		List<JobVertexID> updatedUpstream = heldExecutionPlan.getOperatorDescriptorByID(rawVertexID)
+			.getChildren().stream()
+			.map(child -> rawVertexIDToJobVertexID(child.getOperatorID()))
+			.collect(Collectors.toList());
+
+		// TODO: when doing scale out/in, we need to update the checkpointCoordinator accordingly
+		if (oldParallelism < targetJobVertex.getParallelism()) {
+			targetVertex.scaleOut(executionGraph.getRpcTimeout(), executionGraph.getGlobalModVersion(), System.currentTimeMillis());
+
+
+			for (JobVertexID downstreamID : updatedDownstream) {
+				ExecutionJobVertex downstream = executionGraph.getJobVertex(downstreamID);
+				if (downstream != null) {
+					downstream.reconnectWithUpstream(targetVertex.getProducedDataSets());
+				}
+			}
+		} else if (oldParallelism > targetJobVertex.getParallelism()) {
+			int removedTaskId = operatorWorkloadsAssignment.getRemovedSubtask();
+			checkState(removedTaskId >= 0);
+			targetVertex.scaleIn(removedTaskId);
+
+			for (JobVertexID upstreamID : updatedUpstream) {
+				ExecutionJobVertex upstream = executionGraph.getJobVertex(upstreamID);
+				assert upstream != null;
+				upstream.resetProducedDataSets();
+				targetVertex.reconnectWithUpstream(upstream.getProducedDataSets());
+			}
+
+
+			for (JobVertexID downstreamID : updatedDownstream) {
+				ExecutionJobVertex downstream = executionGraph.getJobVertex(downstreamID);
+				assert downstream != null;
 				downstream.reconnectWithUpstream(targetVertex.getProducedDataSets());
 			}
+		} else {
+			throw new IllegalStateException("No need to rescale with the same parallelism");
 		}
+
 		executionGraph.updateNumOfTotalVertices();
 	}
 

@@ -98,6 +98,7 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 
 	@Override
 	public CompletableFuture<Void> deployTasks(int operatorID, int oldParallelism) {
+		// TODO: add the task to the checkpointCoordinator
 		System.out.println("deploying... tasks of " + operatorID);
 		JobVertexID srcJobVertexID = rawVertexIDToJobVertexID(operatorID);
 		ExecutionJobVertex srcJobVertex = executionGraph.getJobVertex(srcJobVertexID);
@@ -137,6 +138,7 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 			).thenCompose(executions -> {
 				try {
 					final List<CompletableFuture<Void>> finishedFutureList = new ArrayList<>();
+					// TODO: do we need this step? newly deployed tasks do not need to update.
 					updatePartitionAndDownStreamGates(operatorID, rescaleID, finishedFutureList);
 					return FutureUtils.waitForAll(finishedFutureList);
 				} catch (ExecutionGraphException e) {
