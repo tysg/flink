@@ -288,8 +288,8 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 				System.out.println("\nstart stateful scale out test");
 				testScaleOutStateful(statefulOpID);
 
-				System.out.println("\nstart stateful scale out 2 more test");
-				testScaleOut2(statelessOpID);
+//				System.out.println("\nstart stateful scale out 2 more test");
+//				testScaleOut2(statelessOpID);
 
 //				System.out.println("\nstart source near stateful operator rebalance test...");
 //				testRebalanceStateful(nearSourceMap);
