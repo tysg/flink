@@ -97,6 +97,22 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 	}
 
 	@Override
+	public CompletableFuture<Void> updateTaskResources(int operatorID, int oldParallelism) {
+		// TODO: By far we only support horizontal scaling, vertival scaling is not included.
+		System.out.println("++++++ re-allocate resources for tasks" + operatorID);
+		JobVertexID tgtJobVertexID = rawVertexIDToJobVertexID(operatorID);
+		ExecutionJobVertex tgtJobVertex = executionGraph.getJobVertex(tgtJobVertexID);
+		if (tgtJobVertex.getParallelism() < oldParallelism) {
+			cancelTasks(operatorID, 0);
+		} else if (tgtJobVertex.getParallelism() > oldParallelism) {
+			deployTasks(operatorID, oldParallelism);
+		} else {
+			throw new IllegalStateException("none of new tasks has been created");
+		}
+		return CompletableFuture.completedFuture(null);
+	}
+
+	@Override
 	public CompletableFuture<Void> deployTasks(int operatorID, int oldParallelism) {
 		// TODO: add the task to the checkpointCoordinator
 		System.out.println("deploying... tasks of " + operatorID);
@@ -109,11 +125,15 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 			new ArrayList<>(tgtJobVertex.getParallelism() - oldParallelism);
 
 		ExecutionVertex[] taskVertices = tgtJobVertex.getTaskVertices();
-		List<ExecutionVertex> createCandidates = new ArrayList<>(tgtJobVertex.getParallelism() - oldParallelism);
 		RescaleID rescaleID = RescaleID.generateNextID();
-		for (int i = oldParallelism; i < tgtJobVertex.getParallelism(); i++) {
-			createCandidates.add(taskVertices[i]);
-			Execution executionAttempt = taskVertices[i].getCurrentExecutionAttempt();
+//		List<ExecutionVertex> createCandidates = new ArrayList<>(tgtJobVertex.getParallelism() - oldParallelism);
+//		for (int i = oldParallelism; i < tgtJobVertex.getParallelism(); i++) {
+//			createCandidates.add(taskVertices[i]);
+//			Execution executionAttempt = taskVertices[i].getCurrentExecutionAttempt();
+//			allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(rescaleID));
+//		}
+		for (ExecutionVertex vertex : createCandidates.get(operatorID)) {
+			Execution executionAttempt = vertex.getCurrentExecutionAttempt();
 			allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(rescaleID));
 		}
 
@@ -144,7 +164,7 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 				// update checkpointCoodinator
 				CheckpointCoordinator checkpointCoordinator = executionGraph.getCheckpointCoordinator();
 				checkpointCoordinator.stopCheckpointScheduler();
-				checkpointCoordinator.addVertices(createCandidates.toArray(new ExecutionVertex[0]), false);
+				checkpointCoordinator.addVertices(createCandidates.get(operatorID).toArray(new ExecutionVertex[0]), false);
 
 				if (checkpointCoordinator.isPeriodicCheckpointingConfigured()) {
 					checkpointCoordinator.startCheckpointScheduler();
@@ -155,6 +175,10 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 
 	@Override
 	public CompletableFuture<Void> cancelTasks(int operatorID, int offset) {
+		// TODO: add them to the future list
+		for (ExecutionVertex vertex : removedCandidates.get(operatorID)) {
+			vertex.cancel();
+		}
 		return CompletableFuture.completedFuture(null);
 	}
 
