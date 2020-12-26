@@ -326,12 +326,13 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 				controller.allActionsCompleted();
 				return;
 			}
-			CompletableFuture<?> jointFuture = CompletableFuture.allOf(
-				getInputOutputJointFuture(status),
-				pauseActionController.getResumeFuture()
-			);
+//			CompletableFuture<?> jointFuture = CompletableFuture.allOf(
+//				getInputOutputJointFuture(status),
+//				pauseActionController.getResumeFuture()
+//			);
+			CompletableFuture<?> resumeFuture = pauseActionController.getResumeFuture();
 			MailboxDefaultAction.Suspension suspendedDefaultAction = controller.suspendDefaultAction();
-			jointFuture.thenRun(suspendedDefaultAction::resume)
+			resumeFuture.thenRun(suspendedDefaultAction::resume)
 				.thenRun(()->System.out.println(getName() + "pauseActionController get resumed"));
 			return;
 		}
