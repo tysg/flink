@@ -86,8 +86,16 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 				.map(ArrayList::new)
 				.collect(Collectors.toList());
 
+		OptionalInt maxKey = newKeySet.get(oldParallelism-1).stream().mapToInt(value -> value).max();
+		OptionalInt minKey = newKeySet.get(oldParallelism-1).stream().mapToInt(value -> value).min();
+		int mid = 96;
+		if (maxKey.isPresent() && minKey.isPresent()) {
+			mid = (maxKey.getAsInt() + minKey.getAsInt())/2;
+		}
+
+		int finalMid = mid;
 		List<Integer> smallHalf = newKeySet.get(oldParallelism-1).stream()
-			.filter(i -> i < 63) // hardcoded
+			.filter(i -> i < finalMid) // hardcoded
 			.collect(Collectors.toList());
 		newKeySet.get(oldParallelism-1).removeAll(smallHalf);
 		newKeySet.add(smallHalf);
@@ -101,6 +109,7 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 		}
 	}
 
+	// WARNING: This only works without rebalance of the stateless operator
 	private void testScaleOut2(int testingOpID) throws InterruptedException {
 		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
 
@@ -115,15 +124,15 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 			.map(ArrayList::new)
 			.collect(Collectors.toList());
 
-		List<Integer> smallHalf1 = newKeySet.get(oldParallelism-1).stream()
+		List<Integer> smallHalf1 = newKeySet.get(0).stream()
 			.filter(i -> i < 31) // hardcoded
 			.collect(Collectors.toList());
-		newKeySet.get(oldParallelism-1).removeAll(smallHalf1);
+		newKeySet.get(0).removeAll(smallHalf1);
 		newKeySet.add(smallHalf1);
-		List<Integer> smallHalf2 = newKeySet.get(oldParallelism-1).stream()
-			.filter(i -> i < 63) // hardcoded
+		List<Integer> smallHalf2 = newKeySet.get(1).stream()
+			.filter(i -> i < 95) // hardcoded
 			.collect(Collectors.toList());
-		newKeySet.get(oldParallelism-1).removeAll(smallHalf2);
+		newKeySet.get(1).removeAll(smallHalf2);
 		newKeySet.add(smallHalf2);
 
 		System.out.println(newKeySet);
@@ -273,14 +282,14 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 				showOperatorInfo();
 				Thread.sleep(10);
 
-				System.out.println("\nstart stateless rebalance test...");
-				testRebalanceStateless(statelessOpID);
-
-				System.out.println("\nstart stateful rebalance test1...");
-				testRebalanceStateful(statefulOpID);
-
-				System.out.println("\nstart stateful rebalance test2...");
-				testRebalanceStateful(statefulOpID);
+//				System.out.println("\nstart stateless rebalance test...");
+//				testRebalanceStateless(statelessOpID);
+//
+//				System.out.println("\nstart stateful rebalance test1...");
+//				testRebalanceStateful(statefulOpID);
+//
+//				System.out.println("\nstart stateful rebalance test2...");
+//				testRebalanceStateful(statefulOpID);
 
 //				System.out.println("\nstart synchronize source test...");
 //				testPauseSource(sourceOp);
@@ -288,19 +297,19 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 				System.out.println("\nstart stateful scale out test");
 				testScaleOutStateful(statefulOpID);
 
-				System.out.println("\nstart source near stateful operator rebalance test...");
-				testRebalanceStateful(nearSourceMap);
-
-				System.out.println("\nstart source near stateless operator rebalance test...");
-				testRebalanceStateless(nearSourceFilter);
+//				System.out.println("\nstart source near stateful operator rebalance test...");
+//				testRebalanceStateful(nearSourceMap);
+//
+//				System.out.println("\nstart source near stateless operator rebalance test...");
+//				testRebalanceStateless(nearSourceFilter);
 
 				Thread.sleep(3000);
 
-				System.out.println("\nstart update function related test...");
-				testCustomizeWindowUpdateAPI();
-
-				System.out.println("\nstart rescale window join test...");
-				testScaleOutWindowJoin();
+//				System.out.println("\nstart update function related test...");
+//				testCustomizeWindowUpdateAPI();
+//
+//				System.out.println("\nstart rescale window join test...");
+//				testScaleOutWindowJoin();
 
 				System.out.println("\nstart stateful scale out 2 more test");
 				testScaleOut2(statelessOpID);

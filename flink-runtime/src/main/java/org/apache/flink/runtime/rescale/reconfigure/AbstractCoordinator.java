@@ -152,7 +152,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 		Preconditions.checkNotNull(targetVertex, "can not found target vertex");
 		int newParallelism = targetJobVertex.getParallelism();
 		if (oldParallelism < newParallelism) {
-			targetVertex.scaleOut(executionGraph.getRpcTimeout(), executionGraph.getGlobalModVersion(), System.currentTimeMillis(), newParallelism);
+			targetVertex.scaleOut(executionGraph.getRpcTimeout(), executionGraph.getGlobalModVersion(), System.currentTimeMillis());
 		}
 		// TODO: scale in
 		// TODO: throw rescale exception
