@@ -150,10 +150,13 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 		ExecutionJobVertex targetVertex = executionGraph.getJobVertex(rawVertexIDToJobVertexID(rawVertexID));
 		JobVertex targetJobVertex = jobGraph.findVertexByID(rawVertexIDToJobVertexID(rawVertexID));
 		Preconditions.checkNotNull(targetVertex, "can not found target vertex");
-		// todo how about scale in
-		if (oldParallelism < targetJobVertex.getParallelism()) {
-			targetVertex.scaleOut(executionGraph.getRpcTimeout(), executionGraph.getGlobalModVersion(), System.currentTimeMillis());
+		int newParallelism = targetJobVertex.getParallelism();
+		if (oldParallelism < newParallelism) {
+			targetVertex.scaleOut(executionGraph.getRpcTimeout(), executionGraph.getGlobalModVersion(), System.currentTimeMillis(), newParallelism);
 		}
+		// TODO: scale in
+		// TODO: throw rescale exception
+
 		List<JobVertexID> updatedDownstream = heldExecutionPlan.getOperatorDescriptorByID(rawVertexID)
 			.getChildren().stream()
 			.map(child -> rawVertexIDToJobVertexID(child.getOperatorID()))

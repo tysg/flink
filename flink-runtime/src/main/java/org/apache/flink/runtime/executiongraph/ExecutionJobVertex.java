@@ -480,17 +480,18 @@ public class ExecutionJobVertex implements AccessExecutionJobVertex, Archiveable
 	public List<ExecutionVertex> scaleOut(
 		Time timeout,
 		long initialGlobalModVersion,
-		long createTimestamp) {
+		long createTimestamp,
+		int newParallelism) {
 
 		cleanBeforeRescale();
 
 		// TODO scaling: check sanity for parallelism
 		int oldParallelism = parallelism;
-		int numNewTaskVertices = oldParallelism + 1;
-		this.parallelism = numNewTaskVertices;
+//		int newParallelism = oldParallelism + 1;
+		this.parallelism = newParallelism;
 
 		for (IntermediateResult producedDataSet : producedDataSets) {
-			producedDataSet.updateNumParallelProducers(numNewTaskVertices);
+			producedDataSet.updateNumParallelProducers(newParallelism);
 			producedDataSet.resetConsumers();
 		}
 
@@ -499,9 +500,9 @@ public class ExecutionJobVertex implements AccessExecutionJobVertex, Archiveable
 			jobConfiguration.getInteger(JobManagerOptions.MAX_ATTEMPTS_HISTORY_SIZE) :
 			JobManagerOptions.MAX_ATTEMPTS_HISTORY_SIZE.defaultValue();
 
-		ExecutionVertex[] newTaskVertices = new ExecutionVertex[numNewTaskVertices];
-		List<ExecutionVertex> createdTaskVertices = new ArrayList<>(numNewTaskVertices - oldParallelism);
-		for (int i = 0; i < numNewTaskVertices; i++) {
+		ExecutionVertex[] newTaskVertices = new ExecutionVertex[newParallelism];
+		List<ExecutionVertex> createdTaskVertices = new ArrayList<>(newParallelism - oldParallelism);
+		for (int i = 0; i < newParallelism; i++) {
 			if (i < oldParallelism) {
 				newTaskVertices[i] = taskVertices[i];
 				newTaskVertices[i].updateTaskNameWithSubtaskIndex();
