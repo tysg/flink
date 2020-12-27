@@ -288,22 +288,22 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 				System.out.println("\nstart stateful scale out test");
 				testScaleOutStateful(statefulOpID);
 
-				System.out.println("\nstart stateful scale out 2 more test");
-				testScaleOut2(statelessOpID);
+				System.out.println("\nstart source near stateful operator rebalance test...");
+				testRebalanceStateful(nearSourceMap);
 
-//				System.out.println("\nstart source near stateful operator rebalance test...");
-//				testRebalanceStateful(nearSourceMap);
-//
-//				System.out.println("\nstart source near stateless operator rebalance test...");
-//				testRebalanceStateless(nearSourceFilter);
+				System.out.println("\nstart source near stateless operator rebalance test...");
+				testRebalanceStateless(nearSourceFilter);
 
-				Thread.sleep(10);
+				Thread.sleep(3000);
 
 				System.out.println("\nstart update function related test...");
 				testCustomizeWindowUpdateAPI();
 
 				System.out.println("\nstart rescale window join test...");
 				testScaleOutWindowJoin();
+
+				System.out.println("\nstart stateful scale out 2 more test");
+				testScaleOut2(statelessOpID);
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}

@@ -480,14 +480,14 @@ public class ExecutionJobVertex implements AccessExecutionJobVertex, Archiveable
 	public List<ExecutionVertex> scaleOut(
 		Time timeout,
 		long initialGlobalModVersion,
-		long createTimestamp,
-		int newParallelism) {
+		long createTimestamp) {
 
 		cleanBeforeRescale();
 
 		// TODO scaling: check sanity for parallelism
 		int oldParallelism = parallelism;
-//		int newParallelism = oldParallelism + 1;
+
+		int newParallelism = getJobVertex().getParallelism();
 		this.parallelism = newParallelism;
 
 		for (IntermediateResult producedDataSet : producedDataSets) {
