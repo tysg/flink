@@ -109,9 +109,12 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 
 		ExecutionVertex[] taskVertices = srcJobVertex.getTaskVertices();
 		RescaleID rescaleID = RescaleID.generateNextID();
+		List<ExecutionVertex> createdVertex = new ArrayList<>();
 		for (int i = oldParallelism; i < srcJobVertex.getParallelism(); i++) {
+			createdVertex.add(taskVertices[i]);
 			Execution executionAttempt = taskVertices[i].getCurrentExecutionAttempt();
-			allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(rescaleID));
+			// todo a better way is to only update those partition id changed partition, now will loss some data
+			allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(RescaleID.DEFAULT));
 		}
 
 		return FutureUtils.combineAll(allocateSlotFutures)
@@ -136,6 +139,10 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 				}
 			).thenCompose(executions -> {
 				try {
+					CheckpointCoordinator checkpointCoordinator = executionGraph.getCheckpointCoordinator();
+					checkNotNull(checkpointCoordinator);
+					checkpointCoordinator.addVertices(createdVertex.toArray(new ExecutionVertex[0]), false);
+
 					return updatePartitionAndDownStreamGates(operatorID, rescaleID);
 				} catch (ExecutionGraphException e) {
 					e.printStackTrace();
