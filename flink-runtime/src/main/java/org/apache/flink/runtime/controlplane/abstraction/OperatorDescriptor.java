@@ -95,7 +95,6 @@ public class OperatorDescriptor {
 //				.map(Collections::unmodifiableList)
 //				.collect(Collectors.toList())
 //		);
-		payload.keyStateAllocation.clear();
 //		payload.keyStateAllocation.addAll(unmodifiableKeys);
 		addAll(keyStateAllocation);
 		for (OperatorDescriptor parent : parents) {
@@ -106,9 +105,9 @@ public class OperatorDescriptor {
 	}
 
 	private void addAll(Map<Integer, List<Integer>> keyStateAllocation) {
+		payload.keyStateAllocation.clear();
 		for (int taskId : keyStateAllocation.keySet()) {
 			payload.keyStateAllocation.put(taskId, keyStateAllocation.get(taskId));
-
 		}
 	}
 
@@ -119,7 +118,6 @@ public class OperatorDescriptor {
 		for (OperatorDescriptor child : children) {
 			if (child.stateful) {
 				// todo two inputs?
-				child.payload.keyStateAllocation.clear();
 //				child.payload.keyStateAllocation.addAll(keyMapping.get(child.operatorID));
 				child.addAll(keyMapping.get(child.operatorID));
 			}
@@ -162,7 +160,6 @@ public class OperatorDescriptor {
 //					.map(Collections::unmodifiableList)
 //					.collect(Collectors.toList())
 //			);
-			payload.keyStateAllocation.clear();
 			addAll(keyStateAllocation);
 			// sync with parent's key mapping
 			for(OperatorDescriptor parent: parents) {
@@ -193,7 +190,6 @@ public class OperatorDescriptor {
 //			);
 			payload.keyMapping.put(targetOperatorID, keyMapping);
 			if (child.stateful) {
-				child.payload.keyStateAllocation.clear();
 				child.addAll(keyMapping);
 			}
 		} catch (Exception e) {
@@ -254,8 +250,8 @@ public class OperatorDescriptor {
 //		final List<List<Integer>> keyStateAllocation;
 //		final Map<Integer, List<List<Integer>>> keyMapping;
 
-		final Map<Integer, List<Integer>> keyStateAllocation;
-		final Map<Integer, Map<Integer, List<Integer>>> keyMapping;
+		public Map<Integer, List<Integer>> keyStateAllocation;
+		public Map<Integer, Map<Integer, List<Integer>>> keyMapping;
 
 		OperatorPayload(int parallelism) {
 			this.parallelism = parallelism;

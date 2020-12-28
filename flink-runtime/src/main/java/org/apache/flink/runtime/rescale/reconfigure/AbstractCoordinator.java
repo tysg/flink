@@ -130,6 +130,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 								rescaleExecutionGraph(heldDescriptor.getOperatorID(), oldParallelism, operatorWorkloadsAssignment);
 							}
 							heldDescriptor.setKeySet(descriptor.getKeyStateAllocation());
+							System.out.println("++++++ keyset: " + heldDescriptor.getKeyStateAllocation());;
 							updateKeySet(heldDescriptor, isRescale);
 							break;
 						case KEY_MAPPING:
