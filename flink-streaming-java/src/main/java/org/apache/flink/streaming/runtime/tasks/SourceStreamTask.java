@@ -155,6 +155,7 @@ public class SourceStreamTask<OUT, SRC extends SourceFunction<OUT>, OP extends S
 				// update output (writers)
 				rescaleManager.createNewResultPartitions();
 				replaceResultPartitions(rescaleManager);
+				System.out.println("pause the current data sending: " + this.getName());
 			} catch (IOException e) {
 				e.printStackTrace();
 			} finally {

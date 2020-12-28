@@ -290,9 +290,9 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 
 				System.out.println("\nstart stateful rebalance test1...");
 				testRebalanceStateful(statefulOpID);
-//
-//				System.out.println("\nstart stateful rebalance test2...");
-//				testRebalanceStateful(statefulOpID);
+
+				System.out.println("\nstart stateful rebalance test2...");
+				testRebalanceStateful(statefulOpID);
 //
 //				System.out.println("\nstart synchronize source test...");
 //				testPauseSource(sourceOp);

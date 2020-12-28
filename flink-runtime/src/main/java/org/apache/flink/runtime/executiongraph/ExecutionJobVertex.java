@@ -492,8 +492,9 @@ public class ExecutionJobVertex implements AccessExecutionJobVertex, Archiveable
 		cleanBeforeRescale();
 
 		// TODO scaling: check sanity for parallelism
+
 		oldParallelism = parallelism;
-		int numNewTaskVertices = oldParallelism + 1;
+		int numNewTaskVertices = getJobVertex().getParallelism();
 		this.parallelism = numNewTaskVertices;
 
 		for (IntermediateResult producedDataSet : producedDataSets) {
