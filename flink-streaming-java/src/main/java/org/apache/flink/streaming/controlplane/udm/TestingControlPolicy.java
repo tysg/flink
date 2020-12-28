@@ -81,7 +81,7 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 
 		Map<Integer, List<Integer>> newKeyStateAllocation = new HashMap<>();
 		for (Integer taskId : curKeyStateAllocation.keySet()) {
-			newKeyStateAllocation.put(taskId, curKeyStateAllocation.get(taskId));
+			newKeyStateAllocation.put(taskId, new ArrayList<>(curKeyStateAllocation.get(taskId)));
 		}
 
 		List<Integer> oddKeys = newKeyStateAllocation.get(1).stream().filter(i -> i % 2 == 0).collect(Collectors.toList());
