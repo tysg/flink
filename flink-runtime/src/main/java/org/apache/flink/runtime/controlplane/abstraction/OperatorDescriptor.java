@@ -105,16 +105,18 @@ public class OperatorDescriptor {
 	}
 
 	private void addAll(Map<Integer, List<Integer>> keyStateAllocation) {
-		payload.keyStateAllocation.clear();
+//		payload.keyStateAllocation.clear();
+		Map<Integer, List<Integer>> unmodifiable = new HashMap<>();
 		for (int taskId : keyStateAllocation.keySet()) {
-			payload.keyStateAllocation.put(taskId, keyStateAllocation.get(taskId));
+			unmodifiable.put(taskId, Collections.unmodifiableList(keyStateAllocation.get(taskId)));
 		}
+		payload.keyStateAllocation = Collections.unmodifiableMap(unmodifiable);
 	}
 
 	@Internal
 	void setKeyMapping(Map<Integer, Map<Integer, List<Integer>>> keyMapping) {
-//		Map<Integer, Map<Integer, List<Integer>>> unmodifiable = convertToUnmodifiable(keyMapping);
-		payload.keyMapping.putAll(keyMapping);
+		Map<Integer, Map<Integer, List<Integer>>> unmodifiable = convertKeyMappingToUnmodifiable(keyMapping);
+		payload.keyMapping.putAll(unmodifiable);
 		for (OperatorDescriptor child : children) {
 			if (child.stateful) {
 				// todo two inputs?
@@ -129,18 +131,29 @@ public class OperatorDescriptor {
 		return payload.applicationLogic;
 	}
 
-	private Map<Integer, List<List<Integer>>> convertToUnmodifiable(Map<Integer, List<List<Integer>>> keyStateAllocation) {
-		Map<Integer, List<List<Integer>>> unmodifiable = new HashMap<>();
-		for (Integer inOpID : keyStateAllocation.keySet()) {
-			List<List<Integer>> unmodifiableKeys = Collections.unmodifiableList(
-				keyStateAllocation.get(inOpID)
-					.stream()
-					.map(Collections::unmodifiableList)
-					.collect(Collectors.toList())
-			);
+	private Map<Integer, Map<Integer, List<Integer>>> convertKeyMappingToUnmodifiable(Map<Integer, Map<Integer, List<Integer>>> keyMappings) {
+		Map<Integer, Map<Integer, List<Integer>>> unmodifiable = new HashMap<>();
+		for (Integer inOpID : keyMappings.keySet()) {
+//			List<List<Integer>> unmodifiableKeys = Collections.unmodifiableList(
+////				keyStateAllocation.get(inOpID)
+////					.stream()
+////					.map(Collections::unmodifiableList)
+////					.collect(Collectors.toList())
+//			);
+			Map<Integer, List<Integer>> keyStateAllocation = convertKeyStateToUnmodifiable(keyMappings.get(inOpID));
+
+			Map<Integer, List<Integer>> unmodifiableKeys = Collections.unmodifiableMap(keyStateAllocation);
 			unmodifiable.put(inOpID, unmodifiableKeys);
 		}
 		return unmodifiable;
+	}
+
+	private Map<Integer, List<Integer>> convertKeyStateToUnmodifiable(Map<Integer, List<Integer>> keyStateAllocation) {
+		Map<Integer, List<Integer>> newMap = new HashMap<>();
+		for (Integer taskId : keyStateAllocation.keySet()) {
+			newMap.put(taskId, Collections.unmodifiableList(newMap.get(taskId)));
+		}
+		return newMap;
 	}
 
 	/**
