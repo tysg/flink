@@ -114,7 +114,7 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 			createdVertex.add(taskVertices[i]);
 			Execution executionAttempt = taskVertices[i].getCurrentExecutionAttempt();
 			// todo a better way is to only update those partition id changed partition, now will loss some data
-			allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(RescaleID.DEFAULT));
+			allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(rescaleID));
 		}
 
 		return FutureUtils.combineAll(allocateSlotFutures)
@@ -225,7 +225,7 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 			srcJobVertex.cleanBeforeRescale();
 			for (ExecutionVertex vertex : srcJobVertex.getTaskVertices()) {
 				Execution execution = vertex.getCurrentExecutionAttempt();
-				if (execution != null && execution.getState() == ExecutionState.RUNNING) {
+				if (!vertex.getRescaleId().equals(rescaleID) && execution != null && execution.getState() == ExecutionState.RUNNING) {
 					execution.updateProducedPartitions(rescaleID);
 					updatePartitionsFuture.add(execution.scheduleRescale(null, RescaleOptions.RESCALE_PARTITIONS_ONLY, null));
 				}
