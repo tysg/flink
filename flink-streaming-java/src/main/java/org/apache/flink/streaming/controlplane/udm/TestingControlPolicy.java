@@ -61,7 +61,7 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 
 		Map<Integer, List<Integer>> newKeyStateAllocation = new HashMap<>();
 		for (Integer taskId : curKeyStateAllocation.keySet()) {
-			newKeyStateAllocation.put(taskId, curKeyStateAllocation.get(taskId));
+			newKeyStateAllocation.put(taskId, new ArrayList<>(curKeyStateAllocation.get(taskId)));
 		}
 
 		List<Integer> oddKeys = newKeyStateAllocation.get(0).stream().filter(i -> i % 2 == 0).collect(Collectors.toList());
@@ -102,12 +102,11 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 
 		Map<Integer, List<Integer>> curKeyStateAllocation = streamJobState.getKeyStateAllocation(testingOpID);
 
-
 		assert oldParallelism == curKeyStateAllocation.size() : "old parallelism does not match the key set";
 
 		Map<Integer, List<Integer>> newKeyStateAllocation = new HashMap<>();
 		for (Integer taskId : curKeyStateAllocation.keySet()) {
-			newKeyStateAllocation.put(taskId, curKeyStateAllocation.get(taskId));
+			newKeyStateAllocation.put(taskId, new ArrayList<>(curKeyStateAllocation.get(taskId)));
 		}
 
 		List<Integer> oddKeys = newKeyStateAllocation.get(oldParallelism-1).stream()
@@ -119,6 +118,33 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 		System.out.println(newKeyStateAllocation);
 
 		getInstructionSet().rescale(testingOpID, oldParallelism+1, newKeyStateAllocation, this);
+
+		synchronized (object) {
+			object.wait();
+		}
+	}
+
+	private void testScaleInStateful(int testingOpID) throws InterruptedException {
+		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
+
+		int oldParallelism = streamJobState.getParallelism(testingOpID);
+		System.out.println(oldParallelism);
+
+		Map<Integer, List<Integer>> curKeyStateAllocation = streamJobState.getKeyStateAllocation(testingOpID);
+
+		assert oldParallelism == curKeyStateAllocation.size() : "old parallelism does not match the key set";
+
+		Map<Integer, List<Integer>> newKeyStateAllocation = new HashMap<>();
+		for (Integer taskId : curKeyStateAllocation.keySet()) {
+			newKeyStateAllocation.put(taskId, new ArrayList<>(curKeyStateAllocation.get(taskId)));
+		}
+
+		List<Integer> removedKeys = newKeyStateAllocation.remove(oldParallelism-1);
+		newKeyStateAllocation.put(oldParallelism-2, removedKeys);
+
+		System.out.println(newKeyStateAllocation);
+
+		getInstructionSet().rescale(testingOpID, oldParallelism-1, newKeyStateAllocation, this);
 
 		synchronized (object) {
 			object.wait();
@@ -137,7 +163,7 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 
 		Map<Integer, List<Integer>> newKeyStateAllocation = new HashMap<>();
 		for (Integer taskId : curKeyStateAllocation.keySet()) {
-			newKeyStateAllocation.put(taskId, curKeyStateAllocation.get(taskId));
+			newKeyStateAllocation.put(taskId, new ArrayList<>(curKeyStateAllocation.get(taskId)));
 		}
 
 		List<Integer> smallHalf1 = newKeyStateAllocation.get(oldParallelism-1).stream()
@@ -172,7 +198,7 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 //				.collect(Collectors.toList());
 			Map<Integer, List<Integer>> newKeyStateAllocation = new HashMap<>();
 			for (Integer taskId : curKeyStateAllocation.keySet()) {
-				newKeyStateAllocation.put(taskId, curKeyStateAllocation.get(taskId));
+				newKeyStateAllocation.put(taskId, new ArrayList<>(curKeyStateAllocation.get(taskId)));
 			}
 
 			List<Integer> oddKeys = newKeyStateAllocation.get(0).stream().filter(i -> i % 2 == 0).collect(Collectors.toList());
@@ -311,14 +337,17 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 				System.out.println("\nstart stateful rebalance test1...");
 				testRebalanceStateful(statefulOpID);
 
-				System.out.println("\nstart stateful rebalance test2...");
-				testRebalanceStateful2(statefulOpID);
+//				System.out.println("\nstart stateful rebalance test2...");
+//				testRebalanceStateful2(statefulOpID);
 //
 //				System.out.println("\nstart synchronize source test...");
 //				testPauseSource(sourceOp);
 
 //				System.out.println("\nstart stateful scale out test");
 //				testScaleOutStateful(statefulOpID);
+
+				System.out.println("\nstart stateful scale in test");
+				testScaleInStateful(statefulOpID);
 
 //				System.out.println("\nstart stateful scale out 2 more test");
 //				testScaleOut2(statelessOpID);
