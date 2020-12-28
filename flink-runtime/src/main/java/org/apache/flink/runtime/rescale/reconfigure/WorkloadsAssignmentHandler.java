@@ -10,14 +10,17 @@ import java.util.Map;
 
 public class WorkloadsAssignmentHandler {
 	// operator -> workload assignment
-	private Map<Integer, OperatorWorkloadsAssignment> heldWorkloadsAssignmentMap;
+	private final Map<Integer, OperatorWorkloadsAssignment> heldWorkloadsAssignmentMap;
+	private final Map<Integer, Map<Integer, List<Integer>>> heldExecutorMapping;
 
 	public WorkloadsAssignmentHandler(StreamJobExecutionPlan jobExecutionPlan) {
-		heldWorkloadsAssignmentMap = setupWorkloadsAssignmentMapFromExecutionPlan(jobExecutionPlan);
+		heldWorkloadsAssignmentMap = new HashMap<>();
+		heldExecutorMapping = new HashMap<>();
+		setupWorkloadsAssignmentMapFromExecutionPlan(jobExecutionPlan);
 	}
 
-	public Map<Integer, OperatorWorkloadsAssignment> setupWorkloadsAssignmentMapFromExecutionPlan(StreamJobExecutionPlan heldExecutionPlan) {
-		Map<Integer, OperatorWorkloadsAssignment> heldWorkloadsAssignmentMap = new HashMap<>();
+	public void setupWorkloadsAssignmentMapFromExecutionPlan(StreamJobExecutionPlan heldExecutionPlan) {
+//	public Map<Integer, OperatorWorkloadsAssignment> setupWorkloadsAssignmentMapFromExecutionPlan(StreamJobExecutionPlan heldExecutionPlan) {
 		for (Iterator<OperatorDescriptor> it = heldExecutionPlan.getAllOperatorDescriptor(); it.hasNext(); ) {
 			OperatorDescriptor descriptor = it.next();
 			int operatorID = descriptor.getOperatorID();
@@ -25,28 +28,38 @@ public class WorkloadsAssignmentHandler {
 			Map<Integer, List<Integer>> keyStateAllocation = descriptor.getKeyStateAllocation();
 			OperatorWorkloadsAssignment operatorWorkloadsAssignment = new OperatorWorkloadsAssignment(keyStateAllocation, parallelism);
 			heldWorkloadsAssignmentMap.put(operatorID, operatorWorkloadsAssignment);
+			heldExecutorMapping.put(operatorID, keyStateAllocation);
 		}
-		return heldWorkloadsAssignmentMap;
+//		return heldWorkloadsAssignmentMap;
 	}
 
 	public OperatorWorkloadsAssignment handleWorkloadsReallocate(int operatorId, Map<Integer, List<Integer>> executorMapping) {
+		System.out.println("++++++ handle workload: " + heldExecutorMapping.get(operatorId));
 		int newParallelism = executorMapping.keySet().size();
 		OperatorWorkloadsAssignment operatorWorkloadsAssignment;
-		if (newParallelism >= heldWorkloadsAssignmentMap.get(operatorId).getNumOpenedSubtask()) {
+		if (newParallelism == heldWorkloadsAssignmentMap.get(operatorId).getNumOpenedSubtask()) {
 			operatorWorkloadsAssignment = new OperatorWorkloadsAssignment(
 				executorMapping,
-				heldWorkloadsAssignmentMap.get(operatorId).getPartitionAssignment(),
+				heldExecutorMapping.get(operatorId),
 				heldWorkloadsAssignmentMap.get(operatorId),
 				newParallelism);
-			heldWorkloadsAssignmentMap.put(operatorId, operatorWorkloadsAssignment);
+		} else if (newParallelism > heldWorkloadsAssignmentMap.get(operatorId).getNumOpenedSubtask()) {
+			operatorWorkloadsAssignment = new OperatorWorkloadsAssignment(
+				executorMapping,
+				heldExecutorMapping.get(operatorId),
+				heldWorkloadsAssignmentMap.get(operatorId),
+				newParallelism);
 		} else {
 			operatorWorkloadsAssignment = new OperatorWorkloadsAssignment(
 				executorMapping,
-				heldWorkloadsAssignmentMap.get(operatorId).getPartitionAssignment(),
+				heldExecutorMapping.get(operatorId),
 				heldWorkloadsAssignmentMap.get(operatorId),
 				heldWorkloadsAssignmentMap.get(operatorId).getNumOpenedSubtask());
-			heldWorkloadsAssignmentMap.put(operatorId, operatorWorkloadsAssignment);
 		}
+
+		heldWorkloadsAssignmentMap.put(operatorId, operatorWorkloadsAssignment);
+		heldExecutorMapping.put(operatorId, executorMapping);
+		System.out.println("++++++after handle workloads " + heldExecutorMapping.get(operatorId));
 		return operatorWorkloadsAssignment;
 	}
 

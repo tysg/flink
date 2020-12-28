@@ -90,6 +90,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 			OperatorDescriptor descriptor = it.next();
 			int operatorID = descriptor.getOperatorID();
 			OperatorDescriptor heldDescriptor = heldExecutionPlan.getOperatorDescriptorByID(operatorID);
+			System.out.println(heldDescriptor.getKeyStateAllocation() + " : " +  descriptor.getKeyStateAllocation());
 			int oldParallelism = heldDescriptor.getParallelism();
 			// loop until all change in this operator has been detected and sync
 			List<Integer> changes = analyzeOperatorDifference(heldDescriptor, descriptor);
