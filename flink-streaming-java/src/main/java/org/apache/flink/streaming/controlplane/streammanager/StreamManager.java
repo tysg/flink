@@ -349,7 +349,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					.thenCompose(o -> enforcement.synchronizePauseTasks(affectedTasks, o))
 					.thenCompose(o -> enforcement.updateUpstreamKeyMapping(operatorID, o))
 					.thenCompose(o -> enforcement.updateState(operatorID, o))
-					.thenCompose(o -> enforcement.deployTasks(operatorID, oldParallelism))
+					.thenCompose(o -> enforcement.updateTaskResources(operatorID, oldParallelism))
 					.thenCompose(o -> enforcement.resumeTasks())
 					.thenAccept(
 						(acknowledge) -> {

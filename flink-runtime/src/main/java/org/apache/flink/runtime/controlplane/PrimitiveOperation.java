@@ -71,6 +71,16 @@ public interface PrimitiveOperation<M> {
 	CompletableFuture<Void> resumeTasks();
 
 	/**
+	 * A unified API to reallocate affected tasks resources, e.g. add/reduce slots for it
+	 * If the owned slots becomes 0, then cancel, if from 0->1, then create the task.
+	 *
+	 * @param operatorID the operator id of this operator
+	 * @param oldParallelism  the old parallelism to make a comparison
+	 * @return
+	 */
+	CompletableFuture<Void> updateTaskResources(int operatorID, int oldParallelism);
+
+	/**
 	 * Request the resources request from the cluster.
 	 *
 	 * @param operatorID the operator id of this operator

@@ -8,6 +8,7 @@ import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptorVisit
 import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
 import org.apache.flink.runtime.executiongraph.ExecutionGraph;
 import org.apache.flink.runtime.executiongraph.ExecutionJobVertex;
+import org.apache.flink.runtime.executiongraph.ExecutionVertex;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
@@ -34,6 +35,10 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 	protected WorkloadsAssignmentHandler workloadsAssignmentHandler;
 	protected StreamJobExecutionPlan heldExecutionPlan;
 	protected Map<Integer, OperatorID> operatorIDMap;
+
+	// fields for deploy cancel tasks, OperatorID -> created/removed candidates
+	protected volatile Map<Integer, List<ExecutionVertex>> removedCandidates;
+	protected volatile Map<Integer, List<ExecutionVertex>> createCandidates;
 
 
 	protected AbstractCoordinator(JobGraph jobGraph, ExecutionGraph executionGraph) {
@@ -157,26 +162,52 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 		ExecutionJobVertex targetVertex = executionGraph.getJobVertex(rawVertexIDToJobVertexID(rawVertexID));
 		JobVertex targetJobVertex = jobGraph.findVertexByID(rawVertexIDToJobVertexID(rawVertexID));
 		Preconditions.checkNotNull(targetVertex, "can not found target vertex");
-		// todo how about scale in
-		if (oldParallelism < targetJobVertex.getParallelism()) {
-			targetVertex.scaleOut(executionGraph.getRpcTimeout(), executionGraph.getGlobalModVersion(), System.currentTimeMillis());
-		} else if (oldParallelism > targetJobVertex.getParallelism()) {
-			int removedTaskId = operatorWorkloadsAssignment.getRemovedSubtask();
-			checkState(removedTaskId >= 0);
-			targetVertex.scaleIn(removedTaskId);
-		} else {
-			throw new IllegalStateException("No need to rescale with the same parallelism");
-		}
+		// TODO: this should be found through updating the JobGraph
 		List<JobVertexID> updatedDownstream = heldExecutionPlan.getOperatorDescriptorByID(rawVertexID)
 			.getChildren().stream()
 			.map(child -> rawVertexIDToJobVertexID(child.getOperatorID()))
 			.collect(Collectors.toList());
-		for (JobVertexID downstreamID : updatedDownstream) {
-			ExecutionJobVertex downstream = executionGraph.getJobVertex(downstreamID);
-			if (downstream != null) {
+
+		List<JobVertexID> updatedUpstream = heldExecutionPlan.getOperatorDescriptorByID(rawVertexID)
+			.getChildren().stream()
+			.map(child -> rawVertexIDToJobVertexID(child.getOperatorID()))
+			.collect(Collectors.toList());
+
+		// TODO: when doing scale out/in, we need to update the checkpointCoordinator accordingly
+		if (oldParallelism < targetJobVertex.getParallelism()) {
+			// scale out, we assume every time only one scale out will be called. Otherwise it will subsitute current candidates
+			this.createCandidates.put(rawVertexID, targetVertex.scaleOut(executionGraph.getRpcTimeout(), executionGraph.getGlobalModVersion(), System.currentTimeMillis()));
+
+
+			for (JobVertexID downstreamID : updatedDownstream) {
+				ExecutionJobVertex downstream = executionGraph.getJobVertex(downstreamID);
+				if (downstream != null) {
+					downstream.reconnectWithUpstream(targetVertex.getProducedDataSets());
+				}
+			}
+		} else if (oldParallelism > targetJobVertex.getParallelism()) {
+			// scale in
+			int removedTaskId = operatorWorkloadsAssignment.getRemovedSubtask();
+			checkState(removedTaskId >= 0);
+			this.removedCandidates.put(rawVertexID, targetVertex.scaleIn(removedTaskId));
+
+			for (JobVertexID upstreamID : updatedUpstream) {
+				ExecutionJobVertex upstream = executionGraph.getJobVertex(upstreamID);
+				assert upstream != null;
+				upstream.resetProducedDataSets();
+				targetVertex.reconnectWithUpstream(upstream.getProducedDataSets());
+			}
+
+
+			for (JobVertexID downstreamID : updatedDownstream) {
+				ExecutionJobVertex downstream = executionGraph.getJobVertex(downstreamID);
+				assert downstream != null;
 				downstream.reconnectWithUpstream(targetVertex.getProducedDataSets());
 			}
+		} else {
+			throw new IllegalStateException("No need to rescale with the same parallelism");
 		}
+
 		executionGraph.updateNumOfTotalVertices();
 	}
 

@@ -97,24 +97,49 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 	}
 
 	@Override
+	public CompletableFuture<Void> updateTaskResources(int operatorID, int oldParallelism) {
+		// TODO: By far we only support horizontal scaling, vertival scaling is not included.
+		System.out.println("++++++ re-allocate resources for tasks" + operatorID);
+		JobVertexID tgtJobVertexID = rawVertexIDToJobVertexID(operatorID);
+		ExecutionJobVertex tgtJobVertex = executionGraph.getJobVertex(tgtJobVertexID);
+		if (tgtJobVertex.getParallelism() < oldParallelism) {
+			cancelTasks(operatorID, 0);
+		} else if (tgtJobVertex.getParallelism() > oldParallelism) {
+			deployTasks(operatorID, oldParallelism);
+		} else {
+			throw new IllegalStateException("none of new tasks has been created");
+		}
+		return CompletableFuture.completedFuture(null);
+	}
+
+	@Override
 	public CompletableFuture<Void> deployTasks(int operatorID, int oldParallelism) {
+		// TODO: add the task to the checkpointCoordinator
 		System.out.println("deploying... tasks of " + operatorID);
-		JobVertexID srcJobVertexID = rawVertexIDToJobVertexID(operatorID);
-		ExecutionJobVertex srcJobVertex = executionGraph.getJobVertex(srcJobVertexID);
-		Preconditions.checkNotNull(srcJobVertex, "can not found this execution job vertex");
-		srcJobVertex.cleanBeforeRescale();
+		JobVertexID tgtJobVertexID = rawVertexIDToJobVertexID(operatorID);
+		ExecutionJobVertex tgtJobVertex = executionGraph.getJobVertex(tgtJobVertexID);
+		Preconditions.checkNotNull(tgtJobVertex, "can not found this execution job vertex");
+		tgtJobVertex.cleanBeforeRescale();
 
 		Collection<CompletableFuture<Execution>> allocateSlotFutures =
-			new ArrayList<>(srcJobVertex.getParallelism() - oldParallelism);
+			new ArrayList<>(tgtJobVertex.getParallelism() - oldParallelism);
 
-		ExecutionVertex[] taskVertices = srcJobVertex.getTaskVertices();
+		ExecutionVertex[] taskVertices = tgtJobVertex.getTaskVertices();
 		RescaleID rescaleID = RescaleID.generateNextID();
-		List<ExecutionVertex> createdVertex = new ArrayList<>();
-		for (int i = oldParallelism; i < srcJobVertex.getParallelism(); i++) {
-			createdVertex.add(taskVertices[i]);
-			Execution executionAttempt = taskVertices[i].getCurrentExecutionAttempt();
-			// todo a better way is to only update those partition id changed partition, now will loss some data
-			allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(RescaleID.DEFAULT));
+//		List<ExecutionVertex> createdVertex = new ArrayList<>();
+//		for (int i = oldParallelism; i < srcJobVertex.getParallelism(); i++) {
+//			createdVertex.add(taskVertices[i]);
+//			Execution executionAttempt = taskVertices[i].getCurrentExecutionAttempt();
+//			// todo a better way is to only update those partition id changed partition, now will loss some data
+//			allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(RescaleID.DEFAULT));
+//		for (int i = oldParallelism; i < tgtJobVertex.getParallelism(); i++) {
+//			createCandidates.add(taskVertices[i]);
+//			Execution executionAttempt = taskVertices[i].getCurrentExecutionAttempt();
+//			allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(rescaleID));
+//		}
+		for (ExecutionVertex vertex : createCandidates.get(operatorID)) {
+			Execution executionAttempt = vertex.getCurrentExecutionAttempt();
+			allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(rescaleID));
 		}
 
 		return FutureUtils.combineAll(allocateSlotFutures)
@@ -127,7 +152,7 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 				}
 			).thenCompose(executions -> {
 					Collection<CompletableFuture<Acknowledge>> deployFutures =
-						new ArrayList<>(srcJobVertex.getParallelism() - oldParallelism);
+						new ArrayList<>(tgtJobVertex.getParallelism() - oldParallelism);
 					for (Execution execution : executions) {
 						try {
 							deployFutures.add(execution.deploy());
@@ -141,18 +166,38 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 				try {
 					CheckpointCoordinator checkpointCoordinator = executionGraph.getCheckpointCoordinator();
 					checkNotNull(checkpointCoordinator);
-					checkpointCoordinator.addVertices(createdVertex.toArray(new ExecutionVertex[0]), false);
+					checkpointCoordinator.stopCheckpointScheduler();
+					checkpointCoordinator.addVertices(createCandidates.get(operatorID).toArray(new ExecutionVertex[0]), false);
+					if (checkpointCoordinator.isPeriodicCheckpointingConfigured()) {
+						checkpointCoordinator.startCheckpointScheduler();
+					}
 
 					return updatePartitionAndDownStreamGates(operatorID, rescaleID);
 				} catch (ExecutionGraphException e) {
 					e.printStackTrace();
 					return FutureUtils.completedExceptionally(e);
 				}
+//				final List<CompletableFuture<Void>> finishedFutureList = new ArrayList<>();
+//				// TODO: do we need this step? newly deployed tasks do not need to update.
+////					updatePartitionAndDownStreamGates(operatorID, rescaleID, finishedFutureList);
+//				// update checkpointCoodinator
+//				CheckpointCoordinator checkpointCoordinator = executionGraph.getCheckpointCoordinator();
+//				checkpointCoordinator.stopCheckpointScheduler();
+//				checkpointCoordinator.addVertices(createCandidates.get(operatorID).toArray(new ExecutionVertex[0]), false);
+//
+//				if (checkpointCoordinator.isPeriodicCheckpointingConfigured()) {
+//					checkpointCoordinator.startCheckpointScheduler();
+//				}
+//				return FutureUtils.waitForAll(finishedFutureList);
 			});
 	}
 
 	@Override
 	public CompletableFuture<Void> cancelTasks(int operatorID, int offset) {
+		// TODO: add them to the future list
+		for (ExecutionVertex vertex : removedCandidates.get(operatorID)) {
+			vertex.cancel();
+		}
 		return CompletableFuture.completedFuture(null);
 	}
 
