@@ -97,7 +97,11 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 	}
 
 	@Override
-	public CompletableFuture<Void> deployTasks(int operatorID, int oldParallelism) {
+	public CompletableFuture<Void> deployTasks(
+		int operatorID,
+		int oldParallelism,
+		@Nonnull Map<Integer, Map<Integer, AbstractCoordinator.Diff>> diff) {
+
 		System.out.println("deploying... tasks of " + operatorID);
 		JobVertexID srcJobVertexID = rawVertexIDToJobVertexID(operatorID);
 		ExecutionJobVertex srcJobVertex = executionGraph.getJobVertex(srcJobVertexID);
@@ -116,7 +120,7 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 			// todo a better way is to only update those partition id changed partition, now will loss some data
 			allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(rescaleID));
 		}
-
+		final SynchronizeOperation syncOp = currentSyncOp;
 		return FutureUtils.combineAll(allocateSlotFutures)
 			.whenComplete((executions, throwable) -> {
 					if (throwable != null) {
@@ -143,7 +147,17 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 					checkNotNull(checkpointCoordinator);
 					checkpointCoordinator.addVertices(createdVertex.toArray(new ExecutionVertex[0]), false);
 
-					return updatePartitionAndDownStreamGates(operatorID, rescaleID);
+					CompletableFuture<Void> finishFuture = updatePartitionAndDownStreamGates(operatorID, rescaleID);
+					finishFuture.thenAccept(o -> {
+						for (OperatorDescriptor src : heldExecutionPlan.getOperatorDescriptorByID(operatorID).getChildren()) {
+							// check should we resume those tasks
+							Map<Integer, Diff> diffMap = diff.get(src.getOperatorID());
+							if (diffMap.isEmpty() && syncOp != null) {
+								syncOp.resumeTasks(Collections.singletonList(Tuple2.of(src.getOperatorID(), -1)));
+							}
+						}
+					});
+					return finishFuture;
 				} catch (ExecutionGraphException e) {
 					e.printStackTrace();
 					return FutureUtils.completedExceptionally(e);

@@ -77,7 +77,7 @@ public interface PrimitiveOperation<M> {
 	 * @param offset     represent which parallel instance of this operator, -1 means all parallel instance
 	 * @return
 	 */
-	CompletableFuture<Void> deployTasks(int operatorID, int offset);
+	CompletableFuture<Void> deployTasks(int operatorID, int offset, M m);
 
 	/**
 	 * Free the resources request from the cluster.

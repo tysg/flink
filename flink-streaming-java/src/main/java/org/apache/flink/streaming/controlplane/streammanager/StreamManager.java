@@ -327,11 +327,12 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			this.jobExecutionPlan.setStateUpdatingFlag(waitingController);
 
 			OperatorDescriptor targetDescriptor = jobExecutionPlan.getOperatorDescriptorByID(operatorID);
-			List<Tuple2<Integer, Integer>> affectedTasks = targetDescriptor.getParents()
-				.stream()
-				.map(d -> Tuple2.of(d.getOperatorID(), -1))
-				.collect(Collectors.toList());
+			List<Tuple2<Integer, Integer>> affectedTasks = new LinkedList<>();
 			affectedTasks.add(Tuple2.of(operatorID, -1));
+			targetDescriptor.getParents()
+				.forEach(c -> affectedTasks.add(Tuple2.of(c.getOperatorID(), -1)));
+			targetDescriptor.getChildren()
+				.forEach(c -> affectedTasks.add(Tuple2.of(c.getOperatorID(), -1)));
 
 			int oldParallelism = targetDescriptor.getParallelism();
 			// update the parallelism
@@ -349,7 +350,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					.thenCompose(o -> enforcement.synchronizePauseTasks(affectedTasks, o))
 					.thenCompose(o -> enforcement.updateUpstreamKeyMapping(operatorID, o))
 					.thenCompose(o -> enforcement.updateState(operatorID, o))
-					.thenCompose(o -> enforcement.deployTasks(operatorID, oldParallelism))
+					.thenCompose(o -> enforcement.deployTasks(operatorID, oldParallelism, o))
 					.thenCompose(o -> enforcement.resumeTasks())
 					.thenAccept(
 						(acknowledge) -> {
