@@ -1265,11 +1265,11 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 	public void assignNewState(KeyGroupRange keyGroupRange, int idInModel, JobManagerTaskRestore taskRestore) {
 		try {
 			taskStateManager.updateTaskRestore(taskRestore);
-			invokable.reinitializeState(keyGroupRange, idInModel);
 		}catch (NullPointerException e){
 			e.printStackTrace();
 			System.err.println("may not generate state now or it is a stateless task");
 		}finally {
+			invokable.reinitializeState(keyGroupRange, idInModel);
 			taskRescaleManager.finish();
 		}
 	}
