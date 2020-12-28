@@ -74,6 +74,26 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 		}
 	}
 
+	private void testRebalanceStateful2(int testingOpID) throws InterruptedException {
+		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
+		Map<Integer, List<Integer>> curKeyStateAllocation = streamJobState.getKeyStateAllocation(testingOpID);
+		// we assume that each operator only have one input now
+
+		Map<Integer, List<Integer>> newKeyStateAllocation = new HashMap<>();
+		for (Integer taskId : curKeyStateAllocation.keySet()) {
+			newKeyStateAllocation.put(taskId, curKeyStateAllocation.get(taskId));
+		}
+
+		List<Integer> oddKeys = newKeyStateAllocation.get(1).stream().filter(i -> i % 2 == 0).collect(Collectors.toList());
+		newKeyStateAllocation.get(1).removeAll(oddKeys);
+		newKeyStateAllocation.get(0).addAll(oddKeys);
+		getInstructionSet().rebalance(testingOpID, newKeyStateAllocation, true, this);
+		// wait for operation completed
+		synchronized (object) {
+			object.wait();
+		}
+	}
+
 	private void testScaleOutStateful(int testingOpID) throws InterruptedException {
 		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
 
@@ -292,7 +312,7 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 				testRebalanceStateful(statefulOpID);
 
 				System.out.println("\nstart stateful rebalance test2...");
-				testRebalanceStateful(statefulOpID);
+				testRebalanceStateful2(statefulOpID);
 //
 //				System.out.println("\nstart synchronize source test...");
 //				testPauseSource(sourceOp);
