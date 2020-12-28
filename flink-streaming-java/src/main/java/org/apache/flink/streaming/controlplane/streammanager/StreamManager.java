@@ -331,8 +331,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			affectedTasks.add(Tuple2.of(operatorID, -1));
 			targetDescriptor.getParents()
 				.forEach(c -> affectedTasks.add(Tuple2.of(c.getOperatorID(), -1)));
-			targetDescriptor.getChildren()
-				.forEach(c -> affectedTasks.add(Tuple2.of(c.getOperatorID(), -1)));
+//			targetDescriptor.getChildren()
+//				.forEach(c -> affectedTasks.add(Tuple2.of(c.getOperatorID(), -1)));
 
 			int oldParallelism = targetDescriptor.getParallelism();
 			// update the parallelism
