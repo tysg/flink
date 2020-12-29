@@ -351,16 +351,16 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					.thenCompose(o -> enforcement.updateUpstreamKeyMapping(operatorID, o))
 					.thenCompose(o -> enforcement.updateState(operatorID, o))
 					.thenCompose(o -> enforcement.deployTasks(operatorID, oldParallelism, o))
-					.thenCompose(o -> enforcement.resumeTasks())
-					.thenAccept(
-						(acknowledge) -> {
-							try {
-								this.jobExecutionPlan.notifyUpdateFinished(operatorID);
-							} catch (Exception e) {
-								e.printStackTrace();
-							}
+					.whenComplete((o, failure) -> {
+						if(failure != null){
+							failure.printStackTrace();
 						}
-					)
+						try {
+							this.jobExecutionPlan.notifyUpdateFinished(operatorID);
+						} catch (Exception e) {
+							e.printStackTrace();
+						}
+					})
 			));
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -394,31 +394,32 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						.thenCompose(o -> enforcement.synchronizePauseTasks(affectedTasks, o))
 						.thenCompose(o -> enforcement.updateUpstreamKeyMapping(operatorID, o))
 						.thenCompose(o -> enforcement.updateState(operatorID, o))
-						.thenCompose(o -> enforcement.resumeTasks())
-						.thenAccept(
-							(acknowledge) -> {
-								try {
-									this.jobExecutionPlan.notifyUpdateFinished(operatorID);
-								} catch (Exception e) {
-									e.printStackTrace();
-								}
+						.whenComplete((o, failure) -> {
+							if(failure != null){
+								failure.printStackTrace();
 							}
-						)
+							try {
+								this.jobExecutionPlan.notifyUpdateFinished(operatorID);
+							} catch (Exception e) {
+								e.printStackTrace();
+							}
+						})
 				));
 			} else {
 				runAsync(() -> jobMasterGateway.callOperations(
 					enforcement -> FutureUtils.completedVoidFuture()
 						.thenCompose(o -> enforcement.prepareExecutionPlan(jobExecutionPlan))
 						.thenCompose(o -> enforcement.updateUpstreamKeyMapping(operatorID, o))
-						.thenAccept(
-							(acknowledge) -> {
-								try {
-									this.jobExecutionPlan.notifyUpdateFinished(operatorID);
-								} catch (Exception e) {
-									e.printStackTrace();
-								}
+						.whenComplete((o, failure) -> {
+							if(failure != null){
+								failure.printStackTrace();
 							}
-						)
+							try {
+								this.jobExecutionPlan.notifyUpdateFinished(operatorID);
+							} catch (Exception e) {
+								e.printStackTrace();
+							}
+						})
 				));
 			}
 		} catch (Exception e) {
@@ -443,8 +444,6 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						o -> enforcement.synchronizePauseTasks(Collections.singletonList(Tuple2.of(operatorID, -1)), o))
 					.thenCompose(
 						o -> enforcement.updateFunction(operatorID, o))
-					.thenCompose(
-						o -> enforcement.resumeTasks())
 					.thenAccept(
 						(acknowledge) -> {
 							try {
