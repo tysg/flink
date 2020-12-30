@@ -47,7 +47,7 @@ public class OperatorWorkloadsAssignment implements AbstractCoordinator.Diff {
 		checkState(checkPartitionAssignmentValidity(executorMapping),
 			"executorMapping has null or empty partition");
 
-		checkState(checkPartitionAssignmentValidity(executorMapping),
+		checkState(checkPartitionAssignmentValidity(oldExecutorMapping),
 			"oldExecutorMapping has null or empty partition");
 
 		this.partitionAssignment = new HashMap<>();

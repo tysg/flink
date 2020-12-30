@@ -34,7 +34,6 @@ public class WorkloadsAssignmentHandler {
 	}
 
 	public OperatorWorkloadsAssignment handleWorkloadsReallocate(int operatorId, Map<Integer, List<Integer>> executorMapping) {
-		System.out.println("++++++ handle workload: " + heldExecutorMapping.get(operatorId));
 		int newParallelism = executorMapping.keySet().size();
 		OperatorWorkloadsAssignment operatorWorkloadsAssignment;
 		if (newParallelism == heldWorkloadsAssignmentMap.get(operatorId).getNumOpenedSubtask()) {

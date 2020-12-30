@@ -99,17 +99,17 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 	@Override
 	public CompletableFuture<Void> updateTaskResources(int operatorID, int oldParallelism) {
 		// TODO: By far we only support horizontal scaling, vertival scaling is not included.
-		System.out.println("++++++ re-allocate resources for tasks" + operatorID);
+//		System.out.println("++++++ re-allocate resources for tasks" + operatorID);
 		JobVertexID tgtJobVertexID = rawVertexIDToJobVertexID(operatorID);
 		ExecutionJobVertex tgtJobVertex = executionGraph.getJobVertex(tgtJobVertexID);
+		assert tgtJobVertex != null;
 		if (tgtJobVertex.getParallelism() < oldParallelism) {
-			cancelTasks(operatorID, 0);
+			return cancelTasks(operatorID, 0);
 		} else if (tgtJobVertex.getParallelism() > oldParallelism) {
-			deployTasks(operatorID, oldParallelism);
+			return deployTasks(operatorID, oldParallelism);
 		} else {
 			throw new IllegalStateException("none of new tasks has been created");
 		}
-		return CompletableFuture.completedFuture(null);
 	}
 
 	@Override
@@ -125,7 +125,6 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 			new ArrayList<>(tgtJobVertex.getParallelism() - oldParallelism);
 
 		ExecutionVertex[] taskVertices = tgtJobVertex.getTaskVertices();
-		RescaleID rescaleID = RescaleID.generateNextID();
 //		List<ExecutionVertex> createdVertex = new ArrayList<>();
 //		for (int i = oldParallelism; i < srcJobVertex.getParallelism(); i++) {
 //			createdVertex.add(taskVertices[i]);
@@ -139,6 +138,7 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 //		}
 		for (ExecutionVertex vertex : createCandidates.get(operatorID)) {
 			Execution executionAttempt = vertex.getCurrentExecutionAttempt();
+//			System.out.println("++++++allocate for : " + vertex.getID());
 			allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(rescaleID));
 		}
 
@@ -155,6 +155,7 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 						new ArrayList<>(tgtJobVertex.getParallelism() - oldParallelism);
 					for (Execution execution : executions) {
 						try {
+							System.out.println("++++++ deploy: " + execution.getVertex().getID());
 							deployFutures.add(execution.deploy());
 						} catch (JobException e) {
 							e.printStackTrace();
@@ -164,6 +165,7 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 				}
 			).thenCompose(executions -> {
 				try {
+//					System.out.println("++++++ update checkpoint coordinator");
 					CheckpointCoordinator checkpointCoordinator = executionGraph.getCheckpointCoordinator();
 					checkNotNull(checkpointCoordinator);
 					checkpointCoordinator.stopCheckpointScheduler();
@@ -195,10 +197,47 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 	@Override
 	public CompletableFuture<Void> cancelTasks(int operatorID, int offset) {
 		// TODO: add them to the future list
+		Collection<CompletableFuture<?>> removeFutures =
+			new ArrayList<>(removedCandidates.size());
+
 		for (ExecutionVertex vertex : removedCandidates.get(operatorID)) {
-			vertex.cancel();
+			CompletableFuture<?> removedTask = vertex.cancel();
+			removeFutures.add(removedTask);
 		}
-		return CompletableFuture.completedFuture(null);
+
+//		return FutureUtils.supplyAsync(() -> {
+//				try {
+//					CheckpointCoordinator checkpointCoordinator = executionGraph.getCheckpointCoordinator();
+//					assert checkpointCoordinator != null;
+//					checkpointCoordinator.stopCheckpointScheduler();
+//					checkNotNull(checkpointCoordinator);
+//					checkpointCoordinator.dropVertices(removedCandidates.get(operatorID).toArray(new ExecutionVertex[0]), false);
+//
+//					if (checkpointCoordinator.isPeriodicCheckpointingConfigured()) {
+//						checkpointCoordinator.startCheckpointScheduler();
+//					}
+//					return updatePartitionAndDownStreamGates(operatorID, rescaleID);
+//				} catch (ExecutionGraphException e) {
+//					e.printStackTrace();
+//					return FutureUtils.completedExceptionally(e);
+//				}
+//			});
+
+		try {
+			CheckpointCoordinator checkpointCoordinator = executionGraph.getCheckpointCoordinator();
+			assert checkpointCoordinator != null;
+			checkpointCoordinator.stopCheckpointScheduler();
+			checkNotNull(checkpointCoordinator);
+			checkpointCoordinator.dropVertices(removedCandidates.get(operatorID).toArray(new ExecutionVertex[0]), false);
+
+			if (checkpointCoordinator.isPeriodicCheckpointingConfigured()) {
+				checkpointCoordinator.startCheckpointScheduler();
+			}
+			return updatePartitionAndDownStreamGates(operatorID, rescaleID);
+		} catch (ExecutionGraphException e) {
+			e.printStackTrace();
+			return FutureUtils.completedExceptionally(e);
+		}
 	}
 
 	/**
@@ -215,7 +254,6 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 		System.out.println("update mapping...");
 		final List<CompletableFuture<Void>> rescaleCandidatesFutures = new ArrayList<>();
 		try {
-			RescaleID rescaleID = RescaleID.generateNextID();
 			for (OperatorDescriptor src : heldExecutionPlan.getOperatorDescriptorByID(destOpID).getParents()) {
 				// todo some partitions may not need modified, for example, broad cast partitioner
 				rescaleCandidatesFutures.add(updatePartitionAndDownStreamGates(src.getOperatorID(), rescaleID));
@@ -298,6 +336,7 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 	private void updateGates(JobVertexID jobVertexID, List<CompletableFuture<Void>> futureList) throws ExecutionGraphException {
 		ExecutionJobVertex jobVertex = executionGraph.getJobVertex(jobVertexID);
 		Preconditions.checkNotNull(jobVertex, "can not found this execution job vertex");
+//		System.out.println("+++++update downstream..." + jobVertex.getJobVertexId());
 		for (ExecutionVertex vertex : jobVertex.getTaskVertices()) {
 			Execution execution = vertex.getCurrentExecutionAttempt();
 			if (execution != null && execution.getState() == ExecutionState.RUNNING) {
@@ -336,15 +375,16 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 			if (remappingAssignment == null) {
 				syncOp.resumeTasks(Collections.singletonList(Tuple2.of(operatorID, -1)));
 				return CompletableFuture.completedFuture(diff);
-			} else {
-				List<Tuple2<Integer, Integer>> notModifiedList =
-					Arrays.stream(executionJobVertex.getTaskVertices())
-						.map(ExecutionVertex::getParallelSubtaskIndex)
-						.filter(i -> !remappingAssignment.isTaskModified(i))
-						.map(i -> Tuple2.of(operatorID, i))
-						.collect(Collectors.toList());
-				syncOp.resumeTasks(notModifiedList);
 			}
+//			else {
+//				List<Tuple2<Integer, Integer>> notModifiedList =
+//					Arrays.stream(executionJobVertex.getTaskVertices())
+//						.map(ExecutionVertex::getParallelSubtaskIndex)
+//						.filter(i -> !remappingAssignment.isTaskModified(i))
+//						.map(i -> Tuple2.of(operatorID, i))
+//						.collect(Collectors.toList());
+//				syncOp.resumeTasks(notModifiedList);
+//			}
 		}
 
 		checkNotNull(syncOp, "no state collected currently, have you synchronized first?");
@@ -356,18 +396,32 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 				// think about latter
 				stateAssignmentOperation.setRedistributeStrategy(remappingAssignment);
 
-				LOG.info("++++++ start to assign states");
+//				LOG.info("++++++ start to assign states");
 				stateAssignmentOperation.assignStates();
+				executionJobVertex.syncOldConfigInfo();
 			}
 		);
 		return assignStateFuture.thenCompose(o -> {
 				final List<CompletableFuture<?>> rescaleCandidatesFutures = new ArrayList<>();
 				for (int i = 0; i < executionJobVertex.getParallelism(); i++) {
 					Execution execution = executionJobVertex.getTaskVertices()[i].getCurrentExecutionAttempt();
+					// for those unmodified tasks, update keygroup range, for those modified tasks, update state.
 					if (!remappingAssignment.isTaskModified(i)) {
-						continue;
-					}
-					if (execution != null && execution.getState() == ExecutionState.RUNNING) {
+						try {
+							System.out.println(operatorID + " update keygroup range at: " + i);
+							CompletableFuture<Void> stateUpdateFuture = execution.scheduleRescale(null,
+								RescaleOptions.RESCALE_KEYGROUP_RANGE_ONLY,
+								remappingAssignment.getAlignedKeyGroupRange(execution.getParallelSubtaskIndex()));
+							if (diffMap.isEmpty()) {
+								checkNotNull(syncOp, "have you call sync before");
+								final int taskOffset = i;
+								stateUpdateFuture.thenAccept(
+									v -> syncOp.resumeTasks(Collections.singletonList(Tuple2.of(operatorID, taskOffset))));
+							}
+						} catch (ExecutionGraphException e) {
+							e.printStackTrace();
+						}
+					} else if (execution != null && execution.getState() == ExecutionState.RUNNING) {
 						try {
 							System.out.println(operatorID + " update state at: " + i);
 							CompletableFuture<Void> stateUpdateFuture = execution.scheduleRescale(
@@ -459,7 +513,6 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 		private final Object lock = new Object();
 
 		private final CompletableFuture<Map<OperatorID, OperatorState>> finishedFuture;
-		final RescaleID rescaleID = RescaleID.generateNextID();
 
 		private long checkpointId;
 

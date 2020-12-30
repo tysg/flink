@@ -14,6 +14,7 @@ import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.messages.Acknowledge;
+import org.apache.flink.runtime.rescale.RescaleID;
 import org.apache.flink.util.Preconditions;
 
 import java.util.*;
@@ -40,11 +41,16 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 	protected volatile Map<Integer, List<ExecutionVertex>> removedCandidates;
 	protected volatile Map<Integer, List<ExecutionVertex>> createCandidates;
 
+	// rescaleID should be maintained to identify number of reconfigs has been applied
+	protected volatile RescaleID rescaleID;
+
 
 	protected AbstractCoordinator(JobGraph jobGraph, ExecutionGraph executionGraph) {
 		this.jobGraph = jobGraph;
 		this.executionGraph = executionGraph;
 		this.userCodeClassLoader = executionGraph.getUserClassLoader();
+		this.removedCandidates = new HashMap<>();
+		this.createCandidates = new HashMap<>();
 	}
 
 	public void setStreamRelatedInstanceFactory(StreamRelatedInstanceFactory streamRelatedInstanceFactory) {
@@ -85,12 +91,12 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 
 	@Override
 	public final CompletableFuture<Map<Integer, Map<Integer, Diff>>> prepareExecutionPlan(StreamJobExecutionPlan jobExecutionPlan) {
+		rescaleID = RescaleID.generateNextID();
 		Map<Integer, Map<Integer, Diff>> differenceMap = new HashMap<>();
 		for (Iterator<OperatorDescriptor> it = jobExecutionPlan.getAllOperatorDescriptor(); it.hasNext(); ) {
 			OperatorDescriptor descriptor = it.next();
 			int operatorID = descriptor.getOperatorID();
 			OperatorDescriptor heldDescriptor = heldExecutionPlan.getOperatorDescriptorByID(operatorID);
-			System.out.println(heldDescriptor.getKeyStateAllocation() + " : " +  descriptor.getKeyStateAllocation());
 			int oldParallelism = heldDescriptor.getParallelism();
 			// loop until all change in this operator has been detected and sync
 			List<Integer> changes = analyzeOperatorDifference(heldDescriptor, descriptor);
@@ -130,7 +136,6 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 								rescaleExecutionGraph(heldDescriptor.getOperatorID(), oldParallelism, operatorWorkloadsAssignment);
 							}
 							heldDescriptor.setKeySet(descriptor.getKeyStateAllocation());
-							System.out.println("++++++ keyset: " + heldDescriptor.getKeyStateAllocation());;
 							updateKeySet(heldDescriptor, isRescale);
 							break;
 						case KEY_MAPPING:
@@ -171,7 +176,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 			.collect(Collectors.toList());
 
 		List<JobVertexID> updatedUpstream = heldExecutionPlan.getOperatorDescriptorByID(rawVertexID)
-			.getChildren().stream()
+			.getParents().stream()
 			.map(child -> rawVertexIDToJobVertexID(child.getOperatorID()))
 			.collect(Collectors.toList());
 
@@ -179,7 +184,6 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 		if (oldParallelism < targetJobVertex.getParallelism()) {
 			// scale out, we assume every time only one scale out will be called. Otherwise it will subsitute current candidates
 			this.createCandidates.put(rawVertexID, targetVertex.scaleOut(executionGraph.getRpcTimeout(), executionGraph.getGlobalModVersion(), System.currentTimeMillis()));
-
 
 			for (JobVertexID downstreamID : updatedDownstream) {
 				ExecutionJobVertex downstream = executionGraph.getJobVertex(downstreamID);
@@ -209,7 +213,6 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 		} else {
 			throw new IllegalStateException("No need to rescale with the same parallelism");
 		}
-
 		executionGraph.updateNumOfTotalVertices();
 	}
 

@@ -354,6 +354,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					.thenAccept(
 						(acknowledge) -> {
 							try {
+								System.out.println("++++++ finished update");
 								this.jobExecutionPlan.notifyUpdateFinished(operatorID);
 							} catch (Exception e) {
 								e.printStackTrace();
@@ -397,6 +398,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						.thenAccept(
 							(acknowledge) -> {
 								try {
+									System.out.println("++++++ finished update");
 									this.jobExecutionPlan.notifyUpdateFinished(operatorID);
 								} catch (Exception e) {
 									e.printStackTrace();
