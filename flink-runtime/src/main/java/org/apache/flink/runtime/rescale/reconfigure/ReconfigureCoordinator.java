@@ -139,6 +139,7 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 		for (ExecutionVertex vertex : createCandidates.get(operatorID)) {
 			Execution executionAttempt = vertex.getCurrentExecutionAttempt();
 //			System.out.println("++++++allocate for : " + vertex.getID());
+
 			allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(rescaleID));
 		}
 
@@ -310,7 +311,7 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 			srcJobVertex.cleanBeforeRescale();
 			for (ExecutionVertex vertex : srcJobVertex.getTaskVertices()) {
 				Execution execution = vertex.getCurrentExecutionAttempt();
-				if (execution != null && execution.getState() == ExecutionState.RUNNING) {
+				if (!vertex.getRescaleId().equals(rescaleID) && execution != null && execution.getState() == ExecutionState.RUNNING) {
 					execution.updateProducedPartitions(rescaleID);
 					updatePartitionsFuture.add(execution.scheduleRescale(null, RescaleOptions.RESCALE_PARTITIONS_ONLY, null));
 				}
