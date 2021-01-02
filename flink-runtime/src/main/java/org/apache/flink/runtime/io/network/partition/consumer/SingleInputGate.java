@@ -32,6 +32,7 @@ import org.apache.flink.runtime.io.network.buffer.BufferProvider;
 import org.apache.flink.runtime.io.network.partition.PartitionProducerStateProvider;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionID;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionType;
+import org.apache.flink.runtime.io.network.partition.ResultSubpartition;
 import org.apache.flink.runtime.io.network.partition.consumer.InputChannel.BufferAndAvailability;
 import org.apache.flink.runtime.jobgraph.DistributionPattern;
 import org.apache.flink.runtime.jobgraph.IntermediateDataSetID;
@@ -468,6 +469,19 @@ public class SingleInputGate extends InputGate {
 		synchronized (requestLock) {
 			for (InputChannel inputChannel : inputChannels.values()) {
 				try {
+					if(inputChannel instanceof RemoteInputChannel){
+						LOG.info("-----DEBUG number of left buffer in remote channel:" +
+							((RemoteInputChannel) inputChannel).getNumberOfQueuedBuffers()+ " of task " + owningTaskName);
+					}else if(inputChannel instanceof LocalInputChannel){
+						try {
+							Optional<BufferAndAvailability> buffer;
+							if((buffer = inputChannel.getNextBuffer()).isPresent()) {
+								System.err.println("-----DEBUG, the local input channel has buffer:" + buffer);
+							}
+						} catch (InterruptedException e) {
+							e.printStackTrace();
+						}
+					}
 					inputChannel.releaseAllResources();
 				}
 				catch (IOException e) {
@@ -477,6 +491,7 @@ public class SingleInputGate extends InputGate {
 			}
 
 			this.inputChannels.clear();
+			this.inputChannelsWithData.clear();
 		}
 
 		this.numberOfInputChannels = numberOfInputChannels;

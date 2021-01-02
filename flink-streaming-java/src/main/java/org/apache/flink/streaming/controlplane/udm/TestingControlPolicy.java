@@ -277,41 +277,41 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 			// this operator is the downstream of actual source operator
 			int nearSourceMap = findOperatorByName("near source Flatmap");
 			int statelessMap = findOperatorByName("source stateless map");
-			if (statefulOpID == -1 || statelessOpID == -1
-				|| nearSourceMap == -1 || statelessMap == -1
-				|| sourceOp == -1) {
-				System.out.println("can not find operator with given name, corrupt");
-				return;
-			}
+//			if (statefulOpID == -1 || statelessOpID == -1
+//				|| nearSourceMap == -1 || statelessMap == -1
+//				|| sourceOp == -1) {
+//				System.out.println("can not find operator with given name, corrupt");
+//				return;
+//			}
 			try {
 				showOperatorInfo();
 				Thread.sleep(3000);
 
-				System.out.println("\nstart stateless rebalance test...");
-				testRebalanceStateless(statelessMap);
-
-				System.out.println("\nstart stateful rebalance test1...");
-				testRebalanceStateful(statefulOpID);
-
-				System.out.println("\nstart stateful rebalance test2...");
-				testRebalanceStateful(statefulOpID);
-
-				System.out.println("\nstart source near stateful operator rebalance test...");
-				testRebalanceStateful(nearSourceMap);
-
-				System.out.println("\nstart synchronize source test...");
-				testPauseSource(sourceOp);
+//				System.out.println("\nstart stateless rebalance test...");
+//				testRebalanceStateless(statelessMap);
+//
+//				System.out.println("\nstart stateful rebalance test1...");
+//				testRebalanceStateful(statefulOpID);
+//
+//				System.out.println("\nstart stateful rebalance test2...");
+//				testRebalanceStateful(statefulOpID);
+//
+//				System.out.println("\nstart source near stateful operator rebalance test...");
+//				testRebalanceStateful(nearSourceMap);
+//
+//				System.out.println("\nstart synchronize source test...");
+//				testPauseSource(sourceOp);
 
 				System.out.println("\nstart stateful scale out test");
 				testScaleOutStateful(statefulOpID);
 
-				Thread.sleep(1000);
+				Thread.sleep(3000);
 
-				System.out.println("\nstart update function related test...");
-				testCustomizeWindowUpdateAPI();
+//				System.out.println("\nstart update function related test...");111111
+//				testCustomizeWindowUpdateAPI();
 
-				System.out.println("\nstart rescale window join test...");
-				testScaleOutWindowJoin();
+//				System.out.println("\nstart rescale window join test...");
+//				testScaleOutWindowJoin();
 
 				System.out.println("\nstart stateful scale out 2 more test");
 				testScaleOut2(statelessOpID);
