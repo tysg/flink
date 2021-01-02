@@ -375,16 +375,15 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 			if (remappingAssignment == null) {
 				syncOp.resumeTasks(Collections.singletonList(Tuple2.of(operatorID, -1)));
 				return CompletableFuture.completedFuture(diff);
+			} else {
+				List<Tuple2<Integer, Integer>> notModifiedList =
+					Arrays.stream(executionJobVertex.getTaskVertices())
+						.map(ExecutionVertex::getParallelSubtaskIndex)
+						.filter(i -> !remappingAssignment.isTaskModified(i))
+						.map(i -> Tuple2.of(operatorID, i))
+						.collect(Collectors.toList());
+				syncOp.resumeTasks(notModifiedList);
 			}
-//			else {
-//				List<Tuple2<Integer, Integer>> notModifiedList =
-//					Arrays.stream(executionJobVertex.getTaskVertices())
-//						.map(ExecutionVertex::getParallelSubtaskIndex)
-//						.filter(i -> !remappingAssignment.isTaskModified(i))
-//						.map(i -> Tuple2.of(operatorID, i))
-//						.collect(Collectors.toList());
-//				syncOp.resumeTasks(notModifiedList);
-//			}
 		}
 
 		checkNotNull(syncOp, "no state collected currently, have you synchronized first?");
@@ -407,21 +406,23 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 					Execution execution = executionJobVertex.getTaskVertices()[i].getCurrentExecutionAttempt();
 					// for those unmodified tasks, update keygroup range, for those modified tasks, update state.
 					if (!remappingAssignment.isTaskModified(i)) {
-						try {
-							System.out.println(operatorID + " update keygroup range at: " + i);
-							CompletableFuture<Void> stateUpdateFuture = execution.scheduleRescale(null,
-								RescaleOptions.RESCALE_KEYGROUP_RANGE_ONLY,
-								remappingAssignment.getAlignedKeyGroupRange(execution.getParallelSubtaskIndex()));
-							if (diffMap.isEmpty()) {
-								checkNotNull(syncOp, "have you call sync before");
-								final int taskOffset = i;
-								stateUpdateFuture.thenAccept(
-									v -> syncOp.resumeTasks(Collections.singletonList(Tuple2.of(operatorID, taskOffset))));
-							}
-						} catch (ExecutionGraphException e) {
-							e.printStackTrace();
-						}
-					} else if (execution != null && execution.getState() == ExecutionState.RUNNING) {
+//						try {
+//							System.out.println(operatorID + " update keygroup range at: " + i);
+//							CompletableFuture<Void> stateUpdateFuture = execution.scheduleRescale(null,
+//								RescaleOptions.RESCALE_KEYGROUP_RANGE_ONLY,
+//								remappingAssignment.getAlignedKeyGroupRange(execution.getParallelSubtaskIndex()));
+//							if (diffMap.isEmpty()) {
+//								checkNotNull(syncOp, "have you call sync before");
+//								final int taskOffset = i;
+//								stateUpdateFuture.thenAccept(
+//									v -> syncOp.resumeTasks(Collections.singletonList(Tuple2.of(operatorID, taskOffset))));
+//							}
+//						} catch (ExecutionGraphException e) {
+//							e.printStackTrace();
+//						}
+						continue;
+					}
+					if (execution != null && execution.getState() == ExecutionState.RUNNING) {
 						try {
 							System.out.println(operatorID + " update state at: " + i);
 							CompletableFuture<Void> stateUpdateFuture = execution.scheduleRescale(
