@@ -307,7 +307,7 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 
 				Thread.sleep(3000);
 
-//				System.out.println("\nstart update function related test...");111111
+//				System.out.println("\nstart update function related test...");
 //				testCustomizeWindowUpdateAPI();
 
 //				System.out.println("\nstart rescale window join test...");
