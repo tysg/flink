@@ -31,6 +31,7 @@ import org.apache.flink.runtime.io.network.buffer.Buffer;
 import org.apache.flink.runtime.io.network.partition.consumer.BufferOrEvent;
 import org.apache.flink.runtime.plugable.DeserializationDelegate;
 import org.apache.flink.runtime.plugable.NonReusingDeserializationDelegate;
+import org.apache.flink.runtime.util.profiling.MetricsManager;
 import org.apache.flink.streaming.api.watermark.Watermark;
 import org.apache.flink.streaming.runtime.streamrecord.StreamElement;
 import org.apache.flink.streaming.runtime.streamrecord.StreamElementSerializer;
@@ -76,6 +77,8 @@ public final class StreamTaskNetworkInput<T> implements StreamTaskInput<T> {
 	private RecordDeserializer<DeserializationDelegate<StreamElement>> currentRecordDeserializer = null;
 
 	private final IOManager ioManager;
+
+	private MetricsManager metricsManager;
 
 	@SuppressWarnings("unchecked")
 	public StreamTaskNetworkInput(
@@ -248,5 +251,9 @@ public final class StreamTaskNetworkInput<T> implements StreamTaskInput<T> {
 
 		statusWatermarkValve.rescale(numInputChannels);
 		checkpointedInputGate.updateHandlerBufferChannels(numInputChannels);
+	}
+
+	public void setMetricsManager(MetricsManager metricsManager) {
+		this.metricsManager = metricsManager;
 	}
 }

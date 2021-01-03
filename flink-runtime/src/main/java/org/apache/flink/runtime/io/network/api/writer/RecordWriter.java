@@ -30,6 +30,7 @@ import org.apache.flink.runtime.io.network.api.serialization.SpanningRecordSeria
 import org.apache.flink.runtime.io.network.buffer.BufferBuilder;
 import org.apache.flink.runtime.io.network.buffer.BufferConsumer;
 import org.apache.flink.runtime.metrics.groups.TaskIOMetricGroup;
+import org.apache.flink.runtime.util.profiling.MetricsManager;
 import org.apache.flink.util.XORShiftRandom;
 
 import org.slf4j.Logger;
@@ -86,6 +87,12 @@ public abstract class RecordWriter<T extends IOReadableWritable> implements Avai
 
 	/** To avoid synchronization overhead on the critical path, best-effort error tracking is enough here.*/
 	private Throwable flusherException;
+
+	/**
+	 * add a metrics manager to get true processing rate
+	 */
+	protected MetricsManager metricsManager;
+
 
 	RecordWriter(ResultPartitionWriter writer, long timeout, String taskName) {
 		this.targetPartition = writer;
@@ -327,5 +334,9 @@ public abstract class RecordWriter<T extends IOReadableWritable> implements Avai
 	@VisibleForTesting
 	ResultPartitionWriter getTargetPartition() {
 		return targetPartition;
+	}
+
+	public void setMetricsManager(MetricsManager metricsManager) {
+		this.metricsManager = metricsManager;
 	}
 }

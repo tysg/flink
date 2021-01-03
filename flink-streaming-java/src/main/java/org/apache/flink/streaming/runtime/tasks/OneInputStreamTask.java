@@ -28,6 +28,7 @@ import org.apache.flink.runtime.metrics.MetricNames;
 import org.apache.flink.runtime.metrics.groups.TaskIOMetricGroup;
 import org.apache.flink.runtime.rescale.TaskRescaleManager;
 import org.apache.flink.runtime.taskmanager.RuntimeEnvironment;
+import org.apache.flink.runtime.util.profiling.MetricsManager;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.watermark.Watermark;
@@ -96,7 +97,19 @@ public class OneInputStreamTask<IN, OUT> extends StreamTask<OUT, OneInputStreamO
 			taskIOMetricGroup.gauge("checkpointAlignmentTime", inputGate::getAlignmentDurationNanos);
 
 			DataOutput<IN> output = createDataOutput();
+
+			if (output instanceof StreamTaskNetworkOutput) {
+				// pass on the MetricsManager
+				((StreamTaskNetworkOutput) output).setMetricsManager(getMetricsManager());
+			}
+
 			StreamTaskInput<IN> input = createTaskInput(inputGate, output);
+
+			if (input instanceof StreamTaskNetworkInput) {
+				// pass on the MetricsManager
+				((StreamTaskNetworkInput) input).setMetricsManager(getMetricsManager());
+			}
+
 			inputProcessor = new StreamOneInputProcessor<>(
 				input,
 				output,
@@ -167,6 +180,12 @@ public class OneInputStreamTask<IN, OUT> extends StreamTask<OUT, OneInputStreamO
 		private final WatermarkGauge watermarkGauge;
 		private final Counter numRecordsIn;
 
+		private MetricsManager metricsManager;
+		private long deserializationDuration = 0;
+		private long processingDuration = 0;
+		private long recordsProcessed = 0;
+		private long endToEndLatency = 0;
+
 		private StreamTaskNetworkOutput(
 				OneInputStreamOperator<IN, ?> operator,
 				StreamStatusMaintainer streamStatusMaintainer,
@@ -184,8 +203,23 @@ public class OneInputStreamTask<IN, OUT> extends StreamTask<OUT, OneInputStreamO
 		public void emitRecord(StreamRecord<IN> record) throws Exception {
 			synchronized (lock) {
 				numRecordsIn.inc();
+
+				metricsManager.incRecordIn(record.getKeyGroup());
+				endToEndLatency += System.currentTimeMillis() - record.getLatenyTimestamp();
+				recordsProcessed++;
+
+				metricsManager.inputBufferConsumed(System.nanoTime(),
+					deserializationDuration, processingDuration,
+					recordsProcessed, endToEndLatency);
+
 				operator.setKeyContextElement1(record);
 				operator.processElement(record);
+
+				// TODO: by far, we only need to measure the latency and throughput, other things are left for future measurement
+				processingDuration = 0;
+				recordsProcessed = 0;
+				endToEndLatency = 0;
+				deserializationDuration = 0;
 			}
 		}
 
@@ -202,6 +236,10 @@ public class OneInputStreamTask<IN, OUT> extends StreamTask<OUT, OneInputStreamO
 			synchronized (lock) {
 				operator.processLatencyMarker(latencyMarker);
 			}
+		}
+
+		public void setMetricsManager(MetricsManager metricsManager) {
+			this.metricsManager = metricsManager;
 		}
 	}
 }

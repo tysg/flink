@@ -62,6 +62,7 @@ public class TaskDeploymentDescriptorFactory {
 	private final int subtaskIndex;
 	private final ExecutionEdge[][] inputEdges;
 	private final KeyGroupRange keyGroupRange;
+	private final int idInModel;
 
 	private TaskDeploymentDescriptorFactory(
 			ExecutionAttemptID executionId,
@@ -72,7 +73,8 @@ public class TaskDeploymentDescriptorFactory {
 			boolean allowUnknownPartitions,
 			int subtaskIndex,
 			ExecutionEdge[][] inputEdges,
-			@Nullable KeyGroupRange keyGroupRange) {
+			@Nullable KeyGroupRange keyGroupRange,
+			int idInModel) {
 		this.executionId = executionId;
 		this.attemptNumber = attemptNumber;
 		this.serializedJobInformation = serializedJobInformation;
@@ -82,6 +84,7 @@ public class TaskDeploymentDescriptorFactory {
 		this.subtaskIndex = subtaskIndex;
 		this.inputEdges = inputEdges;
 		this.keyGroupRange = keyGroupRange;
+		this.idInModel = idInModel;
 	}
 
 	public TaskDeploymentDescriptor createDeploymentDescriptor(
@@ -101,6 +104,7 @@ public class TaskDeploymentDescriptorFactory {
 			taskRestore,
 			new ArrayList<>(producedPartitions),
 			createInputGateDeploymentDescriptors());
+		taskDeploymentDescriptor.setIdInModel(idInModel);
 		taskDeploymentDescriptor.setKeyGroupRange(keyGroupRange);
 		return taskDeploymentDescriptor;
 	}
@@ -153,7 +157,8 @@ public class TaskDeploymentDescriptorFactory {
 			executionGraph.getScheduleMode().allowLazyDeployment(),
 			executionVertex.getParallelSubtaskIndex(),
 			executionVertex.getAllInputEdges(),
-			executionVertex.getKeyGroupRange());
+			executionVertex.getKeyGroupRange(),
+			executionVertex.getIdInModel());
 	}
 
 	private static MaybeOffloaded<JobInformation> getSerializedJobInformation(ExecutionGraph executionGraph) {

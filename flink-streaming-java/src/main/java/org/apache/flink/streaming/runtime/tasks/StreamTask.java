@@ -53,6 +53,7 @@ import org.apache.flink.runtime.taskmanager.InputGateWithMetrics;
 import org.apache.flink.runtime.taskmanager.RuntimeEnvironment;
 import org.apache.flink.runtime.util.ExecutorThreadFactory;
 import org.apache.flink.runtime.util.FatalExitExceptionHandler;
+import org.apache.flink.runtime.util.profiling.MetricsManager;
 import org.apache.flink.streaming.api.TimeCharacteristic;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.graph.StreamEdge;
@@ -810,6 +811,10 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 		return getEnvironment().getTaskInfo().getTaskNameWithSubtasks();
 	}
 
+	public MetricsManager getMetricsManager() {
+		return getEnvironment().getMetricsManager();
+	}
+
 	/**
 	 * Gets the name of the task, appended with the subtask indicator and execution id.
 	 *
@@ -1237,6 +1242,9 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 			return;
 		}
 
+		// force append latest status into metrics queue.
+		getMetricsManager().updateMetrics();
+
 		TaskOperatorManager operatorManager = ((RuntimeEnvironment) getEnvironment()).taskOperatorManager;
 		if(operatorManager.acknowledgeSyncRequest(checkpointMetaData.getCheckpointId())){
 			// we could now pause the current processing
@@ -1261,9 +1269,12 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 		try {
 			actionExecutor.runThrowing(() -> {
 				this.assignedKeyGroupRange.update(keyGroupRange);
-//				this.idInModel = idInModel;
+				this.idInModel = idInModel;
 
 				initializeStateAndOpen();
+
+				getEnvironment().getMetricsManager().updateTaskId(
+					getEnvironment().getTaskInfo().getTaskNameWithSubtasks(), idInModel);
 // we don't need to reconnect since we have separate api called resume
 //				initReconnect();
 			});

@@ -333,6 +333,8 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 				attemptNumber,
 				String.valueOf(slotAllocationId));
 
+		this.taskInfo.setIdInModel(taskInformation.getIdInModel());
+
 		this.jobId = jobInformation.getJobId();
 		this.vertexId = taskInformation.getJobVertexId();
 		this.executionId  = Preconditions.checkNotNull(executionAttemptID);

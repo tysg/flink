@@ -152,7 +152,7 @@ public final class TaskDeploymentDescriptor implements Serializable {
 	private RescaleID rescaleId = RescaleID.DEFAULT;
 
 	/** The id in Streamswitch. */
-	private int idInModel = 0;
+	private int idInModel = Integer.MAX_VALUE/2;
 
 	/** Assigned keyGroupRange. */
 	private KeyGroupRange keyGroupRange;
@@ -296,6 +296,10 @@ public final class TaskDeploymentDescriptor implements Serializable {
 		this.keyGroupRange = keyGroupRange;
 	}
 
+
+	public void setIdInModel(int idInModel) {
+		this.idInModel = idInModel;
+	}
 
 	public int getIdInModel() {
 		return idInModel;
