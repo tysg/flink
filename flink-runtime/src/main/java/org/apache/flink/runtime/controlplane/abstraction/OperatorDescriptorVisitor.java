@@ -27,11 +27,11 @@ public class OperatorDescriptorVisitor {
 		operatorDescriptor.addParent(parentEdges, allOperatorsById);
 	}
 
-	public void setKeyStateAllocation(List<List<Integer>> keyStateAllocation) {
+	public void setKeyStateAllocation(Map<Integer, List<Integer>> keyStateAllocation) {
 		operatorDescriptor.setKeyStateAllocation(keyStateAllocation);
 	}
 
-	public void setKeyMapping(Map<Integer, List<List<Integer>>> keyMapping) {
+	public void setKeyMapping(Map<Integer, Map<Integer, List<Integer>>> keyMapping) {
 		operatorDescriptor.setKeyMapping(keyMapping);
 	}
 

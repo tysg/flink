@@ -127,6 +127,7 @@ public class ExecutionJobVertex implements AccessExecutionJobVertex, Archiveable
 	private final boolean maxParallelismConfigured;
 
 	private int maxParallelism;
+	private volatile int oldParallelism;
 
 	private final ResourceProfile resourceProfile;
 
@@ -196,6 +197,8 @@ public class ExecutionJobVertex implements AccessExecutionJobVertex, Archiveable
 		}
 
 		this.parallelism = numTaskVertices;
+		this.oldParallelism = numTaskVertices;
+
 		this.resourceProfile = ResourceProfile.fromResourceSpec(jobVertex.getMinResources(), MemorySize.ZERO);
 
 		this.taskVertices = new ExecutionVertex[numTaskVertices];
@@ -332,6 +335,10 @@ public class ExecutionJobVertex implements AccessExecutionJobVertex, Archiveable
 	@Override
 	public int getParallelism() {
 		return parallelism;
+	}
+
+	public int getOldParallelism() {
+		return oldParallelism;
 	}
 
 	@Override
@@ -485,13 +492,13 @@ public class ExecutionJobVertex implements AccessExecutionJobVertex, Archiveable
 		cleanBeforeRescale();
 
 		// TODO scaling: check sanity for parallelism
-		int oldParallelism = parallelism;
 
-		int newParallelism = getJobVertex().getParallelism();
-		this.parallelism = newParallelism;
+		oldParallelism = parallelism;
+		int numNewTaskVertices = getJobVertex().getParallelism();
+		this.parallelism = numNewTaskVertices;
 
 		for (IntermediateResult producedDataSet : producedDataSets) {
-			producedDataSet.updateNumParallelProducers(newParallelism);
+			producedDataSet.updateNumParallelProducers(numNewTaskVertices, 0);
 			producedDataSet.resetConsumers();
 		}
 
@@ -500,9 +507,9 @@ public class ExecutionJobVertex implements AccessExecutionJobVertex, Archiveable
 			jobConfiguration.getInteger(JobManagerOptions.MAX_ATTEMPTS_HISTORY_SIZE) :
 			JobManagerOptions.MAX_ATTEMPTS_HISTORY_SIZE.defaultValue();
 
-		ExecutionVertex[] newTaskVertices = new ExecutionVertex[newParallelism];
-		List<ExecutionVertex> createdTaskVertices = new ArrayList<>(newParallelism - oldParallelism);
-		for (int i = 0; i < newParallelism; i++) {
+		ExecutionVertex[] newTaskVertices = new ExecutionVertex[numNewTaskVertices];
+		List<ExecutionVertex> createdTaskVertices = new ArrayList<>(numNewTaskVertices - oldParallelism);
+		for (int i = 0; i < numNewTaskVertices; i++) {
 			if (i < oldParallelism) {
 				newTaskVertices[i] = taskVertices[i];
 				newTaskVertices[i].updateTaskNameWithSubtaskIndex();
@@ -543,10 +550,61 @@ public class ExecutionJobVertex implements AccessExecutionJobVertex, Archiveable
 	}
 
 	public List<ExecutionVertex> scaleIn(
-		Time timeout,
-		long initialGlobalModVersion,
-		long createTimestamp) {
-		throw new IllegalArgumentException("scaleIn is not suppported now.");
+		int removedTaskId) {
+
+		cleanBeforeRescale();
+
+		// TODO scaling: check sanity for parallelism
+		oldParallelism = parallelism;
+		int numNewTaskVertices = oldParallelism - 1;
+		this.parallelism = numNewTaskVertices;
+
+		for (IntermediateResult producedDataSet : producedDataSets) {
+			producedDataSet.updateNumParallelProducers(numNewTaskVertices, removedTaskId);
+			producedDataSet.resetConsumers();
+		}
+
+		ExecutionVertex[] newTaskVertices = new ExecutionVertex[numNewTaskVertices];
+		// suppose only one task will be removed
+		List<ExecutionVertex> removedTaskVertices = new ArrayList<>(oldParallelism - numNewTaskVertices);
+		int j = 0;
+		for (int i = 0; i < oldParallelism; i++) {
+			if (i != removedTaskId) {
+				newTaskVertices[j] = taskVertices[i];
+				// update subtask index to from i to j
+				newTaskVertices[j].updateTaskIndex(j);
+				newTaskVertices[j].updateTaskNameWithSubtaskIndex();
+				j++;
+			} else {
+				// this task should be canceled when all execution has completed
+//				// cancel and release all resources
+//				taskVertices[i].cancel();
+				// update ExecutionEdge connected to upstream
+
+//				taskVertices[i].deregisterExecution();
+				removedTaskVertices.add(taskVertices[i]);
+			}
+		}
+		this.taskVertices = newTaskVertices;
+
+		// sanity check for the double referencing between intermediate result partitions and execution vertices
+		for (IntermediateResult ir : this.producedDataSets) {
+			if (ir.getNumberOfAssignedPartitions() != parallelism) {
+				throw new RuntimeException("The intermediate result's partitions were not correctly assigned when doing rescaling.");
+			}
+		}
+
+
+		// TODO scaling: whether need to do something for InputSplitSource?
+
+		return removedTaskVertices;
+	}
+
+	public void syncOldConfigInfo() {
+		this.oldParallelism = this.parallelism;
+		for (ExecutionVertex vertex: taskVertices) {
+			vertex.syncOldParallelSubtaskIndex();
+		}
 	}
 
 	public void resetProducedDataSets() {

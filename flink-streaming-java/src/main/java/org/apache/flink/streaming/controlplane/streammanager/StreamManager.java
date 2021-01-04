@@ -319,7 +319,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		runAsync(() -> jobMasterGateway.triggerJobRescale(wrapper, jobGraph, upDownStream.f0, upDownStream.f1));
 	}
 
-	public void rescale(int operatorID, int newParallelism, List<List<Integer>> keyStateAllocation, ControlPolicy waitingController) {
+	public void rescale(int operatorID, int newParallelism, Map<Integer, List<Integer>> keyStateAllocation, ControlPolicy waitingController) {
 		try {
 			// scale in is not support now
 			checkState(keyStateAllocation.size() == newParallelism,
@@ -350,12 +350,14 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					.thenCompose(o -> enforcement.synchronizePauseTasks(affectedTasks, o))
 					.thenCompose(o -> enforcement.updateUpstreamKeyMapping(operatorID, o))
 					.thenCompose(o -> enforcement.updateState(operatorID, o))
-					.thenCompose(o -> enforcement.deployTasks(operatorID, oldParallelism, o))
+					.thenCompose(o -> enforcement.updateTaskResources(operatorID, oldParallelism))
+					.thenCompose(o -> enforcement.resumeTasks())
 					.whenComplete((o, failure) -> {
 						if(failure != null){
 							failure.printStackTrace();
 						}
 						try {
+							System.out.println("++++++ finished update");
 							this.jobExecutionPlan.notifyUpdateFinished(operatorID);
 						} catch (Exception e) {
 							e.printStackTrace();
@@ -369,7 +371,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	}
 
 	@Override
-	public void rebalance(int operatorID, List<List<Integer>> keyStateAllocation, boolean stateful, ControlPolicy waitingController) {
+	public void rebalance(int operatorID, Map<Integer, List<Integer>> keyStateAllocation, boolean stateful, ControlPolicy waitingController) {
 		try {
 			// typically, the target operator should contain key state,
 			// todo if keyStateAllocation is null, means it is stateless operator, but not support now
@@ -399,6 +401,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 								failure.printStackTrace();
 							}
 							try {
+								System.out.println("++++++ finished update");
 								this.jobExecutionPlan.notifyUpdateFinished(operatorID);
 							} catch (Exception e) {
 								e.printStackTrace();

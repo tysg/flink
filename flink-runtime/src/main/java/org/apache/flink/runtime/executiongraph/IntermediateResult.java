@@ -106,31 +106,40 @@ public class IntermediateResult {
 		partitionsAssigned--;
 	}
 
-	public void updateNumParallelProducers(int numParallelProducers) {
+	public void updateNumParallelProducers(int numParallelProducers, int removedTaskId) {
 		if (!resultType.isPipelined() || !resultType.isBounded()) {
 			throw new IllegalArgumentException("cannot adjust parallelism for non-streaming job");
 		}
 		if (numParallelProducers < this.numParallelProducers) {
 			this.numParallelProducers = numParallelProducers;
 			IntermediateResultPartition[] newPartitions = new IntermediateResultPartition[numParallelProducers];
+			int j = 0;
 			for (int i = 0; i < partitions.length; i++) {
-				if (numParallelProducers > i) {
-					newPartitions[i] = partitions[i];
+				if (i != removedTaskId) {
+					newPartitions[j] = partitions[i];
+					j++;
 				} else {
 					// TODO: when decrease the numparallel, remember to remove ejv from executionGraph
 					dropPartition(partitions[i]);
 				}
+//				if (numParallelProducers > i) {
+//					newPartitions[i] = partitions[i];
+//				} else {
+//					// TODO: when decrease the numparallel, remember to remove ejv from executionGraph
+//					dropPartition(partitions[i]);
+//				}
 			}
 			partitions = newPartitions;
-			throw new IllegalArgumentException("scale in is not supported now");
-		}
+//			throw new IllegalArgumentException("scale down is not supported now");
+		} else {
 
-		this.numParallelProducers = numParallelProducers;
-		IntermediateResultPartition[] newPartitions = new IntermediateResultPartition[numParallelProducers];
-		for (int i = 0; i < partitions.length; i++) {
-			newPartitions[i] = partitions[i];
+			this.numParallelProducers = numParallelProducers;
+			IntermediateResultPartition[] newPartitions = new IntermediateResultPartition[numParallelProducers];
+			for (int i = 0; i < partitions.length; i++) {
+				newPartitions[i] = partitions[i];
+			}
+			partitions = newPartitions;
 		}
-		partitions = newPartitions;
 	}
 
 	public void resetConsumers() {

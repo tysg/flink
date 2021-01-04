@@ -92,8 +92,8 @@ public class DummyStreamSwitch extends Thread implements FlinkOperatorController
 			Thread.sleep(5 * 1000);
 
 //			testRepartition();
-			testScaleOut();
-//			testScaleIn();
+//			testScaleOut();
+			testScaleIn();
 //			testCaseOneToOneChange();
 //			testJoin();
 //			testCaseScaleIn();

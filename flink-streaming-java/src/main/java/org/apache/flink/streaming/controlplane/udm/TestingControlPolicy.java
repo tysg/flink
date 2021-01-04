@@ -56,16 +56,38 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 
 	private void testRebalanceStateful(int testingOpID) throws InterruptedException {
 		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
-		List<List<Integer>> keySet = streamJobState.getKeyStateAllocation(testingOpID);
+		Map<Integer, List<Integer>> curKeyStateAllocation = streamJobState.getKeyStateAllocation(testingOpID);
 		// we assume that each operator only have one input now
 
-		List<List<Integer>> newKeySet = keySet.stream()
-			.map(ArrayList::new)
-			.collect(Collectors.toList());
-		List<Integer> oddKeys = newKeySet.get(0).stream().filter(i -> i % 2 == 0).collect(Collectors.toList());
-		newKeySet.get(0).removeAll(oddKeys);
-		newKeySet.get(1).addAll(oddKeys);
-		getInstructionSet().rebalance(testingOpID, newKeySet, true, this);
+		Map<Integer, List<Integer>> newKeyStateAllocation = new HashMap<>();
+		for (Integer taskId : curKeyStateAllocation.keySet()) {
+			newKeyStateAllocation.put(taskId, new ArrayList<>(curKeyStateAllocation.get(taskId)));
+		}
+
+		List<Integer> oddKeys = newKeyStateAllocation.get(0).stream().filter(i -> i % 2 == 0).collect(Collectors.toList());
+		newKeyStateAllocation.get(0).removeAll(oddKeys);
+		newKeyStateAllocation.get(1).addAll(oddKeys);
+		getInstructionSet().rebalance(testingOpID, newKeyStateAllocation, true, this);
+		// wait for operation completed
+		synchronized (object) {
+			object.wait();
+		}
+	}
+
+	private void testRebalanceStateful2(int testingOpID) throws InterruptedException {
+		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
+		Map<Integer, List<Integer>> curKeyStateAllocation = streamJobState.getKeyStateAllocation(testingOpID);
+		// we assume that each operator only have one input now
+
+		Map<Integer, List<Integer>> newKeyStateAllocation = new HashMap<>();
+		for (Integer taskId : curKeyStateAllocation.keySet()) {
+			newKeyStateAllocation.put(taskId, new ArrayList<>(curKeyStateAllocation.get(taskId)));
+		}
+
+		List<Integer> oddKeys = newKeyStateAllocation.get(1).stream().filter(i -> i % 2 == 0).collect(Collectors.toList());
+		newKeyStateAllocation.get(1).removeAll(oddKeys);
+		newKeyStateAllocation.get(0).addAll(oddKeys);
+		getInstructionSet().rebalance(testingOpID, newKeyStateAllocation, true, this);
 		// wait for operation completed
 		synchronized (object) {
 			object.wait();
@@ -78,13 +100,39 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 		int oldParallelism = streamJobState.getParallelism(testingOpID);
 		System.out.println(oldParallelism);
 
-		List<List<Integer>> keySet = streamJobState.getKeyStateAllocation(testingOpID);
+		Map<Integer, List<Integer>> curKeyStateAllocation = streamJobState.getKeyStateAllocation(testingOpID);
 
-		assert oldParallelism == keySet.size() : "old parallelism does not match the key set";
+		assert oldParallelism == curKeyStateAllocation.size() : "old parallelism does not match the key set";
 
-		List<List<Integer>> newKeySet = keySet.stream()
-				.map(ArrayList::new)
-				.collect(Collectors.toList());
+		Map<Integer, List<Integer>> newKeyStateAllocation = new HashMap<>();
+		for (Integer taskId : curKeyStateAllocation.keySet()) {
+			newKeyStateAllocation.put(taskId, new ArrayList<>(curKeyStateAllocation.get(taskId)));
+		}
+
+		List<Integer> oddKeys = newKeyStateAllocation.get(oldParallelism-1).stream()
+			.filter(i -> i % 2 == 0) // hardcoded
+			.collect(Collectors.toList());
+		newKeyStateAllocation.get(oldParallelism-1).removeAll(oddKeys);
+		newKeyStateAllocation.put(oldParallelism, oddKeys);
+
+		System.out.println(newKeyStateAllocation);
+
+		getInstructionSet().rescale(testingOpID, oldParallelism+1, newKeyStateAllocation, this);
+
+		synchronized (object) {
+			object.wait();
+		}
+	}
+
+	private void testScaleOutStateful2(int testingOpID) throws InterruptedException {
+		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
+
+		int oldParallelism = streamJobState.getParallelism(testingOpID);
+		System.out.println(oldParallelism);
+
+		Map<Integer, List<Integer>> curKeyStateAllocation = streamJobState.getKeyStateAllocation(testingOpID);
+
+		assert oldParallelism == curKeyStateAllocation.size() : "old parallelism does not match the key set";
 
 		OptionalInt maxKey = newKeySet.get(oldParallelism-1).stream().mapToInt(value -> value).max();
 		OptionalInt minKey = newKeySet.get(oldParallelism-1).stream().mapToInt(value -> value).min();
@@ -96,13 +144,74 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 		int finalMid = mid;
 		List<Integer> smallHalf = newKeySet.get(oldParallelism-1).stream()
 			.filter(i -> i < finalMid) // hardcoded
+		Map<Integer, List<Integer>> newKeyStateAllocation = new HashMap<>();
+		for (Integer taskId : curKeyStateAllocation.keySet()) {
+			newKeyStateAllocation.put(taskId, new ArrayList<>(curKeyStateAllocation.get(taskId)));
+		}
+
+		List<Integer> smallKeys = newKeyStateAllocation.get(oldParallelism-1).stream()
+			.filter(i -> i <= 64) // hardcoded
 			.collect(Collectors.toList());
-		newKeySet.get(oldParallelism-1).removeAll(smallHalf);
-		newKeySet.add(smallHalf);
+		newKeyStateAllocation.get(oldParallelism-1).removeAll(smallKeys);
+		newKeyStateAllocation.put(oldParallelism, smallKeys);
 
-		System.out.println(newKeySet);
+		System.out.println(newKeyStateAllocation);
 
-		getInstructionSet().rescale(testingOpID, oldParallelism+1, newKeySet, this);
+		getInstructionSet().rescale(testingOpID, oldParallelism+1, newKeyStateAllocation, this);
+
+		synchronized (object) {
+			object.wait();
+		}
+	}
+
+	private void testScaleInStateful(int testingOpID) throws InterruptedException {
+		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
+
+		int oldParallelism = streamJobState.getParallelism(testingOpID);
+		System.out.println(oldParallelism);
+
+		Map<Integer, List<Integer>> curKeyStateAllocation = streamJobState.getKeyStateAllocation(testingOpID);
+
+		assert oldParallelism == curKeyStateAllocation.size() : "old parallelism does not match the key set";
+
+		Map<Integer, List<Integer>> newKeyStateAllocation = new HashMap<>();
+		for (Integer taskId : curKeyStateAllocation.keySet()) {
+			newKeyStateAllocation.put(taskId, new ArrayList<>(curKeyStateAllocation.get(taskId)));
+		}
+
+		List<Integer> removedKeys = newKeyStateAllocation.remove(oldParallelism-1);
+		newKeyStateAllocation.get(oldParallelism-2).addAll(removedKeys);
+
+		System.out.println(newKeyStateAllocation);
+
+		getInstructionSet().rescale(testingOpID, oldParallelism-1, newKeyStateAllocation, this);
+
+		synchronized (object) {
+			object.wait();
+		}
+	}
+
+	private void testScaleInStateful2(int testingOpID) throws InterruptedException {
+		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
+
+		int oldParallelism = streamJobState.getParallelism(testingOpID);
+		System.out.println(oldParallelism);
+
+		Map<Integer, List<Integer>> curKeyStateAllocation = streamJobState.getKeyStateAllocation(testingOpID);
+
+		assert oldParallelism == curKeyStateAllocation.size() : "old parallelism does not match the key set";
+
+		Map<Integer, List<Integer>> newKeyStateAllocation = new HashMap<>();
+		for (Integer taskId : curKeyStateAllocation.keySet()) {
+			newKeyStateAllocation.put(taskId, new ArrayList<>(curKeyStateAllocation.get(taskId)));
+		}
+
+		List<Integer> removedKeys = newKeyStateAllocation.remove(oldParallelism-2);
+		newKeyStateAllocation.get(oldParallelism-1).addAll(removedKeys);
+
+		System.out.println(newKeyStateAllocation);
+
+		getInstructionSet().rescale(testingOpID, oldParallelism-1, newKeyStateAllocation, this);
 
 		synchronized (object) {
 			object.wait();
@@ -116,28 +225,29 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 		int oldParallelism = streamJobState.getParallelism(testingOpID);
 		System.out.println(oldParallelism);
 
-		List<List<Integer>> keySet = streamJobState.getKeyStateAllocation(testingOpID);
+		Map<Integer, List<Integer>> curKeyStateAllocation = streamJobState.getKeyStateAllocation(testingOpID);
 
-		assert oldParallelism == keySet.size() : "old parallelism does not match the key set";
+		assert oldParallelism == curKeyStateAllocation.size() : "old parallelism does not match the key set";
 
-		List<List<Integer>> newKeySet = keySet.stream()
-			.map(ArrayList::new)
-			.collect(Collectors.toList());
+		Map<Integer, List<Integer>> newKeyStateAllocation = new HashMap<>();
+		for (Integer taskId : curKeyStateAllocation.keySet()) {
+			newKeyStateAllocation.put(taskId, new ArrayList<>(curKeyStateAllocation.get(taskId)));
+		}
 
-		List<Integer> smallHalf1 = newKeySet.get(0).stream()
+		List<Integer> smallHalf1 = newKeyStateAllocation.get(oldParallelism-1).stream()
 			.filter(i -> i < 31) // hardcoded
 			.collect(Collectors.toList());
-		newKeySet.get(0).removeAll(smallHalf1);
-		newKeySet.add(smallHalf1);
-		List<Integer> smallHalf2 = newKeySet.get(1).stream()
-			.filter(i -> i < 95) // hardcoded
+		newKeyStateAllocation.get(oldParallelism-1).removeAll(smallHalf1);
+		newKeyStateAllocation.put(oldParallelism, smallHalf1);
+		List<Integer> smallHalf2 = newKeyStateAllocation.get(oldParallelism-1).stream()
+			.filter(i -> i < 63) // hardcoded
 			.collect(Collectors.toList());
-		newKeySet.get(1).removeAll(smallHalf2);
-		newKeySet.add(smallHalf2);
+		newKeyStateAllocation.get(oldParallelism-1).removeAll(smallHalf2);
+		newKeyStateAllocation.put(oldParallelism+1, smallHalf2);
 
-		System.out.println(newKeySet);
+		System.out.println(newKeyStateAllocation);
 
-		getInstructionSet().rescale(testingOpID, oldParallelism+2, newKeySet, this);
+		getInstructionSet().rescale(testingOpID, oldParallelism+2, newKeyStateAllocation, this);
 
 		synchronized (object) {
 			object.wait();
@@ -149,15 +259,20 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 		Set<OperatorDescriptor> parents = streamJobState.getOperatorDescriptorByID(testingOpID).getParents();
 		// we assume that each operator only have one input now
 		for (OperatorDescriptor parent : parents) {
-			List<List<Integer>> newKeySet = parent.getKeyMapping()
-				.get(testingOpID)
-				.stream()
-				.map(ArrayList::new)
-				.collect(Collectors.toList());
-			List<Integer> oddKeys = newKeySet.get(0).stream().filter(i -> i % 2 == 0).collect(Collectors.toList());
-			newKeySet.get(0).removeAll(oddKeys);
-			newKeySet.get(1).addAll(oddKeys);
-			getInstructionSet().rebalance(testingOpID, newKeySet, false, this);
+			Map<Integer, List<Integer>> curKeyStateAllocation = parent.getKeyMapping().get(testingOpID);
+//				.get(testingOpID)
+//				.stream()
+//				.map(ArrayList::new)
+//				.collect(Collectors.toList());
+			Map<Integer, List<Integer>> newKeyStateAllocation = new HashMap<>();
+			for (Integer taskId : curKeyStateAllocation.keySet()) {
+				newKeyStateAllocation.put(taskId, new ArrayList<>(curKeyStateAllocation.get(taskId)));
+			}
+
+			List<Integer> oddKeys = newKeyStateAllocation.get(0).stream().filter(i -> i % 2 == 0).collect(Collectors.toList());
+			newKeyStateAllocation.get(0).removeAll(oddKeys);
+			newKeyStateAllocation.get(1).addAll(oddKeys);
+			getInstructionSet().rebalance(testingOpID, newKeyStateAllocation, false, this);
 			// wait for operation completed
 			synchronized (object) {
 				object.wait();
@@ -245,21 +360,22 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 		int oldParallelism = streamJobState.getParallelism(testingOpID);
 		System.out.println(oldParallelism);
 
-		List<List<Integer>> keySet = streamJobState.getKeyStateAllocation(testingOpID);
+		Map<Integer, List<Integer>> curKeyStateAllocation = streamJobState.getKeyStateAllocation(testingOpID);
 
-		assert oldParallelism == keySet.size() : "old parallelism does not match the key set";
+		assert oldParallelism == curKeyStateAllocation.size() : "old parallelism does not match the key set";
 
-		List<List<Integer>> newKeySet = keySet.stream()
-			.map(ArrayList::new)
-			.collect(Collectors.toList());
+		Map<Integer, List<Integer>> newKeyStateAllocation = new HashMap<>();
+		for (Integer taskId : curKeyStateAllocation.keySet()) {
+			newKeyStateAllocation.put(taskId, curKeyStateAllocation.get(taskId));
+		}
 
-		List<Integer> oddKeys = newKeySet.get(0).stream().filter(i -> i % 2 == 0).collect(Collectors.toList());
-		newKeySet.get(0).removeAll(oddKeys);
-		newKeySet.add(oddKeys);
+		List<Integer> oddKeys = newKeyStateAllocation.get(0).stream().filter(i -> i % 2 == 0).collect(Collectors.toList());
+		newKeyStateAllocation.get(0).removeAll(oddKeys);
+		newKeyStateAllocation.put(oldParallelism, oddKeys);
 
-		System.out.println(newKeySet);
+		System.out.println(newKeyStateAllocation);
 
-		getInstructionSet().rescale(testingOpID, oldParallelism+1, newKeySet, this);
+		getInstructionSet().rescale(testingOpID, oldParallelism+1, newKeyStateAllocation, this);
 
 		synchronized (object) {
 			object.wait();
@@ -315,6 +431,9 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 
 				System.out.println("\nstart stateful scale out 2 more test");
 				testScaleOut2(statelessOpID);
+
+				System.out.println("\nstart stateful scale in test2");
+				testScaleInStateful(statefulOpID);
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}

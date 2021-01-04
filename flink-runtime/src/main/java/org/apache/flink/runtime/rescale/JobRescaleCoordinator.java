@@ -465,7 +465,10 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 		}
 
 		// scale in by given ejv, update involved edges & partitions
-		this.removedCandidates = this.targetVertex.scaleIn(executionGraph.getRpcTimeout(), executionGraph.getGlobalModVersion(), System.currentTimeMillis());
+		int removedTaskId = jobRescalePartitionAssignment.getRemovedSubtask();
+		checkState(removedTaskId >= 0);
+
+		this.removedCandidates = this.targetVertex.scaleIn(removedTaskId);
 
 		for (JobVertexID upstreamID : updatedUpstream) {
 			ExecutionJobVertex upstream = tasks.get(upstreamID);
@@ -686,30 +689,50 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 		stateAssignmentOperation.assignStates();
 
 		Collection<CompletableFuture<Void>> rescaledFuture = new ArrayList<>(targetVertex.getTaskVertices().length);
-		Map<Integer, List<Integer>> partitionAssignment = jobRescalePartitionAssignment.getPartitionAssignment();
 
 		for (int i = 0; i < targetVertex.getTaskVertices().length; i++) {
 			ExecutionVertex vertex  = targetVertex.getTaskVertices()[i];
+			KeyGroupRange keyGroupRange = jobRescalePartitionAssignment.getAlignedKeyGroupRange(i);
+
 			Execution executionAttempt = vertex.getCurrentExecutionAttempt();
 
 			CompletableFuture<Void> scheduledRescale;
 
-			if (partitionAssignment.get(i).size() == 0) {
-				System.out.println("none keygroup assigned for current jobvertex: " + vertex.toString());
-				scheduledRescale = executionAttempt.scheduleRescale(rescaleId,
-					RescaleOptions.RESCALE_REDISTRIBUTE, null);
-			} else {
+			if (jobRescalePartitionAssignment.isSubtaskModified(i)) {
+				int idInModel = jobRescalePartitionAssignment.getIdInModel(i);
 				scheduledRescale = executionAttempt.scheduleRescale(rescaleId,
 					RescaleOptions.RESCALE_REDISTRIBUTE,
-					jobRescalePartitionAssignment.getAlignedKeyGroupRange(i));
+					keyGroupRange, idInModel);
+			} else {
+				scheduledRescale = executionAttempt.scheduleRescale(rescaleId,
+					RescaleOptions.RESCALE_KEYGROUP_RANGE_ONLY,
+					keyGroupRange);
 			}
+
+//			if (partitionAssignment.get(i).size() == 0) {
+//				System.out.println("none keygroup assigned for current jobvertex: " + vertex.toString());
+//				scheduledRescale = executionAttempt.scheduleRescale(rescaleId,
+//					RescaleOptions.RESCALE_REDISTRIBUTE, null);
+//			} else {
+//				scheduledRescale = executionAttempt.scheduleRescale(rescaleId,
+//					RescaleOptions.RESCALE_REDISTRIBUTE,
+//					jobRescalePartitionAssignment.getAlignedKeyGroupRange(i));
+//			}
 			rescaledFuture.add(scheduledRescale);
 		}
+
+		for (ExecutionVertex vertex : removedCandidates) {
+			vertex.cancel();
+		}
+
 		LOG.info("++++++ Assign new state futures created");
 
 		FutureUtils
 			.combineAll(rescaledFuture)
 			.thenRunAsync(() -> {
+				// need to update the old parallelism and index.
+				this.targetVertex.syncOldConfigInfo();
+
 				LOG.info("++++++ Scale in and assign new state Completed");
 				CheckpointCoordinator checkpointCoordinator = executionGraph.getCheckpointCoordinator();
 
@@ -721,11 +744,6 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 				}
 
 				clean();
-
-				// notify streamSwitch that change is finished
-				checkNotNull(streamManagerGateway, "The jobMangerGateway wasn't set yet, notify StreamManager failed.");
-				LOG.info("++++++ StreamSwitch in Stream Manager notify migration completed");
-				streamManagerGateway.streamSwitchCompleted(targetVertex.getJobVertexId());
 			}, mainThreadExecutor);
 	}
 

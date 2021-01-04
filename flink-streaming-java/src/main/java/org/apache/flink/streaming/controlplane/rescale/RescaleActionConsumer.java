@@ -47,13 +47,13 @@ public class RescaleActionConsumer implements Runnable {
 //						rescaleAction.parseParams(wrapper);
 //						primitiveInstruction.rescaleStreamJob(wrapper);
 						Map<Integer, List<Integer>> partitionAssignment = wrapper.jobRescalePartitionAssignment.getPartitionAssignment();
-						List<List<Integer>> keyStateAllocation = new ArrayList<>(
-							partitionAssignment.values());
-						for(Integer key: partitionAssignment.keySet()){
-							keyStateAllocation.add(key, partitionAssignment.get(key));
-						}
+//						List<List<Integer>> keyStateAllocation = new ArrayList<>(
+//							partitionAssignment.values());
+//						for(Integer key: partitionAssignment.keySet()){
+//							keyStateAllocation.add(key, partitionAssignment.get(key));
+//						}
 						// todo should we use JobVertexID in user defined control policy?
-						reconfigurationAPI.rescale(-1, wrapper.newParallelism, keyStateAllocation, controlPolicy);
+						reconfigurationAPI.rescale(-1, wrapper.newParallelism, partitionAssignment, controlPolicy);
 
 						while (!isFinished && !isStop) {
 							queue.wait(); // wait for finish
