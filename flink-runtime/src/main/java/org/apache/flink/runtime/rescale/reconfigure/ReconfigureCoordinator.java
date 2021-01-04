@@ -110,7 +110,6 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 		}
 	}
 
-	@Override
 	public CompletableFuture<Void> deployTasks(int operatorID, int oldParallelism) {
 		// TODO: add the task to the checkpointCoordinator
 		System.out.println("deploying... tasks of " + operatorID);
@@ -165,13 +164,12 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 			).thenCompose(executions -> {
 				CheckpointCoordinator checkpointCoordinator = executionGraph.getCheckpointCoordinator();
 				checkNotNull(checkpointCoordinator);
-				checkpointCoordinator.addVertices(createdVertex.toArray(new ExecutionVertex[0]), false);
+				checkpointCoordinator.addVertices(createCandidates.get(operatorID).toArray(new ExecutionVertex[0]), false);
 				// only deploy success that downstream task could start receiving data in its input gates
 				return updateDownstreamGates(operatorID);
 			});
 	}
 
-	@Override
 	public CompletableFuture<Void> cancelTasks(int operatorID, int offset) {
 		// TODO: add them to the future list
 		Collection<CompletableFuture<?>> removeFutures =
@@ -200,21 +198,17 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 //				}
 //			});
 
-		try {
-			CheckpointCoordinator checkpointCoordinator = executionGraph.getCheckpointCoordinator();
-			assert checkpointCoordinator != null;
-			checkpointCoordinator.stopCheckpointScheduler();
-			checkNotNull(checkpointCoordinator);
-			checkpointCoordinator.dropVertices(removedCandidates.get(operatorID).toArray(new ExecutionVertex[0]), false);
+		CheckpointCoordinator checkpointCoordinator = executionGraph.getCheckpointCoordinator();
+		assert checkpointCoordinator != null;
+		checkpointCoordinator.stopCheckpointScheduler();
+		checkNotNull(checkpointCoordinator);
+		checkpointCoordinator.dropVertices(removedCandidates.get(operatorID).toArray(new ExecutionVertex[0]), false);
 
-			if (checkpointCoordinator.isPeriodicCheckpointingConfigured()) {
-				checkpointCoordinator.startCheckpointScheduler();
-			}
-			return updatePartitionAndDownStreamGates(operatorID, rescaleID);
-		} catch (ExecutionGraphException e) {
-			e.printStackTrace();
-			return FutureUtils.completedExceptionally(e);
+		if (checkpointCoordinator.isPeriodicCheckpointingConfigured()) {
+			checkpointCoordinator.startCheckpointScheduler();
 		}
+		return FutureUtils.completeAll(removeFutures)
+			.thenCompose(o -> updateDownstreamGates(operatorID));
 	}
 
 	/**
@@ -362,9 +356,9 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 						.filter(i -> !remappingAssignment.isTaskModified(i))
 						.map(i -> Tuple2.of(operatorID, i))
 						.collect(Collectors.toList());
-				if (remappingAssignment.isScaleOut()) {
+				if (remappingAssignment.isScaling()) {
 					try {
-						updateTargetPartitionFuture = updatePartitions(operatorID, RescaleID.generateNextID());
+						updateTargetPartitionFuture = updatePartitions(operatorID, rescaleID);
 						updateTargetPartitionFuture.thenAccept(o -> syncOp.resumeTasks(notModifiedList));
 					} catch (ExecutionGraphException e) {
 						e.printStackTrace();
