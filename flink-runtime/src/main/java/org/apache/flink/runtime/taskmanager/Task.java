@@ -69,7 +69,6 @@ import org.apache.flink.runtime.shuffle.ShuffleIOOwnerContext;
 import org.apache.flink.runtime.state.CheckpointListener;
 import org.apache.flink.runtime.state.KeyGroupRange;
 import org.apache.flink.runtime.state.TaskStateManager;
-import org.apache.flink.runtime.state.TaskStateManagerImpl;
 import org.apache.flink.runtime.taskexecutor.BackPressureSampleableTask;
 import org.apache.flink.runtime.taskexecutor.GlobalAggregateManager;
 import org.apache.flink.runtime.taskexecutor.KvStateService;
@@ -97,7 +96,6 @@ import java.net.URL;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
@@ -1267,11 +1265,11 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 	public void assignNewState(KeyGroupRange keyGroupRange, int idInModel, JobManagerTaskRestore taskRestore) {
 		try {
 			taskStateManager.updateTaskRestore(taskRestore);
-			invokable.reinitializeState(keyGroupRange, idInModel);
 		}catch (NullPointerException e){
 			e.printStackTrace();
 			System.err.println("may not generate state now or it is a stateless task");
 		}finally {
+			invokable.reinitializeState(keyGroupRange, idInModel);
 			taskRescaleManager.finish();
 		}
 	}
@@ -1327,8 +1325,8 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 		return String.format("%s (%s) [%s]", taskNameWithSubtask, executionId, executionState);
 	}
 
-	public void finalizeRescale() {
-		checkNotNull(invokable).finalizeRescale();
+	public CompletableFuture<Void> finalizeRescaleAsync() {
+		return checkNotNull(invokable).finalizeRescale();
 	}
 
 	@VisibleForTesting

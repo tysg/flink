@@ -13,8 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# cd flink-core || exit
-# mvn clean install -Dcheckstyle.skip -DskipTests -Dmaven.javadoc.skip -Drat.skip=true
+
+#cd flink-core || exit
+#mvn clean install -Dcheckstyle.skip -Dski1Tests -Dmaven.javadoc.skip -Drat.skip=true
 cd flink-runtime || exit
 mvn clean install -Dcheckstyle.skip -DskipTests -Dmaven.javadoc.skip -Drat.skip=true
 cd ../flink-streaming-java || exit

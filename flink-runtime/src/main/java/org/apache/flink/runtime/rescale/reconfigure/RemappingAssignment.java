@@ -57,6 +57,10 @@ public class RemappingAssignment implements AbstractCoordinator.Diff {
 		return AbstractCoordinator.compareIntList(oldKeymapping.get(taskIndex), keymapping.get(taskIndex));
 	}
 
+	public boolean isScaleOut(){
+		return keymapping.size() > oldKeymapping.size();
+	}
+
 	public Map<Integer, List<Integer>> getPartitionAssignment() {
 		return keymapping;
 	}

@@ -83,11 +83,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -1180,39 +1176,41 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 	protected void reconnect() {}
 
 	private void initReconnect() {
-		TaskRescaleManager rescaleManager = ((RuntimeEnvironment) getEnvironment()).taskRescaleManager;
+		actionExecutor.runThrowing(() -> {
+			TaskRescaleManager rescaleManager = ((RuntimeEnvironment) getEnvironment()).taskRescaleManager;
 
-		if (!rescaleManager.isScalingTarget()) {
-			return;
-		}
-		LOG.info("++++++ trigger target vertex rescaling: " + this.toString());
-		// this line is to record the time to redistribute
+			if (!rescaleManager.isScalingTarget()) {
+				return;
+			}
+			LOG.info("++++++ trigger target vertex rescaling: " + this.toString());
+			// this line is to record the time to redistribute
 //		long start = System.nanoTime();
 
-		try {
-			// update gate
-			if (rescaleManager.isScalingGates()) {
-				for (InputGate gate : getEnvironment().getAllInputGates()) {
-					rescaleManager.substituteInputGateChannels((SingleInputGate) ((InputGateWithMetrics) gate).getInputGate());
+			try {
+				// update gate
+				if (rescaleManager.isScalingGates()) {
+					for (InputGate gate : getEnvironment().getAllInputGates()) {
+						rescaleManager.substituteInputGateChannels((SingleInputGate) ((InputGateWithMetrics) gate).getInputGate());
+					}
 				}
-			}
 
-			// update output (writers)
-			if (rescaleManager.isScalingPartitions()) {
-				replaceResultPartitions(rescaleManager);
-			}
+				// update output (writers)
+				if (rescaleManager.isScalingPartitions()) {
+					replaceResultPartitions(rescaleManager);
+				}
 
-			reconnect();
-		} catch (Exception e) {
-			e.printStackTrace();
-			LOG.info("++++++ error", e);
-		} finally {
-			rescaleManager.finish();
+				reconnect();
+			} catch (Exception e) {
+				e.printStackTrace();
+				LOG.info("++++++ error", e);
+			} finally {
+				rescaleManager.finish();
 //			System.out.println("redistribute id: " + this.toString() + " time: " + (System.nanoTime() - start));
-			// complete reconnection, then start to process tuple,
-			// the total migration time is T(complete reconnection) - T(receive barrior).
-			System.out.println(this.toString() + " completed reconnection: " + System.currentTimeMillis());
-		}
+				// complete reconnection, then start to process tuple,
+				// the total migration time is T(complete reconnection) - T(receive barrior).
+				System.out.println(this.toString() + " completed reconnection: " + System.currentTimeMillis());
+			}
+		});
 	}
 
 	protected void replaceResultPartitions(TaskRescaleManager rescaleManager) throws IOException {
@@ -1313,8 +1311,19 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 		}
 	}
 
-	public void finalizeRescale(){
-		initReconnect();
+	public CompletableFuture<Void> finalizeRescale(){
+		Future<Void> success = mailboxProcessor.getMainMailboxExecutor().submit(
+			this::initReconnect,
+			"initReconnect");
+		return CompletableFuture.runAsync(
+			() -> {
+				try {
+					success.get();
+				} catch (InterruptedException | ExecutionException e) {
+					e.printStackTrace();
+				}
+			}
+		);
 	}
 
 	// ------------------------------------------------------------------------

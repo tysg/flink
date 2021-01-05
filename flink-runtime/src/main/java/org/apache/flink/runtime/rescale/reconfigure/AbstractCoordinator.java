@@ -13,6 +13,7 @@ import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
+import org.apache.flink.runtime.jobgraph.jsonplan.JsonPlanGenerator;
 import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.rescale.RescaleID;
 import org.apache.flink.util.Preconditions;
@@ -161,6 +162,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 //				return FutureUtils.completedExceptionally(new Exception("change no work:" + changedPosition));
 //			}
 //		}
+		executionGraph.setJsonPlan(JsonPlanGenerator.generatePlan(jobGraph));
 		return CompletableFuture.completedFuture(differenceMap);
 	}
 

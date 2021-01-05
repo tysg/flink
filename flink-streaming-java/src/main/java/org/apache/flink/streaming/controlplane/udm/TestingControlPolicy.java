@@ -134,6 +134,12 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 
 		assert oldParallelism == curKeyStateAllocation.size() : "old parallelism does not match the key set";
 
+		OptionalInt maxKey = curKeyStateAllocation.get(oldParallelism-1).stream().mapToInt(value -> value).max();
+		OptionalInt minKey = curKeyStateAllocation.get(oldParallelism-1).stream().mapToInt(value -> value).min();
+		int mid = 96;
+		if (maxKey.isPresent() && minKey.isPresent()) {
+			mid = (maxKey.getAsInt() + minKey.getAsInt())/2;
+		}
 		Map<Integer, List<Integer>> newKeyStateAllocation = new HashMap<>();
 		for (Integer taskId : curKeyStateAllocation.keySet()) {
 			newKeyStateAllocation.put(taskId, new ArrayList<>(curKeyStateAllocation.get(taskId)));
@@ -208,6 +214,7 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 		}
 	}
 
+	// WARNING: This only works without rebalance of the stateless operator
 	private void testScaleOut2(int testingOpID) throws InterruptedException {
 		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
 
@@ -282,7 +289,10 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 					}
 					return enforcement.resumeTasks();
 				})
-				.thenAccept(o -> {
+				.whenComplete((o, failure) -> {
+					if(failure != null){
+						failure.printStackTrace();
+					}
 					synchronized (object) {
 						object.notify();
 					}
@@ -323,8 +333,10 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 				.thenCompose(o -> enforcement.prepareExecutionPlan(getInstructionSet().getJobExecutionPlan()))
 				.thenCompose(o -> enforcement.synchronizePauseTasks(Collections.singletonList(Tuple2.of(rawVertexID, -1)), o))
 				.thenCompose(o -> enforcement.updateFunction(rawVertexID, o))
-				.thenCompose(o -> enforcement.resumeTasks())
-				.thenAccept(o -> {
+				.whenComplete((o, failure) -> {
+					if(failure != null){
+						failure.printStackTrace();
+					}
 					synchronized (object) {
 						object.notify();
 					}
@@ -371,66 +383,56 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 		@Override
 		public void run() {
 			// the testing jobGraph (workload) is in TestingWorkload.java, see that file to know how to use it.
-//			int statefulOpID = findOperatorByName("Splitter Flatmap");
 			int statefulOpID = findOperatorByName("Splitter FlatMap");
-//			int statelessOpID = findOperatorByName("filter");
-//			int sourceOp = findOperatorByName("Source: source");
-//			// this operator is the downstream of actual source operator
-//			int nearSourceMap = findOperatorByName("near source Flatmap");
-//			int nearSourceFilter = findOperatorByName("source stateless map");
+			int statelessOpID = findOperatorByName("filter");
+			int sourceOp = findOperatorByName("Source: source");
+			// this operator is the downstream of actual source operator
+			int nearSourceMap = findOperatorByName("near source Flatmap");
+			int statelessMap = findOperatorByName("source stateless map");
 //			if (statefulOpID == -1 || statelessOpID == -1
-//				|| nearSourceMap == -1 || nearSourceFilter == -1
+//				|| nearSourceMap == -1 || statelessMap == -1
 //				|| sourceOp == -1) {
 //				System.out.println("can not find operator with given name, corrupt");
 //				return;
 //			}
 			try {
 				showOperatorInfo();
-				Thread.sleep(5);
+
+				// todo, if the time of sleep is too short, may cause receiving not belong key
+				Thread.sleep(1000);
+
 
 //				System.out.println("\nstart stateless rebalance test...");
-//				testRebalanceStateless(statelessOpID);
-
+//				testRebalanceStateless(statelessMap);
+//
 //				System.out.println("\nstart stateful rebalance test1...");
 //				testRebalanceStateful(statefulOpID);
-////
+//
 //				System.out.println("\nstart stateful rebalance test2...");
-//				testRebalanceStateful2(statefulOpID);
-//
-//				System.out.println("\nstart synchronize source test...");
-//				testPauseSource(sourceOp);
-
-//				System.out.println("\nstart stateful scale out test");
-//				testScaleOutStateful(statefulOpID);
-
-				System.out.println("\nstart stateful scale in test2");
-				testScaleInStateful(statefulOpID);
-
-//				System.out.println("\nstart stateful scale out test3");
-//				testScaleOutStateful(statefulOpID);
-//
-//				System.out.println("\nstart stateful scale out test4");
-//				testScaleOutStateful2(statefulOpID);
-//
-//				System.out.println("\nstart stateful scale in test5");
-//				testScaleInStateful2(statefulOpID);
-
-//				System.out.println("\nstart stateful scale out 2 more test");
-//				testScaleOut2(statelessOpID);
+//				testRebalanceStateful(statefulOpID);
 //
 //				System.out.println("\nstart source near stateful operator rebalance test...");
 //				testRebalanceStateful(nearSourceMap);
 //
-//				System.out.println("\nstart source near stateless operator rebalance test...");
-//				testRebalanceStateless(nearSourceFilter);
-//
-//				Thread.sleep(10);
-//
+//				System.out.println("\nstart synchronize source test...");
+//				testPauseSource(sourceOp);
+
+				System.out.println("\nstart stateful scale out test");
+				testScaleOutStateful(statefulOpID);
+				// todo, for some reason. if no sleep here, it may be loss some data
+//				Thread.sleep(3000);
+
 //				System.out.println("\nstart update function related test...");
 //				testCustomizeWindowUpdateAPI();
-//
+
 //				System.out.println("\nstart rescale window join test...");
 //				testScaleOutWindowJoin();
+
+//				System.out.println("\nstart stateful scale out 2 more test");
+//				testScaleOutStateful(statelessOpID);
+
+//				System.out.println("\nstart stateful scale in test2");
+//				testScaleInStateful(statefulOpID);
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}

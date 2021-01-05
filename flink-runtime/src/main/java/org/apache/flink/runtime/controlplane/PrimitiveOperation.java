@@ -81,24 +81,6 @@ public interface PrimitiveOperation<M> {
 	CompletableFuture<Void> updateTaskResources(int operatorID, int oldParallelism);
 
 	/**
-	 * Request the resources request from the cluster.
-	 *
-	 * @param operatorID the operator id of this operator
-	 * @param offset     represent which parallel instance of this operator, -1 means all parallel instance
-	 * @return
-	 */
-	CompletableFuture<Void> deployTasks(int operatorID, int offset);
-
-	/**
-	 * Free the resources request from the cluster.
-	 *
-	 * @param operatorID the operator id of this operator
-	 * @param offset     represent which parallel instance of this operator, -1 means all parallel instance
-	 * @return
-	 */
-	CompletableFuture<Void> cancelTasks(int operatorID, int offset);
-
-	/**
 	 * Update key mappings between destOp and its parents
 	 *
 	 * @param destOpID the operator id of destination operator

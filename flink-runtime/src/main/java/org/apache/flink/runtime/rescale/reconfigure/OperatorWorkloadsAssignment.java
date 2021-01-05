@@ -357,4 +357,8 @@ public class OperatorWorkloadsAssignment implements AbstractCoordinator.Diff {
 			"alignedKeyGroupRanges", alignedKeyGroupRanges,
 			"modifiedSubtaskMap", modifiedSubtaskMap);
 	}
+
+	public boolean isScaling() {
+		return true;
+	}
 }
