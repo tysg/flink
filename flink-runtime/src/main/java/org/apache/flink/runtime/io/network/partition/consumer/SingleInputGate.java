@@ -468,9 +468,15 @@ public class SingleInputGate extends InputGate {
 		synchronized (requestLock) {
 			for (InputChannel inputChannel : inputChannels.values()) {
 				try {
+					if (inputChannel instanceof RemoteInputChannel) {
+						System.out.println("++++++ Task: " + owningTaskName + " Number of buffers left during scaling: " + ((RemoteInputChannel) inputChannel).getNumberOfQueuedBuffers());
+					}
+					if (inputChannel instanceof LocalInputChannel) {
+						System.out.println("++++++ Task: " + owningTaskName + " has buffer left: " + ((LocalInputChannel) inputChannel).getNextBuffer());
+					}
 					inputChannel.releaseAllResources();
 				}
-				catch (IOException e) {
+				catch (IOException | InterruptedException e) {
 					LOG.warn("{}: Error during release of channel resources: {}.",
 						owningTaskName, e.getMessage(), e);
 				}

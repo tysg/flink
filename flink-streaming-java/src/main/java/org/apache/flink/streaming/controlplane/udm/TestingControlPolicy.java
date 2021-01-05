@@ -386,7 +386,7 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 //			}
 			try {
 				showOperatorInfo();
-				Thread.sleep(10);
+				Thread.sleep(5);
 
 //				System.out.println("\nstart stateless rebalance test...");
 //				testRebalanceStateless(statelessOpID);
@@ -400,8 +400,8 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 //				System.out.println("\nstart synchronize source test...");
 //				testPauseSource(sourceOp);
 
-				System.out.println("\nstart stateful scale out test");
-				testScaleOutStateful(statefulOpID);
+//				System.out.println("\nstart stateful scale out test");
+//				testScaleOutStateful(statefulOpID);
 
 				System.out.println("\nstart stateful scale in test2");
 				testScaleInStateful(statefulOpID);

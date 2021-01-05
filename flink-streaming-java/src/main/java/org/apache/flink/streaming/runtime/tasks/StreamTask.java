@@ -322,7 +322,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 	protected void processInput(MailboxDefaultAction.Controller controller) throws Exception {
 		InputStatus status = inputProcessor.processInput();
 		// may use this to implement consistent
-		if(pauseActionController.ackIfPause()){
+		if(pauseActionController.ackIfPause()) {
 			if (status == InputStatus.END_OF_INPUT) {
 				controller.allActionsCompleted();
 				return;
@@ -334,7 +334,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 			CompletableFuture<?> resumeFuture = pauseActionController.getResumeFuture();
 			MailboxDefaultAction.Suspension suspendedDefaultAction = controller.suspendDefaultAction();
 			resumeFuture.thenRun(suspendedDefaultAction::resume)
-				.thenRun(()->System.out.println(getName() + "pauseActionController get resumed"));
+				.thenRun(()->System.out.println(getName() + ": pauseActionController get resumed"));
 			return;
 		}
 		if (status == InputStatus.MORE_AVAILABLE && recordWriter.isAvailable()) {
@@ -1249,7 +1249,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 		if(operatorManager.acknowledgeSyncRequest(checkpointMetaData.getCheckpointId())){
 			// we could now pause the current processing
 			try {
-				System.out.println("pause the current data processing:" + this.getName());
+				System.out.println(this.getName() + ": pause the current data processing");
 				operatorManager.getPauseActionController().setPausedAndGetAckFuture();
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -1257,7 +1257,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 		}
 
 		// add a timer for measuring blocking time
-		//System.out.println(this.toString() + " received checkpoint: " + System.currentTimeMillis());
+		//System.out.println(this.toString() + " received check point: " + System.currentTimeMillis());
 		// do not need now
 //		initReconnect();
 	}

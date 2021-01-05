@@ -230,32 +230,34 @@ public class KafkaMetricsManager implements Serializable, MetricsManager {
 				}
 
 				// log the rates: one file per epoch
-				String ratesLine = jobVertexId + ","
-					+ workerName + "-" + instanceId + ","
-					+ numInstances  + ","
-					+ trueProcessingRate + ","
-					+ trueOutputRate + ","
-					+ observedProcessingRate + ","
-					+ observedOutputRate + ","
-					+ endToEndLantecy + ","
-					+ totalRecordsIn + ","
-					+ totalRecordsOut + ","
-					+ utilization + ","
-					+ keyGroupOutput + ","
-					+ keyGroupinput + ","
-					+ System.currentTimeMillis();
+//				String ratesLine = jobVertexId + ","
+//					+ workerName + "-" + instanceId + ","
+//					+ numInstances  + ","
+//					+ trueProcessingRate + ","
+//					+ trueOutputRate + ","
+//					+ observedProcessingRate + ","
+//					+ observedOutputRate + ","
+//					+ endToEndLantecy + ","
+//					+ totalRecordsIn + ","
+//					+ totalRecordsOut + ","
+//					+ utilization + ","
+//					+ keyGroupOutput + ","
+//					+ keyGroupinput + ","
+//					+ System.currentTimeMillis();
 
-	//				String ratesLine = jobVertexId + ","
-	//					+ workerName + "-" + instanceId + ","
-	//					+ " trueProcessingRate: " + trueProcessingRate + ","
-	//					+ " observedProcessingRate: " + observedProcessingRate + ","
-	//					+ " endToEndLantecy: " + endToEndLantecy + ","
-	//					+ " utilization: " + utilization;
+					String ratesLine = jobVertexId + ","
+						+ workerName + "-" + instanceId + ","
+//						+ " trueProcessingRate: " + trueProcessingRate + ","
+						+ " observedProcessingRate: " + observedProcessingRate + ","
+						+ " endToEndLantecy: " + endToEndLantecy + ","
+						+ " totalRecordsIn: " + totalRecordsIn + ","
+						+ " totalRecordsOut: " + totalRecordsOut;
 
-	//				System.out.println("workername: " + getJobVertexId() + " epoch: " + epoch + " keygroups: " + status.inputKeyGroup.keySet());
+					System.out.println(ratesLine);
+//					System.out.println("workername: " + getJobVertexId() + " epoch: " + epoch + " keygroups: " + status.inputKeyGroup.keySet());
 
-				ProducerRecord<String, String> newRecord = new ProducerRecord<>(TOPIC, ratesLine);
-				producer.send(newRecord);
+//				ProducerRecord<String, String> newRecord = new ProducerRecord<>(TOPIC, ratesLine);
+//				producer.send(newRecord);
 
 				// clear counters
 				recordsIn = 0;
@@ -319,7 +321,6 @@ public class KafkaMetricsManager implements Serializable, MetricsManager {
 	@Override
 	public void incRecordsOutKeyGroup(int targetKeyGroup) {
 		status.incRecordsOutChannel(targetKeyGroup);
-
 	}
 
 	@Override
@@ -382,24 +383,31 @@ public class KafkaMetricsManager implements Serializable, MetricsManager {
 					}
 
 					// log the rates: one file per epoch
+//					String ratesLine = jobVertexId + ","
+//						+ workerName + "-" + instanceId + ","
+//						+ numInstances  + ","
+//						+ currentWindowStart + ","
+//						+ 0 + ","
+//	//						+ trueOutputRate + ","
+//						+ 0 + ","
+//						+ observedOutputRate + ","
+//						+ 0 + "," // end to end latency should be 0.
+//						+ 0 + ","
+//						+ totalRecordsOut + ","
+//						+ 0 + ","
+//						+ keyGroupOutput + ","
+//						+ 0 + ","
+//						+ System.currentTimeMillis();
+//					List<String> rates = Arrays.asList(ratesLine);
+//					ProducerRecord<String, String> newRecord = new ProducerRecord<>(TOPIC, ratesLine);
+//					producer.send(newRecord);
+
 					String ratesLine = jobVertexId + ","
 						+ workerName + "-" + instanceId + ","
-						+ numInstances  + ","
-						+ currentWindowStart + ","
-						+ 0 + ","
-	//						+ trueOutputRate + ","
-						+ 0 + ","
-						+ observedOutputRate + ","
-						+ 0 + "," // end to end latency should be 0.
-						+ 0 + ","
-						+ totalRecordsOut + ","
-						+ 0 + ","
-						+ keyGroupOutput + ","
-						+ 0 + ","
-						+ System.currentTimeMillis();
-					List<String> rates = Arrays.asList(ratesLine);
-					ProducerRecord<String, String> newRecord = new ProducerRecord<>(TOPIC, ratesLine);
-					producer.send(newRecord);
+						+ " observedOutputRate: " + observedOutputRate + ","
+						+ " totalRecordsOut: " + totalRecordsOut;
+
+//					System.out.println(ratesLine);
 
 	//					Path ratesFile = Paths.get(ratesPath + workerName.trim() + "-" + instanceId + "-" + epoch + ".log").toAbsolutePath();
 	//					try {
@@ -480,20 +488,27 @@ public class KafkaMetricsManager implements Serializable, MetricsManager {
 			}
 
 			// log the rates: one file per epoch
+//			String ratesLine = jobVertexId + ","
+//				+ workerName + "-" + instanceId  + ","
+//				+ numInstances  + ","
+//				+ trueProcessingRate + ","
+//				+ 0 + ","
+//				+ 0 + ","
+//				+ 0 + ","
+//				+ 0 + ","
+//				+ totalRecordsIn + ","
+//				+ totalRecordsOut + ","
+//				+ 0.1 + ","
+//				+ keyGroupOutput + ","
+//				+ keyGroupinput + ","
+//				+ System.currentTimeMillis();
+
 			String ratesLine = jobVertexId + ","
-				+ workerName + "-" + instanceId  + ","
-				+ numInstances  + ","
-				+ trueProcessingRate + ","
-				+ 0 + ","
-				+ 0 + ","
-				+ 0 + ","
-				+ 0 + ","
-				+ totalRecordsIn + ","
-				+ totalRecordsOut + ","
-				+ 0.1 + ","
-				+ keyGroupOutput + ","
-				+ keyGroupinput + ","
-				+ System.currentTimeMillis();
+				+ workerName + "-" + instanceId + ","
+				+ " observedOutputRate: " + observedOutputRate + ","
+				+ " totalRecordsOut: " + totalRecordsOut;
+
+//			System.out.println(ratesLine);
 
 //			if (taskId.contains("MatchMaker")) {
 //				LOG.info("++++++force update - worker: " + workerName + "-" + instanceId + " keygroups processed:" + keyGroupinput);
@@ -501,8 +516,8 @@ public class KafkaMetricsManager implements Serializable, MetricsManager {
 //				LOG.info("++++++force update - worker: " + workerName + "-" + instanceId + " keygroups output:" + keyGroupOutput);
 //			}
 			// send to flink_metrics topic, for metrics retriever
-			ProducerRecord<String, String> metricsRecord = new ProducerRecord<>(TOPIC, ratesLine);
-			producer.send(metricsRecord);
+//			ProducerRecord<String, String> metricsRecord = new ProducerRecord<>(TOPIC, ratesLine);
+//			producer.send(metricsRecord);
 
 //			if (taskId.contains("MatchMaker") || taskId.contains("Source")) {
 //				LOG.info("++++++force update - worker: " + workerName + "-" + instanceId + " Completed!");
@@ -514,7 +529,7 @@ public class KafkaMetricsManager implements Serializable, MetricsManager {
 			currentWindowStart = 0;
 			latency = 0;
 			epoch++;
-			// clear keygroups for delta
+			// clear keygroups for delta7
 			status.clearKeygroups();
 		}
 	}

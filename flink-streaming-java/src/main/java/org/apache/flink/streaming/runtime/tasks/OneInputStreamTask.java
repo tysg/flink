@@ -28,6 +28,7 @@ import org.apache.flink.runtime.metrics.MetricNames;
 import org.apache.flink.runtime.metrics.groups.TaskIOMetricGroup;
 import org.apache.flink.runtime.rescale.TaskRescaleManager;
 import org.apache.flink.runtime.taskmanager.RuntimeEnvironment;
+import org.apache.flink.runtime.util.profiling.KafkaMetricsManager;
 import org.apache.flink.runtime.util.profiling.MetricsManager;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
@@ -213,6 +214,9 @@ public class OneInputStreamTask<IN, OUT> extends StreamTask<OUT, OneInputStreamO
 					recordsProcessed, endToEndLatency);
 
 				operator.setKeyContextElement1(record);
+				if (metricsManager instanceof KafkaMetricsManager) {
+					System.out.println(metricsManager.getJobVertexId() + ": processing record: " + record.toString() + " keygroup: " + record.getKeyGroup());
+				}
 				operator.processElement(record);
 
 				// TODO: by far, we only need to measure the latency and throughput, other things are left for future measurement

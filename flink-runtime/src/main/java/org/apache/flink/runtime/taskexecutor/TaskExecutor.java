@@ -507,6 +507,7 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 			try {
 				jobInformation = tdd.getSerializedJobInformation().deserializeValue(getClass().getClassLoader());
 				taskInformation = tdd.getSerializedTaskInformation().deserializeValue(getClass().getClassLoader());
+				taskInformation.setIdInModel(tdd.getIdInModel());
 			} catch (IOException | ClassNotFoundException e) {
 				throw new TaskSubmissionException("Could not deserialize the job or task information.", e);
 			}
@@ -678,9 +679,10 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 				if (rescaleOptions.isUpdateKeyGroupRange()) {
 					log.info("++++++ update task keyGroupRange for subtask: " + tdd.getSubtaskIndex() + "  " + tdd.getExecutionAttemptId());
 					task.updateKeyGroupRange(tdd.getKeyGroupRange());
-				}else
-				// author: @hya
-				task.finalizeRescale();
+				} else {
+					// author: @hya
+					task.finalizeRescale();
+				}
 
 				return CompletableFuture.completedFuture(Acknowledge.get());
 			} catch (Exception e) {
