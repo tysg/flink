@@ -214,9 +214,9 @@ public class OneInputStreamTask<IN, OUT> extends StreamTask<OUT, OneInputStreamO
 					recordsProcessed, endToEndLatency);
 
 				operator.setKeyContextElement1(record);
-				if (metricsManager instanceof KafkaMetricsManager) {
-					System.out.println(metricsManager.getJobVertexId() + ": processing record: " + record.toString() + " keygroup: " + record.getKeyGroup());
-				}
+//				if (metricsManager instanceof KafkaMetricsManager) {
+//					System.out.println(metricsManager.getJobVertexId() + ": processing record: " + record.toString() + " keygroup: " + record.getKeyGroup());
+//				}
 				operator.processElement(record);
 
 				// TODO: by far, we only need to measure the latency and throughput, other things are left for future measurement

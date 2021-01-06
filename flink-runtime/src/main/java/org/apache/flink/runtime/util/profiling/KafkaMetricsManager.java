@@ -253,7 +253,7 @@ public class KafkaMetricsManager implements Serializable, MetricsManager {
 						+ " totalRecordsIn: " + totalRecordsIn + ","
 						+ " totalRecordsOut: " + totalRecordsOut;
 
-					System.out.println(ratesLine);
+//					System.out.println(ratesLine);
 //					System.out.println("workername: " + getJobVertexId() + " epoch: " + epoch + " keygroups: " + status.inputKeyGroup.keySet());
 
 //				ProducerRecord<String, String> newRecord = new ProducerRecord<>(TOPIC, ratesLine);
