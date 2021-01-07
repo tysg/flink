@@ -491,7 +491,7 @@ public class SingleInputGate extends InputGate {
 			}
 
 			this.inputChannels.clear();
-			this.inputChannelsWithData.clear();
+//			this.inputChannelsWithData.clear();
 		}
 
 		this.numberOfInputChannels = numberOfInputChannels;

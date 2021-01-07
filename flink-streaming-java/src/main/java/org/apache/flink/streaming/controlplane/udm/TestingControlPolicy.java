@@ -383,7 +383,7 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 		@Override
 		public void run() {
 			// the testing jobGraph (workload) is in TestingWorkload.java, see that file to know how to use it.
-			int statefulOpID = findOperatorByName("Splitter Flatmap");
+			int statefulOpID = findOperatorByName("Splitter FlatMap");
 			int statelessOpID = findOperatorByName("filter");
 			int sourceOp = findOperatorByName("Source: source");
 			// this operator is the downstream of actual source operator
@@ -398,7 +398,7 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 			try {
 				showOperatorInfo();
 				// todo, if the time of sleep is too short, may cause receiving not belong key
-				Thread.sleep(20000);
+				Thread.sleep(2000);
 
 //				System.out.println("\nstart stateless rebalance test...");
 //				testRebalanceStateless(statelessMap);
