@@ -71,22 +71,14 @@ public interface PrimitiveOperation<M> {
 	CompletableFuture<Void> resumeTasks();
 
 	/**
-	 * Request the resources request from the cluster.
+	 * A unified API to reallocate affected tasks resources, e.g. add/reduce slots for it
+	 * If the owned slots becomes 0, then cancel, if from 0->1, then create the task.
 	 *
 	 * @param operatorID the operator id of this operator
-	 * @param offset     represent which parallel instance of this operator, -1 means all parallel instance
+	 * @param oldParallelism  the old parallelism to make a comparison
 	 * @return
 	 */
-	CompletableFuture<Void> deployTasks(int operatorID, int offset);
-
-	/**
-	 * Free the resources request from the cluster.
-	 *
-	 * @param operatorID the operator id of this operator
-	 * @param offset     represent which parallel instance of this operator, -1 means all parallel instance
-	 * @return
-	 */
-	CompletableFuture<Void> cancelTasks(int operatorID, int offset);
+	CompletableFuture<Void> updateTaskResources(int operatorID, int oldParallelism);
 
 	/**
 	 * Update key mappings between destOp and its parents

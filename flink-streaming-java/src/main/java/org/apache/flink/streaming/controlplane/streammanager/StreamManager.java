@@ -319,7 +319,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		runAsync(() -> jobMasterGateway.triggerJobRescale(wrapper, jobGraph, upDownStream.f0, upDownStream.f1));
 	}
 
-	public void rescale(int operatorID, int newParallelism, List<List<Integer>> keyStateAllocation, ControlPolicy waitingController) {
+	public void rescale(int operatorID, int newParallelism, Map<Integer, List<Integer>> keyStateAllocation, ControlPolicy waitingController) {
 		try {
 			// scale in is not support now
 			checkState(keyStateAllocation.size() == newParallelism,
@@ -327,11 +327,12 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			this.jobExecutionPlan.setStateUpdatingFlag(waitingController);
 
 			OperatorDescriptor targetDescriptor = jobExecutionPlan.getOperatorDescriptorByID(operatorID);
-			List<Tuple2<Integer, Integer>> affectedTasks = targetDescriptor.getParents()
-				.stream()
-				.map(d -> Tuple2.of(d.getOperatorID(), -1))
-				.collect(Collectors.toList());
+			List<Tuple2<Integer, Integer>> affectedTasks = new LinkedList<>();
 			affectedTasks.add(Tuple2.of(operatorID, -1));
+			targetDescriptor.getParents()
+				.forEach(c -> affectedTasks.add(Tuple2.of(c.getOperatorID(), -1)));
+//			targetDescriptor.getChildren()
+//				.forEach(c -> affectedTasks.add(Tuple2.of(c.getOperatorID(), -1)));
 
 			int oldParallelism = targetDescriptor.getParallelism();
 			// update the parallelism
@@ -349,17 +350,19 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					.thenCompose(o -> enforcement.synchronizePauseTasks(affectedTasks, o))
 					.thenCompose(o -> enforcement.updateUpstreamKeyMapping(operatorID, o))
 					.thenCompose(o -> enforcement.updateState(operatorID, o))
-					.thenCompose(o -> enforcement.deployTasks(operatorID, oldParallelism))
+					.thenCompose(o -> enforcement.updateTaskResources(operatorID, oldParallelism))
 					.thenCompose(o -> enforcement.resumeTasks())
-					.thenAccept(
-						(acknowledge) -> {
-							try {
-								this.jobExecutionPlan.notifyUpdateFinished(operatorID);
-							} catch (Exception e) {
-								e.printStackTrace();
-							}
+					.whenComplete((o, failure) -> {
+						if(failure != null){
+							failure.printStackTrace();
 						}
-					)
+						try {
+							System.out.println("++++++ finished update");
+							this.jobExecutionPlan.notifyUpdateFinished(operatorID);
+						} catch (Exception e) {
+							e.printStackTrace();
+						}
+					})
 			));
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -368,7 +371,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	}
 
 	@Override
-	public void rebalance(int operatorID, List<List<Integer>> keyStateAllocation, boolean stateful, ControlPolicy waitingController) {
+	public void rebalance(int operatorID, Map<Integer, List<Integer>> keyStateAllocation, boolean stateful, ControlPolicy waitingController) {
 		try {
 			// typically, the target operator should contain key state,
 			// todo if keyStateAllocation is null, means it is stateless operator, but not support now
@@ -393,31 +396,33 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						.thenCompose(o -> enforcement.synchronizePauseTasks(affectedTasks, o))
 						.thenCompose(o -> enforcement.updateUpstreamKeyMapping(operatorID, o))
 						.thenCompose(o -> enforcement.updateState(operatorID, o))
-						.thenCompose(o -> enforcement.resumeTasks())
-						.thenAccept(
-							(acknowledge) -> {
-								try {
-									this.jobExecutionPlan.notifyUpdateFinished(operatorID);
-								} catch (Exception e) {
-									e.printStackTrace();
-								}
+						.whenComplete((o, failure) -> {
+							if(failure != null){
+								failure.printStackTrace();
 							}
-						)
+							try {
+								System.out.println("++++++ finished update");
+								this.jobExecutionPlan.notifyUpdateFinished(operatorID);
+							} catch (Exception e) {
+								e.printStackTrace();
+							}
+						})
 				));
 			} else {
 				runAsync(() -> jobMasterGateway.callOperations(
 					enforcement -> FutureUtils.completedVoidFuture()
 						.thenCompose(o -> enforcement.prepareExecutionPlan(jobExecutionPlan))
 						.thenCompose(o -> enforcement.updateUpstreamKeyMapping(operatorID, o))
-						.thenAccept(
-							(acknowledge) -> {
-								try {
-									this.jobExecutionPlan.notifyUpdateFinished(operatorID);
-								} catch (Exception e) {
-									e.printStackTrace();
-								}
+						.whenComplete((o, failure) -> {
+							if(failure != null){
+								failure.printStackTrace();
 							}
-						)
+							try {
+								this.jobExecutionPlan.notifyUpdateFinished(operatorID);
+							} catch (Exception e) {
+								e.printStackTrace();
+							}
+						})
 				));
 			}
 		} catch (Exception e) {
@@ -442,8 +447,6 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						o -> enforcement.synchronizePauseTasks(Collections.singletonList(Tuple2.of(operatorID, -1)), o))
 					.thenCompose(
 						o -> enforcement.updateFunction(operatorID, o))
-					.thenCompose(
-						o -> enforcement.resumeTasks())
 					.thenAccept(
 						(acknowledge) -> {
 							try {

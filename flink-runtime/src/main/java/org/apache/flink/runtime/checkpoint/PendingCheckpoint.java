@@ -342,7 +342,14 @@ public class PendingCheckpoint {
 			}
 
 			List<OperatorID> operatorIDs = vertex.getJobVertex().getOperatorIDs();
-			int subtaskIndex = vertex.getParallelSubtaskIndex();
+//			int subtaskIndex = vertex.getParallelSubtaskIndex();
+
+			// if this is a rescale point, we need to use the old config e,g, parallelism, index of vertex
+			int subtaskIndex = props.getCheckpointType() == CheckpointType.RESCALEPOINT ?
+				vertex.getOldParallelSubtaskIndex():vertex.getParallelSubtaskIndex();
+			int parallelism = props.getCheckpointType() == CheckpointType.RESCALEPOINT ?
+				vertex.getOldTotalNumberOfParallelSubtasks() : vertex.getTotalNumberOfParallelSubtasks();
+
 			long ackTimestamp = System.currentTimeMillis();
 
 			long stateSize = 0L;
@@ -363,7 +370,7 @@ public class PendingCheckpoint {
 					if (operatorState == null) {
 						operatorState = new OperatorState(
 							operatorID,
-							vertex.getTotalNumberOfParallelSubtasks(),
+							parallelism,
 							vertex.getMaxParallelism());
 						operatorStates.put(operatorID, operatorState);
 					}

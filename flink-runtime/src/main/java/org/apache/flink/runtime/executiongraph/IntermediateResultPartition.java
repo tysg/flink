@@ -30,7 +30,7 @@ public class IntermediateResultPartition {
 
 	private final ExecutionVertex producer;
 
-	private final int partitionNumber;
+	private int partitionNumber;
 
 	private final IntermediateResultPartitionID partitionId;
 
@@ -134,5 +134,9 @@ public class IntermediateResultPartition {
 		}
 
 		return false;
+	}
+
+	void updatePartitionNumber(int partitionNumber) {
+		this.partitionNumber = partitionNumber;
 	}
 }

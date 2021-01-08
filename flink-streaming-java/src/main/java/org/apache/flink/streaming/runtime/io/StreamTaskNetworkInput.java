@@ -31,6 +31,7 @@ import org.apache.flink.runtime.io.network.buffer.Buffer;
 import org.apache.flink.runtime.io.network.partition.consumer.BufferOrEvent;
 import org.apache.flink.runtime.plugable.DeserializationDelegate;
 import org.apache.flink.runtime.plugable.NonReusingDeserializationDelegate;
+import org.apache.flink.runtime.rescale.reconfigure.TaskOperatorManager;
 import org.apache.flink.streaming.api.watermark.Watermark;
 import org.apache.flink.streaming.runtime.streamrecord.StreamElement;
 import org.apache.flink.streaming.runtime.streamrecord.StreamElementSerializer;
@@ -77,6 +78,8 @@ public final class StreamTaskNetworkInput<T> implements StreamTaskInput<T> {
 
 	private final IOManager ioManager;
 
+	private TaskOperatorManager.PauseActionController pauseActionController;
+
 	@SuppressWarnings("unchecked")
 	public StreamTaskNetworkInput(
 			CheckpointedInputGate checkpointedInputGate,
@@ -119,6 +122,10 @@ public final class StreamTaskNetworkInput<T> implements StreamTaskInput<T> {
 		this.ioManager = null;
 	}
 
+	public void setPauseActionController(TaskOperatorManager.PauseActionController pauseActionController) {
+		this.pauseActionController = pauseActionController;
+	}
+
 	@Override
 	public InputStatus emitNext(DataOutput<T> output) throws Exception {
 
@@ -147,6 +154,9 @@ public final class StreamTaskNetworkInput<T> implements StreamTaskInput<T> {
 						throw new IllegalStateException("Trailing data in checkpoint barrier handler.");
 					}
 					return InputStatus.END_OF_INPUT;
+				}
+				if(this.pauseActionController != null && pauseActionController.ackIfPause()){
+					return InputStatus.NEED_PAUSE;
 				}
 				return InputStatus.NOTHING_AVAILABLE;
 			}

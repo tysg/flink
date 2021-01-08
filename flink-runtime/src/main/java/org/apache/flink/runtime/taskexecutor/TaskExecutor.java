@@ -680,7 +680,7 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 					task.updateKeyGroupRange(tdd.getKeyGroupRange());
 				}else
 				// author: @hya
-				task.finalizeRescale();
+				return task.finalizeRescaleAsync().thenApply(o -> Acknowledge.get());
 
 				return CompletableFuture.completedFuture(Acknowledge.get());
 			} catch (Exception e) {

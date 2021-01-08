@@ -272,7 +272,7 @@ public abstract class AbstractInvokable {
 		throw new UnsupportedOperationException(String.format("updateOperatorConfig not supported by %s", this.getClass().getName()));
 	}
 
-	public void finalizeRescale(){
+	public CompletableFuture<Void> finalizeRescale(){
 		throw new UnsupportedOperationException(String.format("updateOperatorConfig not supported by %s", this.getClass().getName()));
 	}
 }

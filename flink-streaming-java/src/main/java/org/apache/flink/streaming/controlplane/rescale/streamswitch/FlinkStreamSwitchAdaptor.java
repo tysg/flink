@@ -19,8 +19,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.apache.flink.runtime.rescale.JobRescaleAction.ActionType.REPARTITION;
-import static org.apache.flink.runtime.rescale.JobRescaleAction.ActionType.SCALE_OUT;
+import static org.apache.flink.runtime.rescale.JobRescaleAction.ActionType.*;
 
 public class FlinkStreamSwitchAdaptor implements ControlPolicy {
 
@@ -58,10 +57,11 @@ public class FlinkStreamSwitchAdaptor implements ControlPolicy {
 			FlinkOperatorController controller;
 
 			if (jobVertex.getName().toLowerCase().contains("map")) {
-//				controller = new DummyStreamSwitch("map");
-				continue;
+				controller = new DummyStreamSwitch("map");
+//				continue;
 			} else if (jobVertex.getName().toLowerCase().contains("filter")) {
-				controller = new DummyStreamSwitch("filter");
+//				controller = new DummyStreamSwitch("filter");
+				continue;
 			} else {
 				controller = ConfigurableDummyStreamSwitch.createFromJobVertex(jobVertex.getName());
 				if (controller == null) {
@@ -185,14 +185,22 @@ public class FlinkStreamSwitchAdaptor implements ControlPolicy {
 
 			JobRescalePartitionAssignment jobRescalePartitionAssignment;
 
-			if (numOpenedSubtask >= newParallelism) {
+			if (numOpenedSubtask == newParallelism) {
 				// repartition
 				jobRescalePartitionAssignment = new JobRescalePartitionAssignment(
 					executorMapping, oldExecutorMapping, oldRescalePA, numOpenedSubtask);
 
 //				rescaleAction.repartition(jobVertexID, jobRescalePartitionAssignment);
 				actionConsumer.put(REPARTITION, jobVertexID, -1, jobRescalePartitionAssignment);
-			} else {
+			} else if (numOpenedSubtask > newParallelism) {
+				jobRescalePartitionAssignment = new JobRescalePartitionAssignment(
+					executorMapping, oldExecutorMapping, oldRescalePA, numOpenedSubtask);
+
+//				rescaleAction.repartition(jobVertexID, jobRescalePartitionAssignment);
+				actionConsumer.put(SCALE_IN, jobVertexID, newParallelism, jobRescalePartitionAssignment);
+				numOpenedSubtask = newParallelism;
+			}
+			else {
 				// scale out
 				jobRescalePartitionAssignment = new JobRescalePartitionAssignment(
 					executorMapping, oldExecutorMapping, oldRescalePA, newParallelism);

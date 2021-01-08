@@ -82,11 +82,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -213,7 +209,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 
 	private final KeyGroupRange assignedKeyGroupRange;
 
-	private final TaskOperatorManager.PauseActionController pauseActionController;
+	protected final TaskOperatorManager.PauseActionController pauseActionController;
 
 	private volatile int idInModel;
 
@@ -321,15 +317,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 	protected void processInput(MailboxDefaultAction.Controller controller) throws Exception {
 		InputStatus status = inputProcessor.processInput();
 		// may use this to implement consistent
-		if(pauseActionController.ackIfPause()){
-			if (status == InputStatus.END_OF_INPUT) {
-				controller.allActionsCompleted();
-				return;
-			}
-//			CompletableFuture<?> jointFuture = CompletableFuture.allOf(
-//				getInputOutputJointFuture(status),
-//				pauseActionController.getResumeFuture()
-//			);
+		if(status == InputStatus.NEED_PAUSE){
 			CompletableFuture<?> resumeFuture = pauseActionController.getResumeFuture();
 			MailboxDefaultAction.Suspension suspendedDefaultAction = controller.suspendDefaultAction();
 			resumeFuture.thenRun(suspendedDefaultAction::resume)
@@ -1175,39 +1163,41 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 	protected void reconnect() {}
 
 	private void initReconnect() {
-		TaskRescaleManager rescaleManager = ((RuntimeEnvironment) getEnvironment()).taskRescaleManager;
+		actionExecutor.runThrowing(() -> {
+			TaskRescaleManager rescaleManager = ((RuntimeEnvironment) getEnvironment()).taskRescaleManager;
 
-		if (!rescaleManager.isScalingTarget()) {
-			return;
-		}
-		LOG.info("++++++ trigger target vertex rescaling: " + this.toString());
-		// this line is to record the time to redistribute
+			if (!rescaleManager.isScalingTarget()) {
+				return;
+			}
+			LOG.info("++++++ trigger target vertex rescaling: " + this.toString());
+			// this line is to record the time to redistribute
 //		long start = System.nanoTime();
 
-		try {
-			// update gate
-			if (rescaleManager.isScalingGates()) {
-				for (InputGate gate : getEnvironment().getAllInputGates()) {
-					rescaleManager.substituteInputGateChannels((SingleInputGate) ((InputGateWithMetrics) gate).getInputGate());
+			try {
+				// update gate
+				if (rescaleManager.isScalingGates()) {
+					for (InputGate gate : getEnvironment().getAllInputGates()) {
+						rescaleManager.substituteInputGateChannels((SingleInputGate) ((InputGateWithMetrics) gate).getInputGate());
+					}
 				}
-			}
 
-			// update output (writers)
-			if (rescaleManager.isScalingPartitions()) {
-				replaceResultPartitions(rescaleManager);
-			}
+				// update output (writers)
+				if (rescaleManager.isScalingPartitions()) {
+					replaceResultPartitions(rescaleManager);
+				}
 
-			reconnect();
-		} catch (Exception e) {
-			e.printStackTrace();
-			LOG.info("++++++ error", e);
-		} finally {
-			rescaleManager.finish();
+				reconnect();
+			} catch (Exception e) {
+				e.printStackTrace();
+				LOG.info("++++++ error", e);
+			} finally {
+				rescaleManager.finish();
 //			System.out.println("redistribute id: " + this.toString() + " time: " + (System.nanoTime() - start));
-			// complete reconnection, then start to process tuple,
-			// the total migration time is T(complete reconnection) - T(receive barrior).
-			System.out.println(this.toString() + " completed reconnection: " + System.currentTimeMillis());
-		}
+				// complete reconnection, then start to process tuple,
+				// the total migration time is T(complete reconnection) - T(receive barrior).
+				System.out.println(this.toString() + " completed reconnection: " + System.currentTimeMillis());
+			}
+		});
 	}
 
 	protected void replaceResultPartitions(TaskRescaleManager rescaleManager) throws IOException {
@@ -1302,8 +1292,19 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 		}
 	}
 
-	public void finalizeRescale(){
-		initReconnect();
+	public CompletableFuture<Void> finalizeRescale(){
+		Future<Void> success = mailboxProcessor.getMainMailboxExecutor().submit(
+			this::initReconnect,
+			"initReconnect");
+		return CompletableFuture.runAsync(
+			() -> {
+				try {
+					success.get();
+				} catch (InterruptedException | ExecutionException e) {
+					e.printStackTrace();
+				}
+			}
+		);
 	}
 
 	// ------------------------------------------------------------------------

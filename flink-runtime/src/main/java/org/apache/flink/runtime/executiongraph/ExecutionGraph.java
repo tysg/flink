@@ -1478,7 +1478,13 @@ public class ExecutionGraph implements AccessExecutionGraph {
 		if (attempt != null) {
 			try {
 				final boolean stateUpdated = updateStateInternal(state, attempt);
-				maybeReleasePartitions(attempt);
+				// if executionVertex not in the current ejv, skip, because we updated the pipelineRegion
+				for (ExecutionVertex vertex : tasks.get(attempt.getVertex().getJobvertexId()).getTaskVertices()) {
+					if (attempt.getVertex().getID() == vertex.getID()) {
+						maybeReleasePartitions(attempt);
+					}
+				}
+
 				return stateUpdated;
 			}
 			catch (Throwable t) {

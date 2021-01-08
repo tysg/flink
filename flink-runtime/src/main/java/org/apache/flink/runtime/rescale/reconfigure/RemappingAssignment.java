@@ -13,7 +13,7 @@ public class RemappingAssignment implements AbstractCoordinator.Diff {
 	private final Map<Integer, List<Integer>> oldKeymapping = new HashMap<>();
 	private final List<KeyGroupRange> alignedKeyGroupRanges;
 
-	public RemappingAssignment(List<List<Integer>> newMapping, List<List<Integer>> oldMapping) {
+	public RemappingAssignment(Map<Integer, List<Integer>> newMapping, Map<Integer, List<Integer>> oldMapping) {
 		for (int i = 0; i < newMapping.size(); i++) {
 			keymapping.put(i, newMapping.get(i));
 		}
@@ -23,17 +23,17 @@ public class RemappingAssignment implements AbstractCoordinator.Diff {
 		alignedKeyGroupRanges = generateAlignedKeyGroupRanges(newMapping);
 	}
 
-	public RemappingAssignment(List<List<Integer>> mapping) {
+	public RemappingAssignment(Map<Integer, List<Integer>> mapping) {
 		for (int i = 0; i < mapping.size(); i++) {
 			keymapping.put(i, mapping.get(i));
 		}
 		alignedKeyGroupRanges = generateAlignedKeyGroupRanges(mapping);
 	}
 
-	private List<KeyGroupRange> generateAlignedKeyGroupRanges(List<List<Integer>> partitionAssignment) {
+	private List<KeyGroupRange> generateAlignedKeyGroupRanges(Map<Integer, List<Integer>> partitionAssignment) {
 		int keyGroupStart = 0;
 		List<KeyGroupRange> alignedKeyGroupRanges = new ArrayList<>();
-		for (List<Integer> list : partitionAssignment) {
+		for (List<Integer> list : partitionAssignment.values()) {
 			int rangeSize = list.size();
 
 			KeyGroupRange keyGroupRange = rangeSize == 0 ?
@@ -55,6 +55,10 @@ public class RemappingAssignment implements AbstractCoordinator.Diff {
 			return true;
 		}
 		return AbstractCoordinator.compareIntList(oldKeymapping.get(taskIndex), keymapping.get(taskIndex));
+	}
+
+	public boolean isScaleOut(){
+		return keymapping.size() > oldKeymapping.size();
 	}
 
 	public Map<Integer, List<Integer>> getPartitionAssignment() {
