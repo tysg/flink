@@ -180,7 +180,7 @@ public abstract class RecordWriter<T extends IOReadableWritable> implements Avai
 	}
 
 	public void flushAll() {
-		metricsManager.outputBufferFull(System.nanoTime());
+//		metricsManager.outputBufferFull(System.nanoTime());
 
 		targetPartition.flushAll();
 	}
