@@ -46,6 +46,9 @@ import org.apache.flink.runtime.state.TaskStateManager;
 import java.util.Map;
 import java.util.concurrent.Future;
 import org.apache.flink.runtime.taskexecutor.GlobalAggregateManager;
+import org.apache.flink.runtime.util.profiling.KafkaMetricsManager;
+import org.apache.flink.runtime.util.profiling.MetricsManager;
+import org.apache.flink.runtime.util.profiling.NoopMetricsManager;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -96,6 +99,8 @@ public class RuntimeEnvironment implements Environment {
 	public final TaskOperatorManager taskOperatorManager;
 
 	public final KeyGroupRange keyGroupRange;
+
+	private final MetricsManager metricsManager;
 
 	// ------------------------------------------------------------------------
 
@@ -155,6 +160,22 @@ public class RuntimeEnvironment implements Environment {
 		this.taskOperatorManager = checkNotNull(taskOperatorManager);
 		this.metrics = metrics;
 		this.keyGroupRange = keyGroupRange;
+
+		if (taskInfo.getTaskNameWithSubtasks().contains("Sink")) {
+			this.metricsManager = new NoopMetricsManager(
+				taskInfo.getTaskNameWithSubtasks(),
+				this.jobVertexId,
+				jobConfiguration,
+				taskInfo.getIdInModel(),
+				taskInfo.getMaxNumberOfParallelSubtasks());
+		} else {
+			this.metricsManager = new KafkaMetricsManager(
+				taskInfo.getTaskNameWithSubtasks(),
+				this.jobVertexId,
+				jobConfiguration,
+				taskInfo.getIdInModel(),
+				taskInfo.getMaxNumberOfParallelSubtasks());
+		}
 	}
 
 	// ------------------------------------------------------------------------
@@ -303,5 +324,10 @@ public class RuntimeEnvironment implements Environment {
 	@Override
 	public void failExternally(Throwable cause) {
 		this.containingTask.failExternally(cause);
+	}
+
+	@Override
+	public MetricsManager getMetricsManager() {
+		return metricsManager;
 	}
 }

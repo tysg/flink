@@ -469,19 +469,24 @@ public class SingleInputGate extends InputGate {
 		synchronized (requestLock) {
 			for (InputChannel inputChannel : inputChannels.values()) {
 				try {
-					if(inputChannel instanceof RemoteInputChannel){
-						LOG.info("-----DEBUG number of left buffer in remote channel:" +
-							((RemoteInputChannel) inputChannel).getNumberOfQueuedBuffers()+ " of task " + owningTaskName);
-					}else if(inputChannel instanceof LocalInputChannel){
-						try {
-							Optional<BufferAndAvailability> buffer;
-							if((buffer = inputChannel.getNextBuffer()).isPresent()) {
-								System.err.println("-----DEBUG, the local input channel has buffer:" + buffer);
-							}
-						} catch (InterruptedException e) {
-							e.printStackTrace();
-						}
-					}
+//					if (inputChannel instanceof RemoteInputChannel) {
+//						System.out.println("++++++ Task: " + owningTaskName + " Number of buffers left during scaling: " + ((RemoteInputChannel) inputChannel).getNumberOfQueuedBuffers());
+//					}
+//					if (inputChannel instanceof LocalInputChannel) {
+//						System.out.println("++++++ Task: " + owningTaskName + " has buffer left: " + ((LocalInputChannel) inputChannel).getNextBuffer());
+//					if(inputChannel instanceof RemoteInputChannel){
+//						LOG.info("-----DEBUG number of left buffer in remote channel:" +
+//							((RemoteInputChannel) inputChannel).getNumberOfQueuedBuffers()+ " of task " + owningTaskName);
+//					}else if(inputChannel instanceof LocalInputChannel){
+//						try {
+//							Optional<BufferAndAvailability> buffer;
+//							if((buffer = inputChannel.getNextBuffer()).isPresent()) {
+//								System.err.println("-----DEBUG, the local input channel has buffer:" + buffer);
+//							}
+//						} catch (InterruptedException e) {
+//							e.printStackTrace();
+//						}
+//					}
 					inputChannel.releaseAllResources();
 				}
 				catch (IOException e) {

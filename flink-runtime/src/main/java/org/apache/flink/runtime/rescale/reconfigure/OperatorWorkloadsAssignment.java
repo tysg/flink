@@ -35,6 +35,8 @@ public class OperatorWorkloadsAssignment implements AbstractCoordinator.Diff {
 	// this is used for remove the corresponding subtask
 	private final Map<Integer, Boolean> removedSubtaskMap;
 
+	private final boolean isScaling;
+
 	public OperatorWorkloadsAssignment(
 		Map<Integer, List<Integer>> executorMapping,
 		Map<Integer, List<Integer>> oldExecutorMapping,
@@ -65,10 +67,13 @@ public class OperatorWorkloadsAssignment implements AbstractCoordinator.Diff {
 		int oldParallelism = oldExecutorMapping.keySet().size();
 
 		if (newParallelism > oldParallelism) {
+			isScaling = true;
 			setupFollowScaleOut(executorMapping, oldExecutorMapping);
 		} else if (newParallelism < oldParallelism) {
+			isScaling = true;
 			setupFollowScaleIn(executorMapping, oldExecutorMapping);
 		} else {
+			isScaling = false;
 			setupFollowRepartition(executorMapping, oldExecutorMapping);
 		}
 		fillingUnused(executorMapping.keySet().size());
@@ -94,6 +99,8 @@ public class OperatorWorkloadsAssignment implements AbstractCoordinator.Diff {
 		this.alignedKeyGroupRanges = new ArrayList<>();
 		this.modifiedSubtaskMap = new HashMap<>();
 		this.removedSubtaskMap = new HashMap<>();
+
+		isScaling = false;
 
 		generateAlignedKeyGroupRanges();
 		generateExecutorIdMapping();
@@ -359,6 +366,6 @@ public class OperatorWorkloadsAssignment implements AbstractCoordinator.Diff {
 	}
 
 	public boolean isScaling() {
-		return true;
+		return isScaling;
 	}
 }

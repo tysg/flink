@@ -47,6 +47,7 @@ import org.apache.flink.runtime.query.TaskKvStateRegistry;
 import org.apache.flink.runtime.state.TaskStateManager;
 import org.apache.flink.runtime.taskexecutor.GlobalAggregateManager;
 import org.apache.flink.runtime.taskmanager.TaskManagerRuntimeInfo;
+import org.apache.flink.runtime.util.profiling.MetricsManager;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.Preconditions;
 
@@ -247,6 +248,11 @@ public class SavepointEnvironment implements Environment {
 	@Override
 	public TaskEventDispatcher getTaskEventDispatcher() {
 		throw new UnsupportedOperationException(ERROR_MSG);
+	}
+
+	@Override
+	public MetricsManager getMetricsManager() {
+		return null;
 	}
 
 	/**

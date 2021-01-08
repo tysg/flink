@@ -214,6 +214,7 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 		}
 	}
 
+	// WARNING: This only works without rebalance of the stateless operator
 	private void testScaleOut2(int testingOpID) throws InterruptedException {
 		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
 

@@ -172,43 +172,49 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 
 	public CompletableFuture<Void> cancelTasks(int operatorID, int offset) {
 		// TODO: add them to the future list
-		Collection<CompletableFuture<?>> removeFutures =
-			new ArrayList<>(removedCandidates.size());
-
-		for (ExecutionVertex vertex : removedCandidates.get(operatorID)) {
-			CompletableFuture<?> removedTask = vertex.cancel();
-			removeFutures.add(removedTask);
-		}
-
-//		return FutureUtils.supplyAsync(() -> {
-//				try {
-//					CheckpointCoordinator checkpointCoordinator = executionGraph.getCheckpointCoordinator();
-//					assert checkpointCoordinator != null;
-//					checkpointCoordinator.stopCheckpointScheduler();
-//					checkNotNull(checkpointCoordinator);
-//					checkpointCoordinator.dropVertices(removedCandidates.get(operatorID).toArray(new ExecutionVertex[0]), false);
+//		Collection<CompletableFuture<?>> removeFutures =
+//			new ArrayList<>(removedCandidates.size());
 //
-//					if (checkpointCoordinator.isPeriodicCheckpointingConfigured()) {
-//						checkpointCoordinator.startCheckpointScheduler();
-//					}
-//					return updatePartitionAndDownStreamGates(operatorID, rescaleID);
-//				} catch (ExecutionGraphException e) {
-//					e.printStackTrace();
-//					return FutureUtils.completedExceptionally(e);
-//				}
-//			});
+//		for (ExecutionVertex vertex : removedCandidates.get(operatorID)) {
+//			CompletableFuture<?> removedTask = vertex.cancel();
+//			removeFutures.add(removedTask);
+//		}
+//
+//		CheckpointCoordinator checkpointCoordinator = executionGraph.getCheckpointCoordinator();
+//		assert checkpointCoordinator != null;
+//		checkpointCoordinator.stopCheckpointScheduler();
+//		checkNotNull(checkpointCoordinator);
+//		checkpointCoordinator.dropVertices(removedCandidates.get(operatorID).toArray(new ExecutionVertex[0]), false);
+//
+//		if (checkpointCoordinator.isPeriodicCheckpointingConfigured()) {
+//			checkpointCoordinator.startCheckpointScheduler();
+//		}
+//		return FutureUtils.completeAll(removeFutures)
+//			.thenCompose(o -> updateDownstreamGates(operatorID));
 
-		CheckpointCoordinator checkpointCoordinator = executionGraph.getCheckpointCoordinator();
-		assert checkpointCoordinator != null;
-		checkpointCoordinator.stopCheckpointScheduler();
-		checkNotNull(checkpointCoordinator);
-		checkpointCoordinator.dropVertices(removedCandidates.get(operatorID).toArray(new ExecutionVertex[0]), false);
+		updateDownstreamGates(operatorID)
+			.thenCompose(executions -> {
+				Collection<CompletableFuture<?>> removeFutures =
+					new ArrayList<>(removedCandidates.size());
 
-		if (checkpointCoordinator.isPeriodicCheckpointingConfigured()) {
-			checkpointCoordinator.startCheckpointScheduler();
-		}
-		return FutureUtils.completeAll(removeFutures)
-			.thenCompose(o -> updateDownstreamGates(operatorID));
+				for (ExecutionVertex vertex : removedCandidates.get(operatorID)) {
+					CompletableFuture<?> removedTask = vertex.cancel();
+					removeFutures.add(removedTask);
+				}
+
+				CheckpointCoordinator checkpointCoordinator = executionGraph.getCheckpointCoordinator();
+				assert checkpointCoordinator != null;
+				checkpointCoordinator.stopCheckpointScheduler();
+				checkNotNull(checkpointCoordinator);
+				checkpointCoordinator.dropVertices(removedCandidates.get(operatorID).toArray(new ExecutionVertex[0]), false);
+
+				if (checkpointCoordinator.isPeriodicCheckpointingConfigured()) {
+					checkpointCoordinator.startCheckpointScheduler();
+				}
+
+				return CompletableFuture.completedFuture(checkpointCoordinator);
+			});
+		return CompletableFuture.completedFuture(null);
 	}
 
 	/**
@@ -380,6 +386,7 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 
 //				LOG.info("++++++ start to assign states");
 				stateAssignmentOperation.assignStates();
+				// can safely sync the some old parameters because all modifications in JobMaster is completed.
 				executionJobVertex.syncOldConfigInfo();
 			}
 		);
@@ -416,7 +423,7 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 							);
 							rescaleCandidatesFutures.add(stateUpdateFuture);
 							if (diffMap.isEmpty()) {
-								checkNotNull(syncOp, "have you call sync before");
+								checkNotNull(syncOp, "have you call sync before?");
 								final int taskOffset = i;
 								stateUpdateFuture.runAfterBoth(
 									finalUpdateTargetPartitionFuture,

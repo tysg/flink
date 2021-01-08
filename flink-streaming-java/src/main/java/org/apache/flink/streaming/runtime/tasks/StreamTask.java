@@ -53,6 +53,7 @@ import org.apache.flink.runtime.taskmanager.InputGateWithMetrics;
 import org.apache.flink.runtime.taskmanager.RuntimeEnvironment;
 import org.apache.flink.runtime.util.ExecutorThreadFactory;
 import org.apache.flink.runtime.util.FatalExitExceptionHandler;
+import org.apache.flink.runtime.util.profiling.MetricsManager;
 import org.apache.flink.streaming.api.TimeCharacteristic;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.graph.StreamEdge;
@@ -321,7 +322,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 			CompletableFuture<?> resumeFuture = pauseActionController.getResumeFuture();
 			MailboxDefaultAction.Suspension suspendedDefaultAction = controller.suspendDefaultAction();
 			resumeFuture.thenRun(suspendedDefaultAction::resume)
-				.thenRun(()->System.out.println(getName() + "pauseActionController get resumed"));
+				.thenRun(()->System.out.println(getName() + ": pauseActionController get resumed"));
 			return;
 		}
 		if (status == InputStatus.MORE_AVAILABLE && recordWriter.isAvailable()) {
@@ -798,6 +799,10 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 		return getEnvironment().getTaskInfo().getTaskNameWithSubtasks();
 	}
 
+	public MetricsManager getMetricsManager() {
+		return getEnvironment().getMetricsManager();
+	}
+
 	/**
 	 * Gets the name of the task, appended with the subtask indicator and execution id.
 	 *
@@ -1227,11 +1232,14 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 			return;
 		}
 
+		// force append latest status into metrics queue.
+		getMetricsManager().updateMetrics();
+
 		TaskOperatorManager operatorManager = ((RuntimeEnvironment) getEnvironment()).taskOperatorManager;
 		if(operatorManager.acknowledgeSyncRequest(checkpointMetaData.getCheckpointId())){
 			// we could now pause the current processing
 			try {
-				System.out.println("pause the current data processing:" + this.getName());
+				System.out.println(this.getName() + ": pause the current data processing");
 				operatorManager.getPauseActionController().setPausedAndGetAckFuture();
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -1239,7 +1247,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 		}
 
 		// add a timer for measuring blocking time
-		//System.out.println(this.toString() + " received checkpoint: " + System.currentTimeMillis());
+		//System.out.println(this.toString() + " received check point: " + System.currentTimeMillis());
 		// do not need now
 //		initReconnect();
 	}
@@ -1251,9 +1259,12 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 		try {
 			actionExecutor.runThrowing(() -> {
 				this.assignedKeyGroupRange.update(keyGroupRange);
-//				this.idInModel = idInModel;
+				this.idInModel = idInModel;
 
 				initializeStateAndOpen();
+
+				getEnvironment().getMetricsManager().updateTaskId(
+					getEnvironment().getTaskInfo().getTaskNameWithSubtasks(), idInModel);
 // we don't need to reconnect since we have separate api called resume
 //				initReconnect();
 			});

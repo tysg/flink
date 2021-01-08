@@ -62,6 +62,8 @@ public class KeyGroupStreamPartitioner<T, K> extends StreamPartitioner<T> implem
 		K key;
 		try {
 			key = keySelector.getKey(record.getInstance().getValue());
+			record.getInstance().setKeyGroup(KeyGroupRangeAssignment.assignToKeyGroup(key, maxParallelism));
+			metricsManager.incRecordsOutKeyGroup(record.getInstance().getKeyGroup());
 		} catch (Exception e) {
 			throw new RuntimeException("Could not extract key from " + record.getInstance().getValue(), e);
 		}

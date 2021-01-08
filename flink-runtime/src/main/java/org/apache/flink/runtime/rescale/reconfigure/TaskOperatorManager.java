@@ -20,7 +20,7 @@ public class TaskOperatorManager {
 
 	public TaskOperatorManager(Task task) {
 		this.containedTask = task;
-		this.pauseActionController = new PauseActionControllerImpl();
+		this.pauseActionController = new PauseActionControllerImpl(containedTask.getTaskInfo().getTaskNameWithSubtasks());
 	}
 
 	public PauseActionController getPauseActionController() {
@@ -30,14 +30,14 @@ public class TaskOperatorManager {
 	public void setSyncRequestFlag(int syncFlag) throws Exception {
 		switch (syncFlag){
 			case NEED_SYNC_REQUEST:
-				System.out.println("prepare to synchronize");
+				System.out.println(containedTask.getTaskInfo().getTaskNameWithSubtasks() + ": prepare to synchronize");
 				break;
 			case NEED_RESUME_REQUEST:
-				System.out.println("task resuming...");
+				System.out.println(containedTask.getTaskInfo().getTaskNameWithSubtasks() + ": task resuming...");
 				this.getPauseActionController().resume();
 				break;
 			default:
-				throw new Exception("unknown flag");
+				throw new Exception(containedTask.getTaskInfo().getTaskNameWithSubtasks() + ": unknown flag");
 		}
 		hasSyncRequest.set(syncFlag);
 	}
@@ -82,11 +82,17 @@ public class TaskOperatorManager {
 
 		private final Object lock = new Object();
 
+		private final String taskName;
+
+		public PauseActionControllerImpl(String taskName) {
+			this.taskName = taskName;
+		}
+
 		@Override
 		public boolean ackIfPause() {
 			if (state.get() == TaskStatus.PAUSE) {
 				// only the state become pause should we acquire the lock
-				System.out.println("suspend process to wait for pauseActionController ready");
+				System.out.println(taskName + ": suspend process to wait for pauseActionController ready");
 				synchronized (lock) {
 					ackPausedFuture.complete(Acknowledge.get());
 					return true;
