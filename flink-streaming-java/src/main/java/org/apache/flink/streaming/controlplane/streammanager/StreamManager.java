@@ -49,6 +49,7 @@ import org.apache.flink.runtime.rpc.FencedRpcEndpoint;
 import org.apache.flink.runtime.rpc.RpcService;
 import org.apache.flink.runtime.rpc.RpcUtils;
 import org.apache.flink.runtime.rpc.akka.AkkaRpcServiceUtils;
+import org.apache.flink.runtime.util.profiling.ReconfigurationProfiler;
 import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
 import org.apache.flink.runtime.rescale.reconfigure.JobGraphRescaler;
 import org.apache.flink.streaming.controlplane.jobgraph.NormalInstantiateFactory;
@@ -110,6 +111,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 	private CompletableFuture<Acknowledge> rescalePartitionFuture;
 
+	private ReconfigurationProfiler reconfigurationProfiler;
+
     /*
 
     // --------- JobManager --------
@@ -159,6 +162,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 //		this.controlPolicyList.add(new FlinkStreamSwitchAdaptor(this, jobGraph));
 //		this.controlPolicyList.add(new TestingCFManager(this));
 		this.controlPolicyList.add(new TestingControlPolicy(this));
+
+		reconfigurationProfiler = new ReconfigurationProfiler();
 	}
 
 	/**
@@ -321,6 +326,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 	public void rescale(int operatorID, int newParallelism, Map<Integer, List<Integer>> keyStateAllocation, ControlPolicy waitingController) {
 		try {
+			reconfigurationProfiler.onReconfigurationStart();
 			// scale in is not support now
 			checkState(keyStateAllocation.size() == newParallelism,
 				"new parallelism not match key state allocation");
@@ -359,6 +365,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						try {
 							System.out.println("++++++ finished update");
 							this.jobExecutionPlan.notifyUpdateFinished(operatorID);
+							reconfigurationProfiler.onReconfigurationEnd();
 						} catch (Exception e) {
 							e.printStackTrace();
 						}
@@ -367,12 +374,12 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-
 	}
 
 	@Override
 	public void rebalance(int operatorID, Map<Integer, List<Integer>> keyStateAllocation, boolean stateful, ControlPolicy waitingController) {
 		try {
+			reconfigurationProfiler.onReconfigurationStart();
 			// typically, the target operator should contain key state,
 			// todo if keyStateAllocation is null, means it is stateless operator, but not support now
 			this.jobExecutionPlan.setStateUpdatingFlag(waitingController);
@@ -403,6 +410,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 							try {
 								System.out.println("++++++ finished update");
 								this.jobExecutionPlan.notifyUpdateFinished(operatorID);
+								reconfigurationProfiler.onReconfigurationEnd();
 							} catch (Exception e) {
 								e.printStackTrace();
 							}
@@ -419,6 +427,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 							}
 							try {
 								this.jobExecutionPlan.notifyUpdateFinished(operatorID);
+								reconfigurationProfiler.onReconfigurationEnd();
 							} catch (Exception e) {
 								e.printStackTrace();
 							}

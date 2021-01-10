@@ -113,28 +113,29 @@ public class OperatorWorkloadsAssignment implements AbstractCoordinator.Diff {
 		List<Integer> createdIdList = executorMapping.keySet().stream()
 			.filter(id -> !oldExecutorMapping.containsKey(id))
 			.collect(Collectors.toList());
-		checkState(createdIdList.size() == 1, "more than one created");
+//		checkState(createdIdList.size() == 1, "more than one created");
 
-		int createdExecutorId = createdIdList.get(0);
+//		int createdExecutorId = createdIdList.get(0);
 
 		List<Integer> modifiedIdList = oldExecutorMapping.keySet().stream()
 			.filter(id -> oldExecutorMapping.get(id).size() != executorMapping.get(id).size())
 			.collect(Collectors.toList());
-		checkState(modifiedIdList.size() == 1, "more than one modified in scale out");
+//		checkState(modifiedIdList.size() == 1, "more than one modified in scale out");
 
-		int modifiedExecutorId = modifiedIdList.get(0);
+//		int modifiedExecutorId = modifiedIdList.get(0);
 
 		for (Map.Entry<Integer, List<Integer>> entry : executorMapping.entrySet()) {
 			int executorId = entry.getKey();
 			List<Integer> partition = entry.getValue();
 
-			int subtaskIndex = (executorId == createdExecutorId) ?
+			int subtaskIndex = (createdIdList.contains(executorId)) ?
 				findNextUnusedSubtask():
 				oldRescalePA.getSubTaskId(executorId);
 
 			putExecutorToSubtask(subtaskIndex, executorId, partition);
 
-			if (executorId == createdExecutorId || executorId == modifiedExecutorId) {
+//			if (executorId == createdExecutorId || executorId == modifiedExecutorId) {
+			if (createdIdList.contains(executorId) || modifiedIdList.contains(executorId)) {
 				modifiedSubtaskMap.put(subtaskIndex, true);
 			}
 		}
@@ -144,21 +145,25 @@ public class OperatorWorkloadsAssignment implements AbstractCoordinator.Diff {
 		Map<Integer, List<Integer>> executorMapping,
 		Map<Integer, List<Integer>> oldExecutorMapping) {
 
-		List<Integer> removedExecutorId = oldExecutorMapping.keySet().stream()
+		List<Integer> removedIdList = oldExecutorMapping.keySet().stream()
 			.filter(id -> !executorMapping.containsKey(id))
 			.collect(Collectors.toList());
-		checkState(removedExecutorId.size() == 1, "more than one removed");
+//		checkState(removedIdList.size() == 1, "more than one removed");
 
-		int removedId = removedExecutorId.get(0);
-		modifiedSubtaskMap.put(oldRescalePA.getSubTaskId(removedId), true);
-		removedSubtaskMap.put(oldRescalePA.getSubTaskId(removedId), true);
+//		int removedId = removedIdList.get(0);
+//		modifiedSubtaskMap.put(oldRescalePA.getSubTaskId(removedId), true);
+//		removedSubtaskMap.put(oldRescalePA.getSubTaskId(removedId), true);
+		for (int removedId : removedIdList) {
+			modifiedSubtaskMap.put(oldRescalePA.getSubTaskId(removedId), true);
+			removedSubtaskMap.put(oldRescalePA.getSubTaskId(removedId), true);
+		}
 
 		List<Integer> modifiedIdList = executorMapping.keySet().stream()
 			.filter(id -> executorMapping.get(id).size() != oldExecutorMapping.get(id).size())
 			.collect(Collectors.toList());
-		checkState(modifiedIdList.size() == 1, "more than one modified in scale in");
+//		checkState(modifiedIdList.size() == 1, "more than one modified in scale in");
 
-		int modifiedExecutorId = modifiedIdList.get(0);
+//		int modifiedExecutorId = modifiedIdList.get(0);
 
 		for (Map.Entry<Integer, List<Integer>> entry : executorMapping.entrySet()) {
 			int executorId = entry.getKey();
@@ -167,7 +172,7 @@ public class OperatorWorkloadsAssignment implements AbstractCoordinator.Diff {
 			int subtaskIndex = oldRescalePA.getSubTaskId(executorId);
 			putExecutorToSubtask(subtaskIndex, executorId, partition);
 
-			if (executorId == modifiedExecutorId) {
+			if (modifiedIdList.contains(executorId) || removedIdList.contains(executorId)) {
 				modifiedSubtaskMap.put(subtaskIndex, true);
 			}
 		}
@@ -180,7 +185,7 @@ public class OperatorWorkloadsAssignment implements AbstractCoordinator.Diff {
 		List<Integer> modifiedIdList = executorMapping.keySet().stream()
 			.filter(id -> executorMapping.get(id).size() != oldExecutorMapping.get(id).size())
 			.collect(Collectors.toList());
-		checkState(modifiedIdList.size() == 2, "not exactly two are modified in repartition");
+//		checkState(modifiedIdList.size() == 2, "not exactly two are modified in repartition");
 
 		for (Map.Entry<Integer, List<Integer>> entry : executorMapping.entrySet()) {
 			int executorId = entry.getKey();
