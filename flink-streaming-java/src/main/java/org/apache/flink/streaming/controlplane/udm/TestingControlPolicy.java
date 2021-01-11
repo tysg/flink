@@ -381,6 +381,15 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 		}
 	}
 
+	private void testNoOp(int operatorID) throws InterruptedException {
+
+		getInstructionSet().noOp(operatorID, this);
+
+		synchronized (object) {
+			object.wait();
+		}
+	}
+
 	private class TestingThread extends Thread {
 
 		@Override
@@ -398,6 +407,8 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 //				System.out.println("can not find operator with given name, corrupt");
 //				return;
 //			}
+
+			int frequency = 10;
 			try {
 				showOperatorInfo();
 				// todo, if the time of sleep is too short, may cause receiving not belong key
@@ -406,8 +417,11 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 //				System.out.println("\nstart synchronize source test...");
 //				testPauseSource(sourceOp);
 
-				System.out.println("\nstart stateful scale out test");
-				testScaleOutStateful(statefulOpID);
+//				System.out.println("\nstart stateful scale out test");
+//				testScaleOutStateful(statefulOpID);
+//
+//				System.out.println("\nstart stateful scale out test");
+//				testScaleOutStateful2(statefulOpID);
 				// todo, for some reason. if no sleep here, it may be loss some data
 //				Thread.sleep(3000);
 
@@ -425,6 +439,16 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 
 				System.out.println("\nstart update function related test...");
 				testCustomizeWindowUpdateAPI();
+//
+//				System.out.println("\nstart stateful scale in test2");
+//				testScaleInStateful(statefulOpID);
+
+//				while (true) {
+//					sleep(1000/frequency);
+//					System.out.println("\nstart no op frequency test...");
+//					testNoOp(statefulOpID);
+//				}
+
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}

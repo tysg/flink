@@ -471,6 +471,35 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		}
 	}
 
+	@Override
+	public void noOp(int operatorID, ControlPolicy waitingController) {
+		try {
+			reconfigurationProfiler.onReconfigurationStart();
+			// very similar to acquire a positive spin write lock
+			this.jobExecutionPlan.setStateUpdatingFlag(waitingController);
+			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
+			runAsync(() -> jobMasterGateway.callOperations(
+				enforcement -> FutureUtils.completedVoidFuture()
+					.thenCompose(o -> enforcement.synchronizePauseTasks(Collections.singletonList(Tuple2.of(operatorID, -1)), null))
+					.thenCompose(o -> {
+						return enforcement.resumeTasks();
+					})
+					.thenAccept(
+						(acknowledge) -> {
+							try {
+								this.jobExecutionPlan.notifyUpdateFinished(operatorID);
+								reconfigurationProfiler.onReconfigurationEnd();
+							} catch (Exception e) {
+								e.printStackTrace();
+							}
+						}
+					)
+			));
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
 	public void callCustomizeOperations(Function<PrimitiveOperation<Map<Integer, Map<Integer, AbstractCoordinator.Diff>>>, CompletableFuture<?>> operationCaller) {
 		try {
 			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
