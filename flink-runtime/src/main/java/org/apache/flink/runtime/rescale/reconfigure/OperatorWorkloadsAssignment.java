@@ -32,7 +32,7 @@ public class OperatorWorkloadsAssignment implements AbstractCoordinator.Diff {
 
 	private Map<Integer, Boolean> modifiedSubtaskMap;
 
-	// this is used for remove the correponding subtask
+	// this is used for remove the corresponding subtask
 	private final Map<Integer, Boolean> removedSubtaskMap;
 
 	private final boolean isScaling;

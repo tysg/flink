@@ -995,8 +995,8 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 		final LogicalSlot slot = assignedResource;
 		checkNotNull(slot, "Try to rescale a vertex which isn't assigned slot.");
 
-		if(this.state != RUNNING) {
-			throw new IllegalStateException("The vertex must be in RUNNING state to be rescaled. Found state " + this.state);
+		if(this.state != RUNNING && this.state != DEPLOYING) {
+			throw new IllegalStateException("The vertex must be in RUNNING or DEPLOYING state to be send sync request. Found state " + this.state);
 		}
 		try {
 			LOG.info(String.format("Update operator in this execution attempt: %s (attempt #%d) to %s",

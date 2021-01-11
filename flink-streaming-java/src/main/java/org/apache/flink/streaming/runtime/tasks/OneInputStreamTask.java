@@ -162,12 +162,14 @@ public class OneInputStreamTask<IN, OUT> extends StreamTask<OUT, OneInputStreamO
 		StatusWatermarkValve statusWatermarkValve = new StatusWatermarkValve(numberOfInputChannels, output);
 
 		TypeSerializer<IN> inSerializer = configuration.getTypeSerializerIn1(getUserCodeClassLoader());
-		return new StreamTaskNetworkInput<>(
+		StreamTaskNetworkInput<IN> networkInput = new StreamTaskNetworkInput<>(
 			inputGate,
 			inSerializer,
 			getEnvironment().getIOManager(),
 			statusWatermarkValve,
 			0);
+		networkInput.setPauseActionController(this.pauseActionController);
+		return networkInput;
 	}
 
 	/**

@@ -42,7 +42,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 	protected volatile Map<Integer, List<ExecutionVertex>> removedCandidates;
 	protected volatile Map<Integer, List<ExecutionVertex>> createCandidates;
 
-	// rescaleID should be maintained to identify number of reconfigs has been applied
+	// rescaleID should be maintained to identify number of reconfiguration that has been applied
 	protected volatile RescaleID rescaleID;
 
 

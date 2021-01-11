@@ -210,7 +210,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 
 	private final KeyGroupRange assignedKeyGroupRange;
 
-	private final TaskOperatorManager.PauseActionController pauseActionController;
+	protected final TaskOperatorManager.PauseActionController pauseActionController;
 
 	private volatile int idInModel;
 
@@ -318,15 +318,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 	protected void processInput(MailboxDefaultAction.Controller controller) throws Exception {
 		InputStatus status = inputProcessor.processInput();
 		// may use this to implement consistent
-		if(pauseActionController.ackIfPause()) {
-			if (status == InputStatus.END_OF_INPUT) {
-				controller.allActionsCompleted();
-				return;
-			}
-//			CompletableFuture<?> jointFuture = CompletableFuture.allOf(
-//				getInputOutputJointFuture(status),
-//				pauseActionController.getResumeFuture()
-//			);
+		if(status == InputStatus.NEED_PAUSE){
 			CompletableFuture<?> resumeFuture = pauseActionController.getResumeFuture();
 			MailboxDefaultAction.Suspension suspendedDefaultAction = controller.suspendDefaultAction();
 			resumeFuture.thenRun(suspendedDefaultAction::resume)

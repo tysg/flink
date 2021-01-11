@@ -506,8 +506,9 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 			if (vertexID.f1 < 0) {
 				convertedVertexIDList.addAll(
 					Arrays.stream(executionJobVertex.getTaskVertices())
-						.filter(e -> e.getCurrentExecutionAttempt() != null
-							&& e.getCurrentExecutionAttempt().getState() == ExecutionState.RUNNING)
+						.filter(e -> e.getCurrentExecutionAttempt() != null &&
+							(e.getCurrentExecutionAttempt().getState() == ExecutionState.RUNNING)
+							|| e.getCurrentExecutionAttempt().getState() == ExecutionState.DEPLOYING)
 						.map(e -> Tuple2.of(vertexID.f0, e.getParallelSubtaskIndex()))
 						.collect(Collectors.toList())
 				);
@@ -553,7 +554,8 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 				} else {
 					operatedVertex.stream()
 						.map(ExecutionVertex::getCurrentExecutionAttempt)
-						.filter(execution -> execution != null && execution.getState() == ExecutionState.RUNNING)
+						.filter(execution -> execution != null &&
+							(execution.getState() == ExecutionState.RUNNING || execution.getState() == ExecutionState.DEPLOYING))
 						.forEach(execution -> {
 								affectedExecutionPrepareSyncFutures.add(execution.scheduleForInterTaskSync(TaskOperatorManager.NEED_SYNC_REQUEST));
 								notYetAcknowledgedTasks.add(execution.getAttemptId());
