@@ -60,6 +60,8 @@ public interface ReconfigurationAPI {
 	 */
 	void reconfigureUserFunction(int operatorID, Object function, ControlPolicy waitingController);
 
+	void noOp(int operatorID, ControlPolicy waitingController);
+
 	default void callCustomizeOperations(
 		Function<PrimitiveOperation<Map<Integer, Map<Integer, AbstractCoordinator.Diff>>>, CompletableFuture<?>> operationCaller){
 
