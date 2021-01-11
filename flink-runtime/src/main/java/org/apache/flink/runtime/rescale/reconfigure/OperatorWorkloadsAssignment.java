@@ -124,12 +124,14 @@ public class OperatorWorkloadsAssignment implements AbstractCoordinator.Diff {
 
 //		int modifiedExecutorId = modifiedIdList.get(0);
 
+		Map<Integer, Integer> unUsedSubtaskList = findNextUnusedSubtask(createdIdList);
+
 		for (Map.Entry<Integer, List<Integer>> entry : executorMapping.entrySet()) {
 			int executorId = entry.getKey();
 			List<Integer> partition = entry.getValue();
 
 			int subtaskIndex = (createdIdList.contains(executorId)) ?
-				findNextUnusedSubtask():
+				unUsedSubtaskList.get(executorId):
 				oldRescalePA.getSubTaskId(executorId);
 
 			putExecutorToSubtask(subtaskIndex, executorId, partition);
@@ -200,25 +202,31 @@ public class OperatorWorkloadsAssignment implements AbstractCoordinator.Diff {
 		}
 	}
 
-	private int findNextUnusedSubtask() {
-		int subtaskIndex = -1;
+	private Map<Integer, Integer> findNextUnusedSubtask(List<Integer> createdIdList) {
+		checkState(createdIdList.size() > 0, "null created task list");
+
+		int n = createdIdList.size();
+		Map<Integer, Integer> subtaskIndex = new HashMap<>(n);
 		for (int i = 0; i < numOpenedSubtask; i++) {
 			if (oldRescalePA.getIdInModel(i) == UNUSED_SUBTASK) {
-				subtaskIndex = i;
-				break;
+				subtaskIndex.put(createdIdList.get(createdIdList.size()-n), i);
+				n--;
+				if (n == 0) {
+					break;
+				}
 			}
 		}
-		checkState(subtaskIndex >= 0, "cannot find valid subtask for created executor");
+		checkState(subtaskIndex.size() > 0, "cannot find valid subtask for created executor");
 
 		return subtaskIndex;
 	}
 
 	private void putExecutorToSubtask(int subtaskIndex, int executorId, List<Integer> partition) {
 		Integer absent = subtaskIndexMapping.putIfAbsent(subtaskIndex, executorId);
-		checkState(absent == null, "should be one-to-one mapping");
+		checkState(absent == null, "should be one-to-one mapping " + absent);
 
 		List<Integer> absent1 = partitionAssignment.putIfAbsent(subtaskIndex, partition);
-		checkState(absent1 == null, "should be one-to-one mapping");
+		checkState(absent1 == null, "should be one-to-one mapping " + absent1);
 	}
 
 //	private void fillingUnused(int newParallelism) {
