@@ -417,9 +417,9 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 //				System.out.println("\nstart synchronize source test...");
 //				testPauseSource(sourceOp);
 
-//				System.out.println("\nstart stateful scale out test");
-//				testScaleOutStateful(statefulOpID);
-//
+				System.out.println("\nstart stateful scale out test");
+				testScaleOutStateful(statefulOpID);
+
 //				System.out.println("\nstart stateful scale out test");
 //				testScaleOutStateful2(statefulOpID);
 				// todo, for some reason. if no sleep here, it may be loss some data
@@ -428,17 +428,17 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 				System.out.println("\nstart stateful scale out 2 more test");
 				testScaleOutStateful(statelessOpID);
 
-//				System.out.println("\nstart stateful scale in test2");
-//				testScaleInStateful(statefulOpID);
+				System.out.println("\nstart stateful scale in test2");
+				testScaleInStateful(statefulOpID);
 
-				System.out.println("\nstart rescale window join test...");
-				testScaleOutWindowJoin();
-
-				System.out.println("\nstart source near stateful operator rebalance test...");
-				testRebalanceStateful(nearSourceMap);
-
-				System.out.println("\nstart update function related test...");
-				testCustomizeWindowUpdateAPI();
+//				System.out.println("\nstart rescale window join test...");
+//				testScaleOutWindowJoin();
+//
+//				System.out.println("\nstart source near stateful operator rebalance test...");
+//				testRebalanceStateful(nearSourceMap);
+//
+//				System.out.println("\nstart update function related test...");
+//				testCustomizeWindowUpdateAPI();
 //
 //				System.out.println("\nstart stateful scale in test2");
 //				testScaleInStateful(statefulOpID);

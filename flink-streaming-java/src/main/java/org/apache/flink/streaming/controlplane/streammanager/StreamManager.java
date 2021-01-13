@@ -59,6 +59,7 @@ import org.apache.flink.streaming.controlplane.streammanager.insts.Reconfigurati
 import org.apache.flink.streaming.controlplane.streammanager.insts.StreamJobExecutionPlanWithUpdatingFlag;
 import org.apache.flink.streaming.controlplane.streammanager.insts.StreamJobExecutionPlanWithUpdatingFlagImpl;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
+import org.apache.flink.streaming.controlplane.udm.PerformanceMeasure;
 import org.apache.flink.streaming.controlplane.udm.TestingControlPolicy;
 import org.apache.flink.util.OptionalConsumer;
 
@@ -161,7 +162,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		/* now the policy is temporary hard coded added */
 //		this.controlPolicyList.add(new FlinkStreamSwitchAdaptor(this, jobGraph));
 //		this.controlPolicyList.add(new TestingCFManager(this));
-		this.controlPolicyList.add(new TestingControlPolicy(this));
+//		this.controlPolicyList.add(new TestingControlPolicy(this));
+		this.controlPolicyList.add(new PerformanceMeasure(this, streamManagerConfiguration.getConfiguration()));
 
 		reconfigurationProfiler = new ReconfigurationProfiler();
 	}
@@ -409,8 +411,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 							}
 							try {
 								System.out.println("++++++ finished update");
-								this.jobExecutionPlan.notifyUpdateFinished(operatorID);
 								reconfigurationProfiler.onReconfigurationEnd();
+								this.jobExecutionPlan.notifyUpdateFinished(operatorID);
 							} catch (Exception e) {
 								e.printStackTrace();
 							}
