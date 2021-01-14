@@ -80,22 +80,28 @@ public class PerformanceMeasure extends AbstractControlPolicy {
 
 	private void shuffleKeySet(Map<Integer, List<Integer>> newKeySet, int numAffectedTasks) {
 		Random random = new Random();
-		List<Integer> selectKeySet = new ArrayList<>(numAffectedTasks);
-		Set<Integer> keys = new HashSet<>();
+		List<Integer> selectTaskID = new ArrayList<>(numAffectedTasks);
+		Set<Integer> allKeyGroup = new HashSet<>();
 		List<Integer> allTaskID = new ArrayList<>(newKeySet.keySet());
 		for (int i = 0; i < numAffectedTasks; i++) {
-			int keySetOffset = random.nextInt(newKeySet.size());
-			selectKeySet.add(keySetOffset);
-			keys.addAll(newKeySet.remove(allTaskID.remove(keySetOffset)));
+			int offset = random.nextInt(newKeySet.size());
+			selectTaskID.add(allTaskID.get(offset));
+			allKeyGroup.addAll(newKeySet.remove(allTaskID.remove(offset)));
 		}
-		List<Integer> keyList = new LinkedList<>(keys);
+		List<Integer> keyGroupList = new LinkedList<>(allKeyGroup);
 		int leftBound = 0;
 		for (int i = 0; i < numAffectedTasks - 1; i++) {
-			int subKeySetSize = random.nextInt(keyList.size() - leftBound - numAffectedTasks - i - 1) + 1;
-			newKeySet.put(selectKeySet.get(i), keyList.subList(leftBound, leftBound + subKeySetSize));
+			int subKeySetSize = random.nextInt(keyGroupList.size() - leftBound - numAffectedTasks + i - 1) + 1;
+			newKeySet.put(
+				selectTaskID.get(i),
+				new ArrayList<>(keyGroupList.subList(leftBound, leftBound + subKeySetSize))
+			);
 			leftBound += subKeySetSize;
 		}
-		newKeySet.put(selectKeySet.get(numAffectedTasks - 1), keyList.subList(leftBound, keyList.size()));
+		newKeySet.put(
+			selectTaskID.get(numAffectedTasks - 1),
+			new ArrayList<>(keyGroupList.subList(leftBound, keyGroupList.size()))
+		);
 	}
 
 	private void testNoOp(int operatorID) throws InterruptedException {
