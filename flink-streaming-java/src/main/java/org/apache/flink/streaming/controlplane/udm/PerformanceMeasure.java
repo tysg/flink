@@ -4,6 +4,10 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
 import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.*;
 
 public class PerformanceMeasure extends AbstractControlPolicy {
@@ -49,13 +53,14 @@ public class PerformanceMeasure extends AbstractControlPolicy {
 		String testOperatorName = experimentConfig.getOrDefault(TEST_OPERATOR_NAME, "filter");
 		int numAffectedTasks = Integer.parseInt(experimentConfig.getOrDefault(AFFECTED_TASK, "3"));
 		int reconfigFreq = Integer.parseInt(experimentConfig.getOrDefault(RECONFIG_FREQUENCY, "5"));
+		int testOpID = findOperatorByName(testOperatorName);
 		switch (experimentConfig.getOrDefault(TEST_TYPE, SCALE)) {
 			case REMAP:
-				int testOpID = findOperatorByName(testOperatorName);
 				measureRebalance(testOpID, numAffectedTasks, reconfigFreq);
 				break;
 			case SCALE:
 		}
+		measureNoOP(testOpID, reconfigFreq);
 	}
 
 	private void measureRebalance(int testOpID, int numAffectedTasks, int reconfigFreq) throws InterruptedException {
@@ -71,6 +76,18 @@ public class PerformanceMeasure extends AbstractControlPolicy {
 			System.out.println("\nnumber of rebalance test: " + i);
 			System.out.println("new key set:" + newKeySet);
 			getInstructionSet().rebalance(testOpID, newKeySet, true, this);
+			// wait for operation completed
+			synchronized (object) {
+				object.wait();
+			}
+		}
+	}
+
+	private void measureNoOP(int testOpID, int reconfigFreq) throws InterruptedException {
+		StreamJobExecutionPlan executionPlan = getInstructionSet().getJobExecutionPlan();
+		for (int i = 0; i < reconfigFreq; i++) {
+			System.out.println("\nnumber of noop test: " + i);
+			getInstructionSet().noOp(testOpID, this);
 			// wait for operation completed
 			synchronized (object) {
 				object.wait();
@@ -119,8 +136,13 @@ public class PerformanceMeasure extends AbstractControlPolicy {
 		public void run() {
 			// the testing jobGraph (workload) is in TestingWorkload.java, see that file to know how to use it.
 			try {
+				Thread.sleep(10000);
 				generateTest();
-			} catch (InterruptedException e) {
+				Thread.sleep(3000);
+				File latencyFile = new File("/home/hya/prog/latency.out");
+				File copy = new File("/home/hya/prog/latency.out.copy");
+				Files.copy(latencyFile.toPath(), copy.toPath());
+			} catch (InterruptedException | IOException e) {
 				e.printStackTrace();
 			}
 		}

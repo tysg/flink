@@ -38,10 +38,10 @@ public class ReconfigurationProfiler {
 	private final Timer syncTimer;
 	private final Timer updateTimer;
 
-	private final Map<String,Timer> otherTimers;
+	private final Map<String, Timer> otherTimers;
+	OutputStream outputStream;
 
 	public ReconfigurationProfiler() {
-		OutputStream outputStream;
 		try {
 			outputStream = new FileOutputStream("/home/hya/prog/exp.output");
 		} catch (FileNotFoundException e) {
@@ -68,22 +68,23 @@ public class ReconfigurationProfiler {
 
 	public void onReconfigurationEnd() {
 		endToEndTimer.endMeasure();
+		endToEndTimer.finish();
 	}
 
 	public void onUpdateEnd() {
 		updateTimer.endMeasure();
 	}
 
-	public void onOtherStart(String timerName){
+	public void onOtherStart(String timerName) {
 		Timer timer = this.otherTimers.get(timerName);
-		if(timer == null){
-			timer = new Timer(timerName);
+		if (timer == null) {
+			timer = new Timer(timerName, outputStream);
 			otherTimers.put(timerName, timer);
 		}
 		timer.startMeasure();
 	}
 
-	public void onOtherEnd(String timerName){
+	public void onOtherEnd(String timerName) {
 		this.otherTimers.get(timerName).endMeasure();
 	}
 
@@ -102,19 +103,23 @@ public class ReconfigurationProfiler {
 			this.outputStream = new LikePrintOutputStream(outputStream);
 		}
 
-		public void startMeasure () {
-			outputStream.println("cur time: " + System.currentTimeMillis());
+		public void startMeasure() {
 			startTime = System.currentTimeMillis();
 		}
 
-		public void endMeasure () {
+		public void endMeasure() {
 			checkState(startTime > 0, "++++++ Invalid invocation, startTime = 0.");
-			outputStream.println("end time: " + System.currentTimeMillis());
+//			outputStream.println("end time: " + System.currentTimeMillis());
 			outputStream.println("++++++" + timerName + " : " + (System.currentTimeMillis() - startTime) + "ms");
+		}
+
+		private void finish() {
+			outputStream.println("cur time in ms: " + System.currentTimeMillis());
+			outputStream.println("\n");
 		}
 	}
 
-	private static class LikePrintOutputStream{
+	private static class LikePrintOutputStream {
 
 		private final OutputStream outputStream;
 
@@ -122,7 +127,7 @@ public class ReconfigurationProfiler {
 			this.outputStream = outputStream;
 		}
 
-		void println(String s){
+		void println(String s) {
 			try {
 				outputStream.write(s.getBytes());
 				outputStream.write('\n');

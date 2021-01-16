@@ -361,7 +361,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					.thenCompose(o -> enforcement.updateTaskResources(operatorID, oldParallelism))
 					.thenCompose(o -> enforcement.resumeTasks())
 					.whenComplete((o, failure) -> {
-						if(failure != null){
+						if (failure != null) {
 							failure.printStackTrace();
 						}
 						try {
@@ -398,19 +398,39 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			affectedTasks.add(Tuple2.of(operatorID, -1));
 
 			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
+			final String PREPARE = "prepare timer";
+			final String SYN = "synchronizePauseTasks timer";
+			final String UPDATE_MAPPING = "updateUpstreamKeyMapping timer";
+			final String UPDATE_STATE = "updateState timer";
 			if (stateful) {
 				runAsync(() -> jobMasterGateway.callOperations(
 					enforcement -> FutureUtils.completedVoidFuture()
-						.thenCompose(o -> enforcement.prepareExecutionPlan(jobExecutionPlan))
-						.thenCompose(o -> enforcement.synchronizePauseTasks(affectedTasks, o))
-						.thenCompose(o -> enforcement.updateUpstreamKeyMapping(operatorID, o))
-						.thenCompose(o -> enforcement.updateState(operatorID, o))
+						.thenCompose(o -> {
+							reconfigurationProfiler.onOtherStart(PREPARE);
+							return enforcement.prepareExecutionPlan(jobExecutionPlan);
+						})
+						.thenCompose(o -> {
+							reconfigurationProfiler.onOtherEnd(PREPARE);
+							reconfigurationProfiler.onOtherStart(SYN);
+							return enforcement.synchronizePauseTasks(affectedTasks, o);
+						})
+						.thenCompose(o -> {
+							reconfigurationProfiler.onOtherEnd(SYN);
+							reconfigurationProfiler.onOtherStart(UPDATE_MAPPING);
+							return enforcement.updateUpstreamKeyMapping(operatorID, o);
+						})
+						.thenCompose(o -> {
+							reconfigurationProfiler.onOtherEnd(UPDATE_MAPPING);
+							reconfigurationProfiler.onOtherStart(UPDATE_STATE);
+							return enforcement.updateState(operatorID, o);
+						})
 						.whenComplete((o, failure) -> {
-							if(failure != null){
+							if (failure != null) {
 								failure.printStackTrace();
 							}
 							try {
 								System.out.println("++++++ finished update");
+								reconfigurationProfiler.onOtherEnd(UPDATE_STATE);
 								reconfigurationProfiler.onReconfigurationEnd();
 								this.jobExecutionPlan.notifyUpdateFinished(operatorID);
 							} catch (Exception e) {
@@ -424,12 +444,12 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						.thenCompose(o -> enforcement.prepareExecutionPlan(jobExecutionPlan))
 						.thenCompose(o -> enforcement.updateUpstreamKeyMapping(operatorID, o))
 						.whenComplete((o, failure) -> {
-							if(failure != null){
+							if (failure != null) {
 								failure.printStackTrace();
 							}
 							try {
-								this.jobExecutionPlan.notifyUpdateFinished(operatorID);
 								reconfigurationProfiler.onReconfigurationEnd();
+								this.jobExecutionPlan.notifyUpdateFinished(operatorID);
 							} catch (Exception e) {
 								e.printStackTrace();
 							}
@@ -448,25 +468,38 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			this.jobExecutionPlan.setStateUpdatingFlag(waitingController);
 			OperatorDescriptor target = jobExecutionPlan.getOperatorDescriptorByID(operatorID);
 			target.setControlAttribute(UDF, function);
-
+			final String PREPARE = "prepare timer";
+			final String SYN = "synchronizePauseTasks timer";
+			final String UPDATE_FUNCTION = "updateFunction timer";
 			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
 			runAsync(() -> jobMasterGateway.callOperations(
 				enforcement -> FutureUtils.completedVoidFuture()
-					.thenCompose(
-						o -> enforcement.prepareExecutionPlan(jobExecutionPlan))
-					.thenCompose(
-						o -> enforcement.synchronizePauseTasks(Collections.singletonList(Tuple2.of(operatorID, -1)), o))
-					.thenCompose(
-						o -> enforcement.updateFunction(operatorID, o))
-					.thenAccept(
-						(acknowledge) -> {
-							try {
-								this.jobExecutionPlan.notifyUpdateFinished(operatorID);
-							} catch (Exception e) {
-								e.printStackTrace();
-							}
+					.thenCompose(o -> {
+						reconfigurationProfiler.onOtherStart(PREPARE);
+						return enforcement.prepareExecutionPlan(jobExecutionPlan);
+					})
+					.thenCompose(o -> {
+						reconfigurationProfiler.onOtherEnd(PREPARE);
+						reconfigurationProfiler.onOtherStart(SYN);
+						return enforcement.synchronizePauseTasks(Collections.singletonList(Tuple2.of(operatorID, -1)), o);
+					})
+					.thenCompose(o -> {
+						reconfigurationProfiler.onOtherEnd(SYN);
+						reconfigurationProfiler.onOtherStart(UPDATE_FUNCTION);
+						return enforcement.updateFunction(operatorID, o);
+					})
+					.whenComplete((o, failure) -> {
+						if (failure != null) {
+							failure.printStackTrace();
 						}
-					)
+						try {
+							reconfigurationProfiler.onOtherEnd(UPDATE_FUNCTION);
+							reconfigurationProfiler.onReconfigurationEnd();
+							this.jobExecutionPlan.notifyUpdateFinished(operatorID);
+						} catch (Exception e) {
+							e.printStackTrace();
+						}
+					})
 			));
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -476,26 +509,30 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	@Override
 	public void noOp(int operatorID, ControlPolicy waitingController) {
 		try {
-			reconfigurationProfiler.onReconfigurationStart();
 			// very similar to acquire a positive spin write lock
 			this.jobExecutionPlan.setStateUpdatingFlag(waitingController);
 			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
+			final String SYN = "synchronizePauseTasks timer";
 			runAsync(() -> jobMasterGateway.callOperations(
 				enforcement -> FutureUtils.completedVoidFuture()
-					.thenCompose(o -> enforcement.synchronizePauseTasks(Collections.singletonList(Tuple2.of(operatorID, -1)), null))
 					.thenCompose(o -> {
+						reconfigurationProfiler.onOtherStart(SYN);
+						return enforcement.synchronizePauseTasks(Collections.singletonList(Tuple2.of(operatorID, -1)), null);
+					})
+					.thenCompose(o -> {
+						reconfigurationProfiler.onOtherEnd(SYN);
 						return enforcement.resumeTasks();
 					})
-					.thenAccept(
-						(acknowledge) -> {
-							try {
-								this.jobExecutionPlan.notifyUpdateFinished(operatorID);
-								reconfigurationProfiler.onReconfigurationEnd();
-							} catch (Exception e) {
-								e.printStackTrace();
-							}
+					.whenComplete((o, failure) -> {
+						if (failure != null) {
+							failure.printStackTrace();
 						}
-					)
+						try {
+							this.jobExecutionPlan.notifyUpdateFinished(operatorID);
+						} catch (Exception e) {
+							e.printStackTrace();
+						}
+					})
 			));
 		} catch (Exception e) {
 			e.printStackTrace();
