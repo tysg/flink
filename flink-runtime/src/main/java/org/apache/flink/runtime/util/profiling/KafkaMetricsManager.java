@@ -253,7 +253,7 @@ public class KafkaMetricsManager implements Serializable, MetricsManager {
 						+ " totalRecordsIn: " + totalRecordsIn + ","
 						+ " totalRecordsOut: " + totalRecordsOut;
 
-//					System.out.println(ratesLine);
+					System.out.println(ratesLine);
 //					System.out.println("workername: " + getJobVertexId() + " epoch: " + epoch + " keygroups: " + status.inputKeyGroup.keySet());
 
 //				ProducerRecord<String, String> newRecord = new ProducerRecord<>(TOPIC, ratesLine);
@@ -407,7 +407,7 @@ public class KafkaMetricsManager implements Serializable, MetricsManager {
 						+ " observedOutputRate: " + observedOutputRate + ","
 						+ " totalRecordsOut: " + totalRecordsOut;
 
-//					System.out.println(ratesLine);
+					System.out.println(ratesLine);
 
 	//					Path ratesFile = Paths.get(ratesPath + workerName.trim() + "-" + instanceId + "-" + epoch + ".log").toAbsolutePath();
 	//					try {
