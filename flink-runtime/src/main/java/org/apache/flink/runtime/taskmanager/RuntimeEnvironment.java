@@ -46,6 +46,7 @@ import org.apache.flink.runtime.state.TaskStateManager;
 import java.util.Map;
 import java.util.concurrent.Future;
 import org.apache.flink.runtime.taskexecutor.GlobalAggregateManager;
+import org.apache.flink.runtime.util.profiling.FSMetricsManager;
 import org.apache.flink.runtime.util.profiling.KafkaMetricsManager;
 import org.apache.flink.runtime.util.profiling.MetricsManager;
 import org.apache.flink.runtime.util.profiling.NoopMetricsManager;
@@ -169,7 +170,13 @@ public class RuntimeEnvironment implements Environment {
 				taskInfo.getIdInModel(),
 				taskInfo.getMaxNumberOfParallelSubtasks());
 		} else {
-			this.metricsManager = new KafkaMetricsManager(
+//			this.metricsManager = new KafkaMetricsManager(
+//				taskInfo.getTaskNameWithSubtasks(),
+//				this.jobVertexId,
+//				jobConfiguration,
+//				taskInfo.getIdInModel(),
+//				taskInfo.getMaxNumberOfParallelSubtasks());
+			this.metricsManager = new FSMetricsManager(
 				taskInfo.getTaskNameWithSubtasks(),
 				this.jobVertexId,
 				jobConfiguration,

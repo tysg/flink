@@ -139,10 +139,10 @@ public class PerformanceMeasure extends AbstractControlPolicy {
 				Thread.sleep(10000);
 				generateTest();
 				Thread.sleep(3000);
-				File latencyFile = new File("/home/hya/prog/latency.out");
-				File copy = new File("/home/hya/prog/latency.out.copy");
-				Files.copy(latencyFile.toPath(), copy.toPath());
-			} catch (InterruptedException | IOException e) {
+//				File latencyFile = new File("/home/hya/prog/latency.out");
+//				File copy = new File("/home/hya/prog/latency.out.copy");
+//				Files.copy(latencyFile.toPath(), copy.toPath());
+			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
 		}

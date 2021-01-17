@@ -20,7 +20,6 @@ package org.apache.flink.runtime.util.profiling;
 
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Map;
@@ -43,7 +42,7 @@ public class ReconfigurationProfiler {
 
 	public ReconfigurationProfiler() {
 		try {
-			outputStream = new FileOutputStream("/home/hya/prog/exp.output");
+			outputStream = new FileOutputStream("/data/trisk/timer.output");
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 			outputStream = System.out;
@@ -91,7 +90,7 @@ public class ReconfigurationProfiler {
 	private static class Timer {
 		private final String timerName;
 		private long startTime;
-		private final LikePrintOutputStream outputStream;
+		private final OutputStreamDecorator outputStream;
 
 		Timer(String timerName) {
 			this(timerName, System.out);
@@ -100,7 +99,7 @@ public class ReconfigurationProfiler {
 		Timer(String timerName, OutputStream outputStream) {
 			this.timerName = timerName;
 			this.startTime = 0;
-			this.outputStream = new LikePrintOutputStream(outputStream);
+			this.outputStream = new OutputStreamDecorator(outputStream);
 		}
 
 		public void startMeasure() {
@@ -117,25 +116,6 @@ public class ReconfigurationProfiler {
 			outputStream.println("cur time in ms: " + System.currentTimeMillis());
 			outputStream.println("\n");
 		}
-	}
-
-	private static class LikePrintOutputStream {
-
-		private final OutputStream outputStream;
-
-		private LikePrintOutputStream(OutputStream outputStream) {
-			this.outputStream = outputStream;
-		}
-
-		void println(String s) {
-			try {
-				outputStream.write(s.getBytes());
-				outputStream.write('\n');
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}
-
 	}
 }
 

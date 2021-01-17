@@ -502,7 +502,7 @@ public class ReconfigureCoordinator extends AbstractCoordinator {
 		List<Tuple2<Integer, Integer>> convertedVertexIDList = new ArrayList<>(vertexIDList.size());
 		for (Tuple2<Integer, Integer> vertexID : vertexIDList) {
 			ExecutionJobVertex executionJobVertex = executionGraph.getJobVertex(rawVertexIDToJobVertexID(vertexID.f0));
-			checkNotNull(executionJobVertex, "can not found such vertex");
+			checkNotNull(executionJobVertex, "can not find the job vertex" + vertexID.toString());
 			if (vertexID.f1 < 0) {
 				convertedVertexIDList.addAll(
 					Arrays.stream(executionJobVertex.getTaskVertices())

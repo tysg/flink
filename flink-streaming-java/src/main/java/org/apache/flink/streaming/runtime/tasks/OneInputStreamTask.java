@@ -28,19 +28,12 @@ import org.apache.flink.runtime.metrics.MetricNames;
 import org.apache.flink.runtime.metrics.groups.TaskIOMetricGroup;
 import org.apache.flink.runtime.rescale.TaskRescaleManager;
 import org.apache.flink.runtime.taskmanager.RuntimeEnvironment;
-import org.apache.flink.runtime.util.profiling.KafkaMetricsManager;
 import org.apache.flink.runtime.util.profiling.MetricsManager;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.watermark.Watermark;
-import org.apache.flink.streaming.runtime.io.AbstractDataOutput;
-import org.apache.flink.streaming.runtime.io.CheckpointedInputGate;
-import org.apache.flink.streaming.runtime.io.InputGateUtil;
-import org.apache.flink.streaming.runtime.io.InputProcessorUtil;
+import org.apache.flink.streaming.runtime.io.*;
 import org.apache.flink.streaming.runtime.io.PushingAsyncDataInput.DataOutput;
-import org.apache.flink.streaming.runtime.io.StreamOneInputProcessor;
-import org.apache.flink.streaming.runtime.io.StreamTaskInput;
-import org.apache.flink.streaming.runtime.io.StreamTaskNetworkInput;
 import org.apache.flink.streaming.runtime.metrics.WatermarkGauge;
 import org.apache.flink.streaming.runtime.streamrecord.LatencyMarker;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
@@ -48,7 +41,6 @@ import org.apache.flink.streaming.runtime.streamstatus.StatusWatermarkValve;
 import org.apache.flink.streaming.runtime.streamstatus.StreamStatusMaintainer;
 
 import javax.annotation.Nullable;
-
 import java.io.IOException;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
