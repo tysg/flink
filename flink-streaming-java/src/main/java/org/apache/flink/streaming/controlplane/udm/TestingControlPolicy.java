@@ -444,7 +444,7 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 //				testScaleInStateful(statefulOpID);
 
 //				while (true) {
-//					sleep(1000/frequency);
+					sleep(1000/frequency);
 //					System.out.println("\nstart no op frequency test...");
 //					testNoOp(statefulOpID);
 //				}

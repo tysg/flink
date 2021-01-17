@@ -23,6 +23,7 @@ public class PerformanceMeasure extends AbstractControlPolicy {
 
 	private final static String REMAP = "remap";
 	private final static String SCALE = "scale";
+	private final static String NOOP = "noop";
 
 	public PerformanceMeasure(ReconfigurationAPI reconfigurationAPI, Configuration configuration) {
 		super(reconfigurationAPI);
@@ -59,8 +60,11 @@ public class PerformanceMeasure extends AbstractControlPolicy {
 				measureRebalance(testOpID, numAffectedTasks, reconfigFreq);
 				break;
 			case SCALE:
+				break;
+			case NOOP:
+				measureNoOP(testOpID, reconfigFreq);
+				break;
 		}
-		measureNoOP(testOpID, reconfigFreq);
 	}
 
 	private void measureRebalance(int testOpID, int numAffectedTasks, int reconfigFreq) throws InterruptedException {
@@ -85,12 +89,22 @@ public class PerformanceMeasure extends AbstractControlPolicy {
 
 	private void measureNoOP(int testOpID, int reconfigFreq) throws InterruptedException {
 		StreamJobExecutionPlan executionPlan = getInstructionSet().getJobExecutionPlan();
-		for (int i = 0; i < reconfigFreq; i++) {
-			System.out.println("\nnumber of noop test: " + i);
-			getInstructionSet().noOp(testOpID, this);
-			// wait for operation completed
-			synchronized (object) {
-				object.wait();
+		if (reconfigFreq > 0) {
+			int timeInterval = 1000 / reconfigFreq;
+			int i = 0;
+			while (true) {
+//			for (int i = 0; i < reconfigFreq; i++) {
+				long start = System.currentTimeMillis();
+				System.out.println("\nnumber of noop test: " + i);
+				getInstructionSet().noOp(testOpID, this);
+				// wait for operation completed
+				synchronized (object) {
+					object.wait();
+				}
+				while ((System.currentTimeMillis() - start) < timeInterval) {
+				}
+//			}
+				i++;
 			}
 		}
 	}
