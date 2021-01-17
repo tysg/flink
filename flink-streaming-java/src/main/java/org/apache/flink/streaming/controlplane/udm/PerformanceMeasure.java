@@ -136,7 +136,7 @@ public class PerformanceMeasure extends AbstractControlPolicy {
 		public void run() {
 			// the testing jobGraph (workload) is in TestingWorkload.java, see that file to know how to use it.
 			try {
-				Thread.sleep(10000);
+				Thread.sleep(5000);
 				generateTest();
 				Thread.sleep(3000);
 				File latencyFile = new File("/home/hya/prog/latency.out");
