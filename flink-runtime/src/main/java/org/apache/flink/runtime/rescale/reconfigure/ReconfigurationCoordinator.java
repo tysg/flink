@@ -31,12 +31,12 @@ import java.util.stream.Collectors;
 import static org.apache.flink.util.Preconditions.checkArgument;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
-public class ReconfigureCoordinator extends AbstractCoordinator {
+public class ReconfigurationCoordinator extends AbstractCoordinator {
 
-	private static final Logger LOG = LoggerFactory.getLogger(ReconfigureCoordinator.class);
+	private static final Logger LOG = LoggerFactory.getLogger(ReconfigurationCoordinator.class);
 	private SynchronizeOperation currentSyncOp = null;
 
-	public ReconfigureCoordinator(JobGraph jobGraph, ExecutionGraph executionGraph) {
+	public ReconfigurationCoordinator(JobGraph jobGraph, ExecutionGraph executionGraph) {
 		super(jobGraph, executionGraph);
 	}
 

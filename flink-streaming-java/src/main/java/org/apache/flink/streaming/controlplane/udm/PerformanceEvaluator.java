@@ -10,7 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
 
-public class PerformanceMeasure extends AbstractControlPolicy {
+public class PerformanceEvaluator extends AbstractControlPolicy {
 
 	private final Object object = new Object();
 	private final TestingThread testingThread;
@@ -25,7 +25,7 @@ public class PerformanceMeasure extends AbstractControlPolicy {
 	private final static String SCALE = "scale";
 	private final static String NOOP = "noop";
 
-	public PerformanceMeasure(ReconfigurationAPI reconfigurationAPI, Configuration configuration) {
+	public PerformanceEvaluator(ReconfigurationAPI reconfigurationAPI, Configuration configuration) {
 		super(reconfigurationAPI);
 		testingThread = new TestingThread();
 		experimentConfig = configuration.toMap();
