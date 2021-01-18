@@ -252,3 +252,11 @@ jobmanager.execution.failover-strategy: region
 # Interval in milliseconds for refreshing the monitored directories.
 #historyserver.archive.fs.refresh-interval: 10000
 
+#==============================================================================
+# Trisk
+#==============================================================================
+
+trisk.reconfig.operator.name: Splitter FlatMap
+trisk.reconfig.frequency: 0
+trisk.reconfig.affected_task: 2
+trisk.reconfig.type: noop
