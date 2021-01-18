@@ -69,20 +69,29 @@ public class PerformanceMeasure extends AbstractControlPolicy {
 
 	private void measureRebalance(int testOpID, int numAffectedTasks, int reconfigFreq) throws InterruptedException {
 		StreamJobExecutionPlan executionPlan = getInstructionSet().getJobExecutionPlan();
-		for (int i = 0; i < reconfigFreq; i++) {
-			Map<Integer, List<Integer>> keySet = executionPlan.getKeyStateAllocation(testOpID);
-			Map<Integer, List<Integer>> newKeySet = new HashMap<>();
-			for (Integer taskId : keySet.keySet()) {
-				newKeySet.put(taskId, new ArrayList<>(keySet.get(taskId)));
-			}
-			// random select numAffectedTask sub key set, and then shuffle them to the same number of key set
-			shuffleKeySet(newKeySet, numAffectedTasks);
-			System.out.println("\nnumber of rebalance test: " + i);
-			System.out.println("new key set:" + newKeySet);
-			getInstructionSet().rebalance(testOpID, newKeySet, true, this);
-			// wait for operation completed
-			synchronized (object) {
-				object.wait();
+		if (reconfigFreq > 0) {
+			int timeInterval = 1000 / reconfigFreq;
+			int i = 0;
+			while (true) {
+//			for (int i = 0; i < reconfigFreq; i++) {
+				long start = System.currentTimeMillis();
+				Map<Integer, List<Integer>> keySet = executionPlan.getKeyStateAllocation(testOpID);
+				Map<Integer, List<Integer>> newKeySet = new HashMap<>();
+				for (Integer taskId : keySet.keySet()) {
+					newKeySet.put(taskId, new ArrayList<>(keySet.get(taskId)));
+				}
+				// random select numAffectedTask sub key set, and then shuffle them to the same number of key set
+				shuffleKeySet(newKeySet, numAffectedTasks);
+				System.out.println("\nnumber of rebalance test: " + i);
+				System.out.println("new key set:" + newKeySet);
+				getInstructionSet().rebalance(testOpID, newKeySet, true, this);
+				// wait for operation completed
+				synchronized (object) {
+					object.wait();
+				}
+				while ((System.currentTimeMillis() - start) < timeInterval) {
+				}
+				i++;
 			}
 		}
 	}
@@ -101,9 +110,11 @@ public class PerformanceMeasure extends AbstractControlPolicy {
 				synchronized (object) {
 					object.wait();
 				}
+				if (System.currentTimeMillis() - start > timeInterval) {
+					System.out.println("overloaded frequency");
+				}
 				while ((System.currentTimeMillis() - start) < timeInterval) {
 				}
-//			}
 				i++;
 			}
 		}
