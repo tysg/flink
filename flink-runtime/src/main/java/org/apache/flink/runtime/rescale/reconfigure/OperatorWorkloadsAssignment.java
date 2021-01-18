@@ -321,10 +321,10 @@ public class OperatorWorkloadsAssignment implements AbstractCoordinator.Diff {
 		return modifiedSubtaskMap.getOrDefault(subtaskIndex, false);
 	}
 
-	public Integer getRemovedSubtask() {
-		int removedSubtask = -1;
+	public List<Integer> getRemovedSubtask() {
+		List<Integer> removedSubtask = new ArrayList<>();
 		for (Integer removedSubtaskId : removedSubtaskMap.keySet()) {
-			removedSubtask = removedSubtaskId;
+			removedSubtask.add(removedSubtaskId);
 		}
 		return removedSubtask;
 	}

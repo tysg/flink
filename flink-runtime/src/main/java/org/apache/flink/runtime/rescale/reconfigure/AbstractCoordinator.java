@@ -195,9 +195,9 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 			}
 		} else if (oldParallelism > targetJobVertex.getParallelism()) {
 			// scale in
-			int removedTaskId = operatorWorkloadsAssignment.getRemovedSubtask();
-			checkState(removedTaskId >= 0);
-			this.removedCandidates.put(rawVertexID, targetVertex.scaleIn(removedTaskId));
+			List<Integer> removedTaskIds = operatorWorkloadsAssignment.getRemovedSubtask();
+			checkState(removedTaskIds.size() > 0);
+			this.removedCandidates.put(rawVertexID, targetVertex.scaleIn(removedTaskIds));
 
 			for (JobVertexID upstreamID : updatedUpstream) {
 				ExecutionJobVertex upstream = executionGraph.getJobVertex(upstreamID);

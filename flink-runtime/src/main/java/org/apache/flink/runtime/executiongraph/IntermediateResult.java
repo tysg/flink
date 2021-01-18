@@ -24,6 +24,7 @@ import org.apache.flink.runtime.jobgraph.IntermediateDataSetID;
 import org.apache.flink.runtime.jobgraph.IntermediateResultPartitionID;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.apache.flink.util.Preconditions.checkArgument;
@@ -106,7 +107,7 @@ public class IntermediateResult {
 		partitionsAssigned--;
 	}
 
-	public void updateNumParallelProducers(int numParallelProducers, int removedTaskId) {
+	public void updateNumParallelProducers(int numParallelProducers, List<Integer> removedTaskId) {
 		if (!resultType.isPipelined() || !resultType.isBounded()) {
 			throw new IllegalArgumentException("cannot adjust parallelism for non-streaming job");
 		}
@@ -115,7 +116,7 @@ public class IntermediateResult {
 			IntermediateResultPartition[] newPartitions = new IntermediateResultPartition[numParallelProducers];
 			int j = 0;
 			for (int i = 0; i < partitions.length; i++) {
-				if (i != removedTaskId) {
+				if (!removedTaskId.contains(i)) {
 					newPartitions[j] = partitions[i];
 					j++;
 				} else {

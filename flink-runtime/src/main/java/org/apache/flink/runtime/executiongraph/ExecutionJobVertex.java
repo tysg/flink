@@ -498,7 +498,7 @@ public class ExecutionJobVertex implements AccessExecutionJobVertex, Archiveable
 		this.parallelism = numNewTaskVertices;
 
 		for (IntermediateResult producedDataSet : producedDataSets) {
-			producedDataSet.updateNumParallelProducers(numNewTaskVertices, 0);
+			producedDataSet.updateNumParallelProducers(numNewTaskVertices, new ArrayList<>(0));
 			producedDataSet.resetConsumers();
 		}
 
@@ -550,7 +550,7 @@ public class ExecutionJobVertex implements AccessExecutionJobVertex, Archiveable
 	}
 
 	public List<ExecutionVertex> scaleIn(
-		int removedTaskId) {
+		List<Integer> removedTaskIds) {
 
 		cleanBeforeRescale();
 
@@ -560,7 +560,7 @@ public class ExecutionJobVertex implements AccessExecutionJobVertex, Archiveable
 		this.parallelism = numNewTaskVertices;
 
 		for (IntermediateResult producedDataSet : producedDataSets) {
-			producedDataSet.updateNumParallelProducers(numNewTaskVertices, removedTaskId);
+			producedDataSet.updateNumParallelProducers(numNewTaskVertices, removedTaskIds);
 			producedDataSet.resetConsumers();
 		}
 
@@ -569,7 +569,7 @@ public class ExecutionJobVertex implements AccessExecutionJobVertex, Archiveable
 		List<ExecutionVertex> removedTaskVertices = new ArrayList<>(oldParallelism - numNewTaskVertices);
 		int j = 0;
 		for (int i = 0; i < oldParallelism; i++) {
-			if (i != removedTaskId) {
+			if (!removedTaskIds.contains(i)) {
 				newTaskVertices[j] = taskVertices[i];
 				// update subtask index to from i to j
 				newTaskVertices[j].updateTaskIndex(j);

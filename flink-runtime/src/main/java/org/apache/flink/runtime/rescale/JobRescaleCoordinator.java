@@ -465,10 +465,10 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 		}
 
 		// scale in by given ejv, update involved edges & partitions
-		int removedTaskId = jobRescalePartitionAssignment.getRemovedSubtask();
-		checkState(removedTaskId >= 0);
+		List<Integer> removedTaskIds = jobRescalePartitionAssignment.getRemovedSubtask();
+		checkState(removedTaskIds.size() > 0);
 
-		this.removedCandidates = this.targetVertex.scaleIn(removedTaskId);
+		this.removedCandidates = this.targetVertex.scaleIn(removedTaskIds);
 
 		for (JobVertexID upstreamID : updatedUpstream) {
 			ExecutionJobVertex upstream = tasks.get(upstreamID);
