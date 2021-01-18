@@ -29,7 +29,6 @@ import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobgraph.OperatorInstanceID;
 import org.apache.flink.runtime.rescale.JobRescalePartitionAssignment;
 import org.apache.flink.runtime.rescale.reconfigure.OperatorWorkloadsAssignment;
-import org.apache.flink.runtime.rescale.reconfigure.ReconfigureCoordinator;
 import org.apache.flink.runtime.rescale.reconfigure.RemappingAssignment;
 import org.apache.flink.runtime.state.*;
 import org.apache.flink.util.Preconditions;
