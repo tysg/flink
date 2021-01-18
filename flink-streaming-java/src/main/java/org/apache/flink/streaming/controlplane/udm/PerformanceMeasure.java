@@ -133,7 +133,10 @@ public class PerformanceMeasure extends AbstractControlPolicy {
 		List<Integer> keyGroupList = new LinkedList<>(allKeyGroup);
 		int leftBound = 0;
 		for (int i = 0; i < numAffectedTasks - 1; i++) {
-			int subKeySetSize = random.nextInt(keyGroupList.size() - leftBound - numAffectedTasks + i - 1) + 1;
+			// sub keyset size is in [1, left - num_of_to_keyset_that_are_to_be_decided]
+			// we should make sure each sub key set has at at least one element (key group)
+			int subKeySetSize = random.nextInt(keyGroupList.size() - leftBound - numAffectedTasks + i + 2);
+			subKeySetSize = subKeySetSize > 0 ? subKeySetSize : 1;
 			newKeySet.put(
 				selectTaskID.get(i),
 				new ArrayList<>(keyGroupList.subList(leftBound, leftBound + subKeySetSize))
