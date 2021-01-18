@@ -482,9 +482,14 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 
 			String ratesLine = jobVertexId + ","
 				+ workerName + "-" + instanceId + ","
-				+ " observedOutputRate: " + observedOutputRate + ","
-				+ " totalRecordsOut: " + totalRecordsOut;
+//						+ " trueProcessingRate: " + trueProcessingRate + ","
+				+ " observedProcessingRate: " + observedProcessingRate + ","
+				+ " endToEndLantecy: " + endToEndLantecy;
+//						+ ","
+//						+ " totalRecordsIn: " + totalRecordsIn + ","
+//						+ " totalRecordsOut: " + totalRecordsOut;
 
+			outputStreamDecorator.println(ratesLine);
 //			System.out.println(ratesLine);
 
 //			if (taskId.contains("MatchMaker")) {
