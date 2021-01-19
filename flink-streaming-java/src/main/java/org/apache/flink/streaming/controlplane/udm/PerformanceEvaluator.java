@@ -16,7 +16,7 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 	private final TestingThread testingThread;
 	private final Map<String, String> experimentConfig;
 
-	public final static String AFFECTED_TASK = "trisk.reconfig.affected_task";
+	public final static String AFFECTED_TASK = "trisk.reconfig.affected_tasks";
 	public final static String TEST_OPERATOR_NAME = "trisk.reconfig.operator.name";
 	public final static String RECONFIG_FREQUENCY = "trisk.reconfig.frequency";
 	public final static String TEST_TYPE = "trisk.reconfig.type";
