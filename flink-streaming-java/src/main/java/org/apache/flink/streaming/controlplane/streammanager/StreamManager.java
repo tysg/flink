@@ -60,6 +60,7 @@ import org.apache.flink.streaming.controlplane.streammanager.insts.StreamJobExec
 import org.apache.flink.streaming.controlplane.streammanager.insts.StreamJobExecutionPlanWithUpdatingFlagImpl;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 import org.apache.flink.streaming.controlplane.udm.PerformanceEvaluator;
+import org.apache.flink.streaming.controlplane.udm.TestingControlPolicy;
 import org.apache.flink.util.OptionalConsumer;
 
 import java.util.*;
@@ -161,8 +162,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		/* now the policy is temporary hard coded added */
 //		this.controlPolicyList.add(new FlinkStreamSwitchAdaptor(this, jobGraph));
 //		this.controlPolicyList.add(new TestingCFManager(this));
-//		this.controlPolicyList.add(new TestingControlPolicy(this));
-		this.controlPolicyList.add(new PerformanceEvaluator(this, streamManagerConfiguration.getConfiguration()));
+		this.controlPolicyList.add(new TestingControlPolicy(this));
+//		this.controlPolicyList.add(new PerformanceEvaluator(this, streamManagerConfiguration.getConfiguration()));
 
 		reconfigurationProfiler = new ReconfigurationProfiler();
 	}

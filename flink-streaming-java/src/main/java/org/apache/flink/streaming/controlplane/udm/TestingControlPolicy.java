@@ -205,7 +205,7 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 			newKeyStateAllocation.put(taskId, new ArrayList<>(curKeyStateAllocation.get(taskId)));
 		}
 
-		List<Integer> removedKeys = newKeyStateAllocation.remove(oldParallelism-2);
+		List<Integer> removedKeys = newKeyStateAllocation.remove(oldParallelism-3);
 		newKeyStateAllocation.get(oldParallelism-1).addAll(removedKeys);
 
 		System.out.println(newKeyStateAllocation);
@@ -419,19 +419,19 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 //				System.out.println("\nstart synchronize source test...");
 //				testPauseSource(sourceOp);
 
-				System.out.println("\nstart stateful scale out test");
-				testScaleOutStateful(statefulOpID);
+//				System.out.println("\nstart stateful scale out test");
+//				testScaleOutStateful(statefulOpID);
 
 //				System.out.println("\nstart stateful scale out test");
 //				testScaleOutStateful2(statefulOpID);
 				// todo, for some reason. if no sleep here, it may be loss some data
 //				Thread.sleep(3000);
 
-				System.out.println("\nstart stateful scale out 2 more test");
-				testScaleOutStateful(statelessOpID);
+//				System.out.println("\nstart stateful scale out 2 more test");
+//				testScaleOutStateful(statelessOpID);
 
 				System.out.println("\nstart stateful scale in test2");
-				testScaleInStateful(statefulOpID);
+				testScaleInStateful2(statefulOpID);
 
 //				System.out.println("\nstart rescale window join test...");
 //				testScaleOutWindowJoin();
@@ -442,11 +442,14 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 //				System.out.println("\nstart update function related test...");
 //				testCustomizeWindowUpdateAPI();
 //
-//				System.out.println("\nstart stateful scale in test2");
-//				testScaleInStateful(statefulOpID);
+//				System.out.println("\nstart stateful scale in test3");
+//				testScaleInStateful2(statefulOpID);
+//
+//				System.out.println("\nstart stateful scale in test4");
+//				testScaleInStateful2(statefulOpID);
 
 //				while (true) {
-					sleep(1000/frequency);
+//					sleep(1000/frequency);
 //					System.out.println("\nstart no op frequency test...");
 //					testNoOp(statefulOpID);
 //				}
