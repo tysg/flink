@@ -365,7 +365,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						}
 						try {
 							System.out.println("++++++ finished update");
-							this.jobExecutionPlan.notifyUpdateFinished(operatorID);
+							this.jobExecutionPlan.notifyUpdateFinished(failure);
 							reconfigurationProfiler.onReconfigurationEnd();
 						} catch (Exception e) {
 							e.printStackTrace();
@@ -431,7 +431,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 								System.out.println("++++++ finished update");
 								reconfigurationProfiler.onOtherEnd(UPDATE_STATE);
 								reconfigurationProfiler.onReconfigurationEnd();
-								this.jobExecutionPlan.notifyUpdateFinished(operatorID);
+								this.jobExecutionPlan.notifyUpdateFinished(failure);
 							} catch (Exception e) {
 								e.printStackTrace();
 							}
@@ -448,7 +448,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 							}
 							try {
 								reconfigurationProfiler.onReconfigurationEnd();
-								this.jobExecutionPlan.notifyUpdateFinished(operatorID);
+								this.jobExecutionPlan.notifyUpdateFinished(failure);
 							} catch (Exception e) {
 								e.printStackTrace();
 							}
@@ -494,7 +494,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						try {
 							reconfigurationProfiler.onOtherEnd(UPDATE_FUNCTION);
 							reconfigurationProfiler.onReconfigurationEnd();
-							this.jobExecutionPlan.notifyUpdateFinished(operatorID);
+							this.jobExecutionPlan.notifyUpdateFinished(failure);
 						} catch (Exception e) {
 							e.printStackTrace();
 						}
@@ -527,7 +527,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 							failure.printStackTrace();
 						}
 						try {
-							this.jobExecutionPlan.notifyUpdateFinished(operatorID);
+							this.jobExecutionPlan.notifyUpdateFinished(failure);
 						} catch (Exception e) {
 							e.printStackTrace();
 						}

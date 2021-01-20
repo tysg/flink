@@ -76,9 +76,8 @@ public interface StreamJobExecutionPlanWithUpdatingFlag extends StreamJobExecuti
 	 * Notify that current state update is finished.
 	 * This could only be invoke once
 	 *
-	 * @param operatorId
 	 * @throws Exception
 	 */
 	@Internal
-	void notifyUpdateFinished(Integer operatorId) throws Exception;
+	void notifyUpdateFinished(Throwable throwable) throws Exception;
 }

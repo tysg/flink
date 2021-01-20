@@ -36,7 +36,10 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 	}
 
 	@Override
-	public synchronized void onChangeCompleted(Integer jobVertexID) {
+	public synchronized void onChangeCompleted(Throwable throwable) {
+		if(throwable != null){
+			testingThread.interrupt();
+		}
 		System.out.println("my self defined instruction finished??");
 		synchronized (object) {
 			object.notify();
@@ -340,14 +343,13 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 						failure.printStackTrace();
 					}
 					synchronized (object) {
-						object.notify();
+						this.onChangeCompleted(failure);
 					}
 				})
 		);
 		// wait for operation completed
 		synchronized (object) {
 			object.wait();
-			this.onChangeCompleted(rawVertexID);
 		}
 	}
 

@@ -13,7 +13,6 @@ public interface ControlPolicy {
 
 	/**
 	 * How stream manager notify one User Defined Model that one state update is completed?
-	 * @param jobVertexID
 	 */
-	void onChangeCompleted(Integer jobVertexID);
+	void onChangeCompleted(Throwable throwable);
 }

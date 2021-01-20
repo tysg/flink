@@ -84,8 +84,10 @@ public class TestingCFManager extends ControlFunctionManager implements ControlP
 	}
 
 	@Override
-	public void onChangeCompleted(Integer jobVertexID) {
-		System.out.println(System.currentTimeMillis() + ":one operator function update is finished:"+jobVertexID);
+	public void onChangeCompleted(Throwable throwable) {
+		if(throwable != null) {
+			System.out.println(System.currentTimeMillis() + ":one operator function update is finished");
+		}
 	}
 
 }

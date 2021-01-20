@@ -110,7 +110,7 @@ public class FlinkStreamSwitchAdaptor implements ControlPolicy {
 	}
 
 	@Override
-	public void onChangeCompleted(Integer jobVertexID) {
+	public void onChangeCompleted(Throwable throwable) {
 
 	}
 

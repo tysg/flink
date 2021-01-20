@@ -51,10 +51,10 @@ public class StreamJobExecutionPlanWithUpdatingFlagImpl implements StreamJobExec
 	}
 
 	@Override
-	public void notifyUpdateFinished(Integer jobVertexID) throws Exception {
+	public void notifyUpdateFinished(Throwable throwable) throws Exception {
 		if (stateOfUpdate.compareAndSet(STAGED, COMMITTED)) {
 			if (currentWaitingController != null) {
-				currentWaitingController.onChangeCompleted(jobVertexID);
+				currentWaitingController.onChangeCompleted(throwable);
 			}
 			return;
 		}
