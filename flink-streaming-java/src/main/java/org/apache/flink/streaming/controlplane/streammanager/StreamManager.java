@@ -398,8 +398,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
 			final String PREPARE = "prepare timer";
-			final String SYN = "synchronizePauseTasks timer";
-			final String UPDATE_MAPPING = "updateUpstreamKeyMapping timer";
+			final String SYN = "synchronize timer";
+			final String UPDATE_MAPPING = "updateKeyMapping timer";
 			final String UPDATE_STATE = "updateState timer";
 			if (stateful) {
 				runAsync(() -> jobMasterGateway.callOperations(
@@ -468,7 +468,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			OperatorDescriptor target = jobExecutionPlan.getOperatorDescriptorByID(operatorID);
 			target.setControlAttribute(UDF, function);
 			final String PREPARE = "prepare timer";
-			final String SYN = "synchronizePauseTasks timer";
+			final String SYN = "synchronize timer";
 			final String UPDATE_FUNCTION = "updateFunction timer";
 			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
 			runAsync(() -> jobMasterGateway.callOperations(
@@ -511,7 +511,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			// very similar to acquire a positive spin write lock
 			this.jobExecutionPlan.setStateUpdatingFlag(waitingController);
 			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
-			final String SYN = "synchronizePauseTasks timer";
+			final String SYN = "synchronize timer";
 			runAsync(() -> jobMasterGateway.callOperations(
 				enforcement -> FutureUtils.completedVoidFuture()
 					.thenCompose(o -> {
