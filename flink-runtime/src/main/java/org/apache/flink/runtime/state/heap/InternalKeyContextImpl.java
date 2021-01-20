@@ -76,9 +76,7 @@ public class InternalKeyContextImpl<K> implements InternalKeyContext<K> {
 			int alignedCurrentKeyGroupIndex = keyGroupRange.mapFromHashedToAligned(currentKeyGroupIndex);
 			this.currentKeyGroupIndex = alignedCurrentKeyGroupIndex;
 		}catch (NullPointerException e){
-			e.printStackTrace();
-			System.out.println("the input key may not belongs to this context:"+currentKeyGroupIndex);
-			throw e;
+			throw new RuntimeException("the input key may not belongs to this context:" + currentKeyGroupIndex, e);
 		}
 	}
 
