@@ -123,7 +123,6 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 					continue;
 				}
 				// random select numAffectedTask sub key set, and then shuffle them to the same number of key set
-				shuffleKeySet(newKeySet, numAffectedTasks);
 				System.out.println("\nnumber of rescale test: " + i);
 				System.out.println("new key set:" + newKeySet);
 				getInstructionSet().rescale(testOpID, newParallelism, newKeySet, this);
