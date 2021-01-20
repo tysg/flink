@@ -164,6 +164,7 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 
 	private void shuffleKeySet(Map<Integer, List<Integer>> newKeySet, int numAffectedTasks) {
 		Random random = new Random();
+		numAffectedTasks = Math.min(numAffectedTasks, newKeySet.size());
 		List<Integer> selectTaskID = new ArrayList<>(numAffectedTasks);
 		Set<Integer> allKeyGroup = new HashSet<>();
 		List<Integer> allTaskID = new ArrayList<>(newKeySet.keySet());
@@ -209,6 +210,7 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 		List<Integer> selectTaskID = new ArrayList<>(findNextSubTaskID(newKeySet.keySet(), newParallelism - newKeySet.size()));
 		Set<Integer> allKeyGroup = new HashSet<>();
 		List<Integer> allTaskID = new ArrayList<>(newKeySet.keySet());
+		numAffectedTasks = Math.min(numAffectedTasks, newKeySet.size());
 		// add affected task key set id
 		for (int i = 0; i < numAffectedTasks; i++) {
 			int offset = random.nextInt(newKeySet.size());
@@ -238,6 +240,7 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 	private void shuffleKeySetWhenScaleIn(Map<Integer, List<Integer>> newKeySet, int newParallelism, int numAffectedTasks) {
 		Random random = new Random();
 		int numOfRemove = newKeySet.size() - newParallelism;
+		numAffectedTasks = Math.min(numAffectedTasks, newKeySet.size());
 		numAffectedTasks = numAffectedTasks > numOfRemove ? numAffectedTasks : numOfRemove + 1;
 		int keeped = numAffectedTasks - numOfRemove;
 		List<Integer> selectTaskID = new ArrayList<>(numAffectedTasks);
