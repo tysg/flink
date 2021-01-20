@@ -61,8 +61,7 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 				measureRebalance(testOpID, numAffectedTasks, reconfigFreq);
 				break;
 			case SCALE:
-				int newParallelism = Integer.parseInt(experimentConfig.getOrDefault(MAX_CONFIG_PARALLELISM, "10"));
-				measureRescale(testOpID, numAffectedTasks, newParallelism, reconfigFreq);
+				measureRescale(testOpID, numAffectedTasks, 10, reconfigFreq);
 				break;
 			case NOOP:
 				measureNoOP(testOpID, reconfigFreq);
