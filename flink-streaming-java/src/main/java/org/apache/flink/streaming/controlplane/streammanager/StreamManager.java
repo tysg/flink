@@ -162,8 +162,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		/* now the policy is temporary hard coded added */
 //		this.controlPolicyList.add(new FlinkStreamSwitchAdaptor(this, jobGraph));
 //		this.controlPolicyList.add(new TestingCFManager(this));
-		this.controlPolicyList.add(new TestingControlPolicy(this));
-//		this.controlPolicyList.add(new PerformanceEvaluator(this, streamManagerConfiguration.getConfiguration()));
+//		this.controlPolicyList.add(new TestingControlPolicy(this));
+		this.controlPolicyList.add(new PerformanceEvaluator(this, streamManagerConfiguration.getConfiguration()));
 
 		reconfigurationProfiler = new ReconfigurationProfiler();
 	}
@@ -559,7 +559,9 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	public void jobStatusChanged(JobID jobId, JobStatus newJobStatus, long timestamp, Throwable error, StreamJobExecutionPlan jobAbstraction) {
 		runAsync(
 			() -> {
-				this.jobExecutionPlan = new StreamJobExecutionPlanWithUpdatingFlagImpl(jobAbstraction);
+				if (jobAbstraction != null) {
+					this.jobExecutionPlan = new StreamJobExecutionPlanWithUpdatingFlagImpl(jobAbstraction);
+				}
 				if (newJobStatus == JobStatus.RUNNING) {
 					for (ControlPolicy policy : controlPolicyList) {
 						policy.startControllers();

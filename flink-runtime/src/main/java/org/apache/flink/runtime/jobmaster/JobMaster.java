@@ -959,8 +959,11 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		checkState(streamManagerGatewayFuture != null);
 		streamManagerGatewayFuture.thenAccept(
 			streamManagerGateway -> {
-				AbstractCoordinator abstractCoordinator = schedulerNG.getJobRescaleCoordinator().getOperatorUpdateCoordinator();
-				StreamJobExecutionPlan jobAbstraction = abstractCoordinator.getHeldExecutionPlanCopy();
+				StreamJobExecutionPlan jobAbstraction = null;
+				if(newJobStatus == JobStatus.RUNNING){
+					AbstractCoordinator abstractCoordinator = schedulerNG.getJobRescaleCoordinator().getOperatorUpdateCoordinator();
+					jobAbstraction = abstractCoordinator.getHeldExecutionPlanCopy();
+				}
 				streamManagerGateway.jobStatusChanged(
 					jobGraph.getJobID(), newJobStatus, timestamp, error, jobAbstraction
 				);

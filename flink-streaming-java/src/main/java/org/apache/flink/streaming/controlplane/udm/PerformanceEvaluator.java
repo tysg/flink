@@ -38,6 +38,7 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 	@Override
 	public void stopControllers() {
 		System.out.println("PerformanceMeasure is stopping...");
+		testingThread.interrupt();
 	}
 
 	@Override
