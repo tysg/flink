@@ -505,6 +505,11 @@ public abstract class SchedulerBase implements SchedulerNG {
 		if (updateSuccess) {
 			checkState(executionVertexId.isPresent());
 
+			// if executionVertex not in the current ejv, skip, because we updated the pipelineRegion
+			if (executionGraph.checkValidityOfExecutionState(taskExecutionState)) {
+				return true;
+			}
+
 			if (isNotifiable(executionVertexId.get(), taskExecutionState)) {
 				updateTaskExecutionStateInternal(executionVertexId.get(), taskExecutionState);
 			}

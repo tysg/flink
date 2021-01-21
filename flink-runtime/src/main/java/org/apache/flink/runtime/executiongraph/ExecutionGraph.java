@@ -1478,11 +1478,8 @@ public class ExecutionGraph implements AccessExecutionGraph {
 		if (attempt != null) {
 			try {
 				final boolean stateUpdated = updateStateInternal(state, attempt);
-				// if executionVertex not in the current ejv, skip, because we updated the pipelineRegion
-				for (ExecutionVertex vertex : tasks.get(attempt.getVertex().getJobvertexId()).getTaskVertices()) {
-					if (attempt.getVertex().getID() == vertex.getID()) {
-						maybeReleasePartitions(attempt);
-					}
+				if (checkValidityOfExecutionState(state)) {
+					maybeReleasePartitions(attempt);
 				}
 
 				return stateUpdated;
@@ -1498,6 +1495,21 @@ public class ExecutionGraph implements AccessExecutionGraph {
 		else {
 			return false;
 		}
+	}
+
+	public boolean checkValidityOfExecutionState(TaskExecutionState state) {
+		// the validity of execition state means whether we have dropped it already from pipelineRegion
+		final Execution attempt = currentExecutions.get(state.getID());
+		if (attempt == null) {
+			return false;
+		}
+		// if executionVertex not in the current ejv, skip, because we updated the pipelineRegion
+		for (ExecutionVertex vertex : tasks.get(attempt.getVertex().getJobvertexId()).getTaskVertices()) {
+			if (attempt.getVertex().getID() == vertex.getID()) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private boolean updateStateInternal(final TaskExecutionState state, final Execution attempt) {
