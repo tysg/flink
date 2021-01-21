@@ -179,8 +179,8 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 		for (int i = 0; i < numAffectedTasks - 1; i++) {
 			// sub keyset size is in [1, left - num_of_to_keyset_that_are_to_be_decided]
 			// we should make sure each sub key set has at at least one element (key group)
-			int subKeySetSize = random.nextInt(keyGroupList.size() - leftBound - numAffectedTasks + i + 2);
-			subKeySetSize = subKeySetSize > 0 ? subKeySetSize : 1;
+			int subKeySetSize = random.nextInt(keyGroupList.size() - leftBound - numAffectedTasks + i + 1) + 1;
+//			subKeySetSize = subKeySetSize > 0 ? subKeySetSize : 1;
 			newKeySet.put(
 				selectTaskID.get(i),
 				new ArrayList<>(keyGroupList.subList(leftBound, leftBound + subKeySetSize))
@@ -213,10 +213,18 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 		List<Integer> allTaskID = new ArrayList<>(newKeySet.keySet());
 		numAffectedTasks = Math.min(numAffectedTasks, newKeySet.size());
 		// add affected task key set id
-		for (int i = 0; i < numAffectedTasks; i++) {
+//		for (int i = 0; i < numAffectedTasks; i++) {
+//			int offset = random.nextInt(newKeySet.size());
+//			selectTaskID.add(allTaskID.get(offset));
+//			allKeyGroup.addAll(newKeySet.remove(allTaskID.remove(offset)));
+//		}
+		int numOfAddedSubset = 0;
+		while (numOfAddedSubset < numAffectedTasks || allKeyGroup.size() < selectTaskID.size()){
+			// allKeyGroup.size() < selectTaskID.size() means we don't have enough key groups
 			int offset = random.nextInt(newKeySet.size());
 			selectTaskID.add(allTaskID.get(offset));
 			allKeyGroup.addAll(newKeySet.remove(allTaskID.remove(offset)));
+			numOfAddedSubset ++;
 		}
 
 		List<Integer> keyGroupList = new LinkedList<>(allKeyGroup);
@@ -224,8 +232,8 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 		for (int i = 0; i < selectTaskID.size() - 1; i++) {
 			// sub keyset size is in [1, left - num_of_to_keyset_that_are_to_be_decided]
 			// we should make sure each sub key set has at at least one element (key group)
-			int subKeySetSize = random.nextInt(keyGroupList.size() - leftBound - selectTaskID.size() + i + 2);
-			subKeySetSize = subKeySetSize > 0 ? subKeySetSize : 1;
+			int subKeySetSize = 1 + random.nextInt(keyGroupList.size() - leftBound - selectTaskID.size() + i + 1);
+//			subKeySetSize = subKeySetSize > 0 ? subKeySetSize : 1;
 			newKeySet.put(
 				selectTaskID.get(i),
 				new ArrayList<>(keyGroupList.subList(leftBound, leftBound + subKeySetSize))
@@ -258,8 +266,8 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 		for (int i = 0; i < keeped - 1; i++) {
 			// sub keyset size is in [1, left - num_of_to_keyset_that_are_to_be_decided]
 			// we should make sure each sub key set has at at least one element (key group)
-			int subKeySetSize = random.nextInt(keyGroupList.size() - leftBound - keeped + i + 2);
-			subKeySetSize = subKeySetSize > 0 ? subKeySetSize : 1;
+			int subKeySetSize = 1 + random.nextInt(keyGroupList.size() - leftBound - keeped + i + 1);
+//			subKeySetSize = subKeySetSize > 0 ? subKeySetSize : 1;
 			newKeySet.put(
 				selectTaskID.get(i),
 				new ArrayList<>(keyGroupList.subList(leftBound, leftBound + subKeySetSize))
