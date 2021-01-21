@@ -124,6 +124,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 //							difference.add(PARALLELISM);
 							break;
 						case KEY_STATE_ALLOCATION:
+							// convert the logical key mapping to Flink version partition assignment
 							OperatorWorkloadsAssignment operatorWorkloadsAssignment =
 								workloadsAssignmentHandler.handleWorkloadsReallocate(operatorID, descriptor.getKeyStateAllocation());
 							difference.put(
@@ -137,7 +138,8 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 								rescaleExecutionGraph(heldDescriptor.getOperatorID(), oldParallelism, operatorWorkloadsAssignment);
 							}
 							heldDescriptor.setKeySet(descriptor.getKeyStateAllocation());
-							updateKeySet(heldDescriptor, isRescale);
+							// update the partition assignment of Flink JobGrpah
+							updatePartitionAssignment(heldDescriptor, operatorWorkloadsAssignment, isRescale);
 							break;
 						case KEY_MAPPING:
 							// update key set will indirectly update key mapping, so we ignore this type of detected change here
@@ -218,7 +220,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 		executionGraph.updateNumOfTotalVertices();
 	}
 
-	private void updateKeySet(OperatorDescriptor heldDescriptor, boolean isRescale) {
+	private void updatePartitionAssignment(OperatorDescriptor heldDescriptor, OperatorWorkloadsAssignment operatorWorkloadsAssignment, boolean isRescale) {
 //		Map<Integer, List<Integer>> partionAssignment = new HashMap<>();
 //		Map<Integer, List<Integer>> one = heldDescriptor.getKeyStateAllocation();
 //		for (int i = 0; i < one.size(); i++) {
@@ -228,11 +230,11 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 			jobGraphUpdater.rescale(rawVertexIDToJobVertexID(
 				heldDescriptor.getOperatorID()),
 				heldDescriptor.getParallelism(),
-				heldDescriptor.getKeyStateAllocation());
+				operatorWorkloadsAssignment.getPartitionAssignment());
 		} else {
 			jobGraphUpdater.repartition(rawVertexIDToJobVertexID(
 				heldDescriptor.getOperatorID()),
-				heldDescriptor.getKeyStateAllocation());
+				operatorWorkloadsAssignment.getPartitionAssignment());
 		}
 	}
 
