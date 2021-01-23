@@ -58,7 +58,7 @@ public class WorkloadsAssignmentHandler {
 
 		heldWorkloadsAssignmentMap.put(operatorId, operatorWorkloadsAssignment);
 		heldExecutorMapping.put(operatorId, executorMapping);
-		System.out.println("++++++after handle workloads " + heldExecutorMapping.get(operatorId));
+//		System.out.println("++++++after handle workloads " + heldExecutorMapping.get(operatorId));
 		return operatorWorkloadsAssignment;
 	}
 
