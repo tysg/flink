@@ -1,6 +1,8 @@
 package org.apache.flink.runtime.rescale.reconfigure;
 
 import org.apache.flink.runtime.state.KeyGroupRange;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -13,9 +15,11 @@ import static org.apache.flink.util.Preconditions.checkState;
 
 public class OperatorWorkloadsAssignment implements AbstractCoordinator.Diff {
 
+	private static final Logger LOG = LoggerFactory.getLogger(OperatorWorkloadsAssignment.class);
+
 	public static final int UNUSED_SUBTASK = Integer.MAX_VALUE/2;
 
-	private final int numOpenedSubtask;
+	private int numOpenedSubtask;
 
 	private final OperatorWorkloadsAssignment oldRescalePA;
 
@@ -266,6 +270,12 @@ public class OperatorWorkloadsAssignment implements AbstractCoordinator.Diff {
 		subtaskIndexMapping = newSubtaskIndexMapping;
 		partitionAssignment = newPartitionAssignment;
 		modifiedSubtaskMap = newModifiedSubtaskMap;
+		numOpenedSubtask = newPartitionAssignment.size();
+
+		LOG.info("++++++ subtaskIndexMapping: " + subtaskIndexMapping);
+		LOG.info("++++++ partitionAssignment: " + partitionAssignment);
+		LOG.info("++++++ modifiedSubtaskMap: " + modifiedSubtaskMap);
+		LOG.info("++++++ removedSubtaskMap: " + removedSubtaskMap);
 	}
 
 	private void generateAlignedKeyGroupRanges() {

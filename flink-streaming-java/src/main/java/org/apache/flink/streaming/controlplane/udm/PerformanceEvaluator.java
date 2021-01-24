@@ -2,12 +2,13 @@ package org.apache.flink.streaming.controlplane.udm;
 
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
-import org.apache.flink.runtime.rescale.JobRescaleCoordinator;
 import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+
+import static org.apache.flink.util.Preconditions.checkState;
 
 public class PerformanceEvaluator extends AbstractControlPolicy {
 	private static final Logger LOG = LoggerFactory.getLogger(PerformanceEvaluator.class);
@@ -25,6 +26,8 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 	private final static String RESCALE = "rescale";
 	private final static String NOOP = "noop";
 	private final static String EXECUTION_LOGIC = "logic";
+
+	private int latestUnusedSubTaskIdx = 0;
 
 	public PerformanceEvaluator(ReconfigurationAPI reconfigurationAPI, Configuration configuration) {
 		super(reconfigurationAPI);
@@ -61,6 +64,7 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 		int numAffectedTasks = Integer.parseInt(experimentConfig.getOrDefault(AFFECTED_TASK, "3"));
 		int reconfigFreq = Integer.parseInt(experimentConfig.getOrDefault(RECONFIG_FREQUENCY, "5"));
 		int testOpID = findOperatorByName(testOperatorName);
+		latestUnusedSubTaskIdx = getInstructionSet().getJobExecutionPlan().getParallelism(testOpID);
 		switch (experimentConfig.getOrDefault(TEST_TYPE, RESCALE)) {
 			case REMAP:
 				measureRebalance(testOpID, numAffectedTasks, reconfigFreq);
@@ -208,12 +212,12 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 
 	private List<Integer> findNextSubTaskID(Collection<Integer> keySetID, int numOfNext) {
 		List<Integer> next = new LinkedList<>();
-		for (int i = 0; i < numOfNext; i++) {
-			int id = 0;
-			while (keySetID.contains(id) || next.contains(id)) {
-				id++;
-			}
-			next.add(id);
+		int newParallelism = latestUnusedSubTaskIdx + numOfNext;
+		while(latestUnusedSubTaskIdx < newParallelism) {
+			checkState(!keySetID.contains(latestUnusedSubTaskIdx) && !next.contains(latestUnusedSubTaskIdx),
+				"subtask index has already been used.");
+			next.add(latestUnusedSubTaskIdx);
+			latestUnusedSubTaskIdx++;
 		}
 		return next;
 	}
