@@ -475,6 +475,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			runAsync(() -> jobMasterGateway.callOperations(
 				enforcement -> FutureUtils.completedVoidFuture()
 					.thenCompose(o -> {
+						reconfigurationProfiler.onReconfigurationStart();
 						reconfigurationProfiler.onOtherStart(PREPARE);
 						return enforcement.prepareExecutionPlan(jobExecutionPlan);
 					})

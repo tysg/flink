@@ -73,7 +73,7 @@ public class StreamJobExecutionPlanWithUpdatingFlagImpl implements StreamJobExec
 	}
 
 	@Override
-	public Function getUserFunction(Integer operatorID) throws Exception {
+	public Function getUserFunction(Integer operatorID) {
 		return streamJobExecutionPlanDelegate.getUserFunction(operatorID);
 	}
 

@@ -4,6 +4,7 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
 import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
 
+import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 
 public class PerformanceEvaluator extends AbstractControlPolicy {
@@ -22,6 +23,8 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 	private final static String NOOP = "noop";
 	private final static String EXECUTION_LOGIC = "logic";
 
+	private boolean finished = false;
+
 	public PerformanceEvaluator(ReconfigurationAPI reconfigurationAPI, Configuration configuration) {
 		super(reconfigurationAPI);
 		testingThread = new TestingThread();
@@ -38,12 +41,13 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 	@Override
 	public void stopControllers() {
 		System.out.println("PerformanceMeasure is stopping...");
+		finished = true;
 		testingThread.interrupt();
 	}
 
 	@Override
 	public synchronized void onChangeCompleted(Throwable throwable) {
-		if(throwable != null){
+		if (throwable != null) {
 			testingThread.interrupt();
 			return;
 		}
@@ -63,6 +67,9 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 				break;
 			case SCALE:
 				measureRescale(testOpID, numAffectedTasks, 10, reconfigFreq);
+				break;
+			case EXECUTION_LOGIC:
+				measureFunctionUpdate(testOpID, reconfigFreq);
 				break;
 			case NOOP:
 				measureNoOP(testOpID, reconfigFreq);
@@ -96,6 +103,43 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 				}
 				i++;
 			}
+		}
+	}
+
+	private void measureFunctionUpdate(int testOpID, int reconfigFreq) throws InterruptedException {
+		StreamJobExecutionPlan executionPlan = getInstructionSet().getJobExecutionPlan();
+		try {
+			ClassLoader userClassLoader = executionPlan.getUserFunction(testOpID).getClass().getClassLoader();
+			Class IncreaseCommunicationOverheadMapClass = userClassLoader.loadClass("flinkapp.StatefulDemoLongRun$IncreaseCommunicationOverheadMap");
+			Class IncreaseComputationOverheadMap = userClassLoader.loadClass("flinkapp.StatefulDemoLongRun$IncreaseComputationOverheadMap");
+			if (reconfigFreq > 0) {
+				int timeInterval = 1000 / reconfigFreq;
+				int i = 0;
+				Random random = new Random();
+				while (true) {
+					long start = System.currentTimeMillis();
+					Object func = null;
+					if (random.nextInt(2) > 0) {
+						func = IncreaseCommunicationOverheadMapClass.getConstructor(int.class)
+							.newInstance(random.nextInt(10) + 1);
+					} else {
+						func = IncreaseCommunicationOverheadMapClass.getConstructor(int.class)
+							.newInstance(random.nextInt(10));
+					}
+					System.out.println("\nnumber of function update test: " + i);
+					System.out.println("new function:" + func);
+					getInstructionSet().reconfigureUserFunction(testOpID, func, this);
+					// wait for operation completed
+					synchronized (object) {
+						object.wait();
+					}
+					while ((System.currentTimeMillis() - start) < timeInterval) {
+					}
+					i++;
+				}
+			}
+		} catch (ClassNotFoundException | NoSuchMethodException | IllegalAccessException | InstantiationException | InvocationTargetException e) {
+			e.printStackTrace();
 		}
 	}
 
@@ -219,12 +263,12 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 //			allKeyGroup.addAll(newKeySet.remove(allTaskID.remove(offset)));
 //		}
 		int numOfAddedSubset = 0;
-		while (numOfAddedSubset < numAffectedTasks || allKeyGroup.size() < selectTaskID.size()){
+		while (numOfAddedSubset < numAffectedTasks || allKeyGroup.size() < selectTaskID.size()) {
 			// allKeyGroup.size() < selectTaskID.size() means we don't have enough key groups
 			int offset = random.nextInt(newKeySet.size());
 			selectTaskID.add(allTaskID.get(offset));
 			allKeyGroup.addAll(newKeySet.remove(allTaskID.remove(offset)));
-			numOfAddedSubset ++;
+			numOfAddedSubset++;
 		}
 
 		List<Integer> keyGroupList = new LinkedList<>(allKeyGroup);
@@ -302,6 +346,10 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 //				File copy = new File("/home/hya/prog/latency.out.copy");
 //				Files.copy(latencyFile.toPath(), copy.toPath());
 			} catch (InterruptedException e) {
+				if (finished) {
+					System.err.println("PerformanceEvaluator stopped");
+					return;
+				}
 				e.printStackTrace();
 				System.err.println("interrupted, thread exit");
 			}

@@ -14,7 +14,7 @@ public interface JobGraphConfig {
 	 * @param operatorID the operator id of this operator
 	 * @return
 	 */
-	Function getUserFunction(Integer operatorID) throws Exception;
+	Function getUserFunction(Integer operatorID);
 
 	/**
 	 * To get how the input key state was allocated among the sub operator instance.
