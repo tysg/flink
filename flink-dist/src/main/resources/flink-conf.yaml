@@ -260,3 +260,18 @@ trisk.reconfig.operator.name: Splitter FlatMap
 trisk.reconfig.frequency: 0
 trisk.reconfig.affected_task: 2
 trisk.reconfig.type: noop
+
+#==============================================================================
+# Backpressure Configuration
+#==============================================================================
+#
+
+web.backpressure.refresh-interval: 600000000
+web.backpressure.num-samples: 10000000
+web.backpressure.delay-between-samples: 100000000
+#taskmanager.network.numberOfBuffers: 102400
+taskmanager.network.memory.buffers-per-channel: 10000000
+taskmanager.network.memory.floating-buffers-per-gate: 10000000
+taskmanager.network.memory.max: 10gb
+
+taskmanager.network.credit-model: false

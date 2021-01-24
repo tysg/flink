@@ -247,13 +247,14 @@ public class HeapRestoreOperation<K> implements RestoreOperation<Void> {
 
 			// Check that restored key groups all belong to the backend.
 //			Preconditions.checkState(keyGroupRange.contains(keyGroupIndex), "The key group must belong to the backend.");
-			Preconditions.checkState(keyGroupRange.contains(alignedKeyGroupIndex), "The key group must belong to the backend.");
+			Preconditions.checkState(keyGroupRange.contains(alignedKeyGroupIndex), "The key group must belong to the backend."
+				+ keyGroupRange + " : " + alignedKeyGroupIndex);
 
 			fsDataInputStream.seek(offset);
 
 			int hashedKeyGroup = inView.readInt();
 			Preconditions.checkState(hashedKeyGroup == keyGroupRange.mapFromAlignedToHashed(alignedKeyGroupIndex),
-				"Unexpected key-group in restore.");
+				String.format("Unexpected key-group in restore {%s : %s}.", hashedKeyGroup, keyGroupRange.mapFromAlignedToHashed(alignedKeyGroupIndex)));
 
 			LOG.info("++++++-- keyGroupRange: " + keyGroupRange +
 				", alignedKeyGroupIndex: " + alignedKeyGroupIndex +

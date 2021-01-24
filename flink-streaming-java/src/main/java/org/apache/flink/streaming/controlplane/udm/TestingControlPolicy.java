@@ -442,11 +442,11 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 //				System.out.println("\nstart update function related test...");
 //				testCustomizeWindowUpdateAPI();
 //
-//				System.out.println("\nstart stateful scale in test3");
-//				testScaleInStateful2(statefulOpID);
-//
-//				System.out.println("\nstart stateful scale in test4");
-//				testScaleInStateful2(statefulOpID);
+				System.out.println("\nstart stateful scale in test3");
+				testScaleInStateful2(statefulOpID);
+
+				System.out.println("\nstart stateful scale in test4");
+				testScaleInStateful2(statefulOpID);
 
 //				while (true) {
 //					sleep(1000/frequency);

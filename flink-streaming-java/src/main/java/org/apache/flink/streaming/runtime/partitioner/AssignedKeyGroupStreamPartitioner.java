@@ -78,7 +78,6 @@ public class AssignedKeyGroupStreamPartitioner<T, K> extends StreamPartitioner<T
 
 	public void updateNewPartitionAssignment(Map<Integer, List<Integer>> partitionAssignment) {
 		this.assignKeyToOperator = getAssignKeyToOperator(partitionAssignment);
-		System.out.println("++++" + assignKeyToOperator);
 	}
 
 	private static Map<Integer, Integer> getAssignKeyToOperator(Map<Integer, List<Integer>> partitionAssignment) {

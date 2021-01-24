@@ -3,11 +3,16 @@ package org.apache.flink.streaming.controlplane.udm;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
 import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 
+import static org.apache.flink.util.Preconditions.checkState;
+
 public class PerformanceEvaluator extends AbstractControlPolicy {
+	private static final Logger LOG = LoggerFactory.getLogger(PerformanceEvaluator.class);
 
 	private final Object object = new Object();
 	private final TestingThread testingThread;
@@ -19,11 +24,13 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 	public final static String TEST_TYPE = "trisk.reconfig.type";
 
 	private final static String REMAP = "remap";
-	private final static String SCALE = "scale";
+	private final static String RESCALE = "rescale";
 	private final static String NOOP = "noop";
 	private final static String EXECUTION_LOGIC = "logic";
 
 	private boolean finished = false;
+
+	private int latestUnusedSubTaskIdx = 0;
 
 	public PerformanceEvaluator(ReconfigurationAPI reconfigurationAPI, Configuration configuration) {
 		super(reconfigurationAPI);
@@ -61,11 +68,12 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 		int numAffectedTasks = Integer.parseInt(experimentConfig.getOrDefault(AFFECTED_TASK, "3"));
 		int reconfigFreq = Integer.parseInt(experimentConfig.getOrDefault(RECONFIG_FREQUENCY, "5"));
 		int testOpID = findOperatorByName(testOperatorName);
-		switch (experimentConfig.getOrDefault(TEST_TYPE, SCALE)) {
+		latestUnusedSubTaskIdx = getInstructionSet().getJobExecutionPlan().getParallelism(testOpID);
+		switch (experimentConfig.getOrDefault(TEST_TYPE, RESCALE)) {
 			case REMAP:
 				measureRebalance(testOpID, numAffectedTasks, reconfigFreq);
 				break;
-			case SCALE:
+			case RESCALE:
 				measureRescale(testOpID, numAffectedTasks, 10, reconfigFreq);
 				break;
 			case EXECUTION_LOGIC:
@@ -82,9 +90,10 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 		if (reconfigFreq > 0) {
 			int timeInterval = 1000 / reconfigFreq;
 			int i = 0;
+			long start;
 			while (true) {
 //			for (int i = 0; i < reconfigFreq; i++) {
-				long start = System.currentTimeMillis();
+				start = System.currentTimeMillis();
 				Map<Integer, List<Integer>> keySet = executionPlan.getKeyStateAllocation(testOpID);
 				Map<Integer, List<Integer>> newKeySet = new HashMap<>();
 				for (Integer taskId : keySet.keySet()) {
@@ -94,13 +103,13 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 				shuffleKeySet(newKeySet, numAffectedTasks);
 				System.out.println("\nnumber of rebalance test: " + i);
 				System.out.println("new key set:" + newKeySet);
+
 				getInstructionSet().rebalance(testOpID, newKeySet, true, this);
 				// wait for operation completed
 				synchronized (object) {
 					object.wait();
 				}
-				while ((System.currentTimeMillis() - start) < timeInterval) {
-				}
+				while ((System.currentTimeMillis() - start) < timeInterval) {}
 				i++;
 			}
 		}
@@ -148,9 +157,10 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 		if (reconfigFreq > 0) {
 			int timeInterval = 1000 / reconfigFreq;
 			int i = 0;
+			long start;
 			while (true) {
 //			for (int i = 0; i < reconfigFreq; i++) {
-				long start = System.currentTimeMillis();
+				start = System.currentTimeMillis();
 				Map<Integer, List<Integer>> keySet = executionPlan.getKeyStateAllocation(testOpID);
 				Map<Integer, List<Integer>> newKeySet = new HashMap<>();
 				for (Integer taskId : keySet.keySet()) {
@@ -159,17 +169,23 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 				Random random = new Random();
 				int current = executionPlan.getParallelism(testOpID);
 				int newParallelism = 1 + random.nextInt(maxParallelism);
+				boolean isScaleOut = true;
 				if (newParallelism > current) {
 					shuffleKeySetWhenScaleOut(newKeySet, newParallelism, numAffectedTasks);
 				} else if (newParallelism < current) {
 //					continue;
 					shuffleKeySetWhenScaleIn(newKeySet, newParallelism, numAffectedTasks);
+					isScaleOut = false;
 				} else {
 					continue;
 				}
 				// random select numAffectedTask sub key set, and then shuffle them to the same number of key set
 				System.out.println("\nnumber of rescale test: " + i);
 				System.out.println("new key set:" + newKeySet);
+
+				LOG.info("++++++number of rescale test: " + i + " type: " + (isScaleOut? "scale_out" : "scale_in"));
+				LOG.info("++++++new key set: " + newKeySet);
+
 				getInstructionSet().rescale(testOpID, newParallelism, newKeySet, this);
 				// wait for operation completed
 				synchronized (object) {
@@ -188,9 +204,10 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 		if (reconfigFreq > 0) {
 			int timeInterval = 1000 / reconfigFreq;
 			int i = 0;
+			long start;
 			while (true) {
 //			for (int i = 0; i < reconfigFreq; i++) {
-				long start = System.currentTimeMillis();
+				start = System.currentTimeMillis();
 				System.out.println("\nnumber of noop test: " + i);
 				getInstructionSet().noOp(testOpID, this);
 				// wait for operation completed
@@ -239,12 +256,12 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 
 	private List<Integer> findNextSubTaskID(Collection<Integer> keySetID, int numOfNext) {
 		List<Integer> next = new LinkedList<>();
-		for (int i = 0; i < numOfNext; i++) {
-			int id = 0;
-			while (keySetID.contains(id) || next.contains(id)) {
-				id++;
-			}
-			next.add(id);
+		int newParallelism = latestUnusedSubTaskIdx + numOfNext;
+		while(latestUnusedSubTaskIdx < newParallelism) {
+			checkState(!keySetID.contains(latestUnusedSubTaskIdx) && !next.contains(latestUnusedSubTaskIdx),
+				"subtask index has already been used.");
+			next.add(latestUnusedSubTaskIdx);
+			latestUnusedSubTaskIdx++;
 		}
 		return next;
 	}

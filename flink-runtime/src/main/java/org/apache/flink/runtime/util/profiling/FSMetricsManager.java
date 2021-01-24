@@ -262,27 +262,28 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 
 	@Override
 	public void groundTruth(int keyGroup, long arrivalTs, long completionTs) {
-		if (completionTs - lastTimeSlot >= 1000) {
-			// print out to stdout, and clear the state
-			Iterator it = kgLatencyMap.entrySet().iterator();
-			while (it.hasNext()) {
-				Map.Entry kv = (Map.Entry)it.next();
-				int curKg = (int) kv.getKey();
-				long sumLatency = (long) kv.getValue();
-				int nRecords = kgNRecordsMap.get(curKg);
-				float avgLatency = (float) sumLatency / nRecords;
-//				System.out.println("timeslot: " + lastTimeSlot + " keygroup: "
-//					+ curKg + " records: " + nRecords + " avglatency: " + avgLatency);
-				System.out.println(String.format(jobVertexId.toString() + " GroundTruth: %d %d %d %f", lastTimeSlot, curKg, nRecords, avgLatency));
-			}
-			kgLatencyMap.clear();
-			kgNRecordsMap.clear();
-			lastTimeSlot = completionTs / 1000 * 1000;
-		}
-		kgNRecordsMap.put(keyGroup,
-			kgNRecordsMap.getOrDefault(keyGroup, 0)+1);
-		kgLatencyMap.put(keyGroup,
-			kgLatencyMap.getOrDefault(keyGroup, 0L)+(completionTs - arrivalTs));
+//		if (completionTs - lastTimeSlot >= 1000) {
+//			// print out to stdout, and clear the state
+//			Iterator it = kgLatencyMap.entrySet().iterator();
+//			while (it.hasNext()) {
+//				Map.Entry kv = (Map.Entry)it.next();
+//				int curKg = (int) kv.getKey();
+//				long sumLatency = (long) kv.getValue();
+//				int nRecords = kgNRecordsMap.get(curKg);
+//				float avgLatency = (float) sumLatency / nRecords;
+////				System.out.println("timeslot: " + lastTimeSlot + " keygroup: "
+////					+ curKg + " records: " + nRecords + " avglatency: " + avgLatency);
+//				System.out.println(String.format(jobVertexId.toString() + " GroundTruth: %d %d %d %f", lastTimeSlot, curKg, nRecords, avgLatency));
+//			}
+//			kgLatencyMap.clear();
+//			kgNRecordsMap.clear();
+//			lastTimeSlot = completionTs / 1000 * 1000;
+//		}
+//		kgNRecordsMap.put(keyGroup,
+//			kgNRecordsMap.getOrDefault(keyGroup, 0)+1);
+//		kgLatencyMap.put(keyGroup,
+//			kgLatencyMap.getOrDefault(keyGroup, 0L)+(completionTs - arrivalTs));
+		outputStreamDecorator.println(String.format("keygroup: %d, latency: %d", keyGroup, (completionTs - arrivalTs)));
 	}
 
 

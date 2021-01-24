@@ -58,6 +58,8 @@ public final class StreamRecord<T> extends StreamElement {
 	public StreamRecord(T value, long timestamp) {
 		this.value = value;
 		this.timestamp = timestamp;
+		this.latencyTimestamp = 0l;
+		this.keyGroup=0;
 		this.hasTimestamp = true;
 	}
 
@@ -199,11 +201,11 @@ public final class StreamRecord<T> extends StreamElement {
 		return "Record @ " + (hasTimestamp ? timestamp : "(undef)") + " : " + value;
 	}
 
-	public long getLatenyTimestamp() {
+	public long getLatencyTimestamp() {
 		return latencyTimestamp;
 	}
 
-	public void setLatenyTimestamp(long latencyTimestamp) {
+	public void setLatencyTimestamp(long latencyTimestamp) {
 		this.latencyTimestamp = latencyTimestamp;
 	}
 
