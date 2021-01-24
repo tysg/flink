@@ -523,6 +523,8 @@ public abstract class SchedulerBase implements SchedulerNG {
 			return false;
 		}
 
+		log.info("++++++ execution vertex id: " + executionVertexId);
+
 		final ExecutionVertex executionVertex = getExecutionVertex(executionVertexId);
 
 		// only notifies FINISHED and FAILED states which are needed at the moment.

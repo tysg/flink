@@ -90,7 +90,7 @@ public class RecordWriterOutput<OUT> implements OperatorChain.WatermarkGaugeExpo
 			return;
 		}
 
-		record.setLatenyTimestamp(System.currentTimeMillis());
+		record.setLatencyTimestamp(System.currentTimeMillis());
 
 		pushToRecordWriter(record);
 	}
@@ -103,7 +103,7 @@ public class RecordWriterOutput<OUT> implements OperatorChain.WatermarkGaugeExpo
 			return;
 		}
 
-		record.setLatenyTimestamp(System.currentTimeMillis());
+		record.setLatencyTimestamp(System.currentTimeMillis());
 
 		pushToRecordWriter(record);
 	}

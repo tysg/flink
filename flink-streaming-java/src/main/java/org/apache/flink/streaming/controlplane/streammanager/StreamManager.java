@@ -352,13 +352,34 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			}
 
 			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
+			final String PREPARE = "prepare timer";
+			final String SYN = "synchronize timer";
+			final String UPDATE_MAPPING = "updateKeyMapping timer";
+			final String UPDATE_STATE = "updateState timer";
 			runAsync(() -> jobMasterGateway.callOperations(
 				enforcement -> FutureUtils.completedVoidFuture()
-					.thenCompose(o -> enforcement.prepareExecutionPlan(jobExecutionPlan))
-					.thenCompose(o -> enforcement.synchronizePauseTasks(affectedTasks, o))
-					.thenCompose(o -> enforcement.updateUpstreamKeyMapping(operatorID, o))
-					.thenCompose(o -> enforcement.updateState(operatorID, o))
-					.thenCompose(o -> enforcement.updateTaskResources(operatorID, oldParallelism))
+					.thenCompose(o -> {
+						reconfigurationProfiler.onOtherStart(PREPARE);
+						return enforcement.prepareExecutionPlan(jobExecutionPlan);
+					})
+					.thenCompose(o -> {
+						reconfigurationProfiler.onOtherEnd(PREPARE);
+						reconfigurationProfiler.onOtherStart(SYN);
+						return enforcement.synchronizePauseTasks(affectedTasks, o);
+					})
+					.thenCompose(o -> {
+						reconfigurationProfiler.onOtherEnd(SYN);
+						reconfigurationProfiler.onOtherStart(UPDATE_MAPPING);
+						return enforcement.updateUpstreamKeyMapping(operatorID, o);
+					})
+					.thenCompose(o -> {
+						reconfigurationProfiler.onOtherEnd(UPDATE_MAPPING);
+						reconfigurationProfiler.onOtherStart(UPDATE_STATE);
+						return enforcement.updateState(operatorID, o);
+					})
+					.thenCompose(o -> {
+						return enforcement.updateTaskResources(operatorID, oldParallelism);
+					})
 					.thenCompose(o -> enforcement.resumeTasks())
 					.whenComplete((o, failure) -> {
 						if (failure != null) {
@@ -366,6 +387,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						}
 						try {
 							System.out.println("++++++ finished update");
+							// TODO: extract the deployment overhead
+							reconfigurationProfiler.onOtherEnd(UPDATE_STATE);
 							this.jobExecutionPlan.notifyUpdateFinished(failure);
 							reconfigurationProfiler.onReconfigurationEnd();
 						} catch (Exception e) {

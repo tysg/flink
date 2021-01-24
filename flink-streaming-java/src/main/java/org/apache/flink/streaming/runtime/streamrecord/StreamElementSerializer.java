@@ -173,7 +173,7 @@ public final class StreamElementSerializer<T> extends TypeSerializer<StreamEleme
 				target.write(TAG_REC_WITHOUT_TIMESTAMP);
 			}
 			target.writeInt(record.getKeyGroup());
-			target.writeLong(record.getLatenyTimestamp());
+			target.writeLong(record.getLatencyTimestamp());
 			typeSerializer.serialize(record.getValue(), target);
 		}
 		else if (value.isWatermark()) {
@@ -204,7 +204,7 @@ public final class StreamElementSerializer<T> extends TypeSerializer<StreamEleme
 			int keyGroup = source.readInt();
 			long latencyTimestamp = source.readLong();
 			StreamRecord record = new StreamRecord<T>(typeSerializer.deserialize(source), timestamp);
-			record.setLatenyTimestamp(latencyTimestamp);
+			record.setLatencyTimestamp(latencyTimestamp);
 			record.setKeyGroup(keyGroup);
 //			return new StreamRecord<T>(typeSerializer.deserialize(source), timestamp);
 			return record;
@@ -213,7 +213,7 @@ public final class StreamElementSerializer<T> extends TypeSerializer<StreamEleme
 			int keyGroup = source.readInt();
 			long latencyTimestamp = source.readLong();
 			StreamRecord record = new StreamRecord<T>(typeSerializer.deserialize(source));
-			record.setLatenyTimestamp(latencyTimestamp);
+			record.setLatencyTimestamp(latencyTimestamp);
 			record.setKeyGroup(keyGroup);
 //			return new StreamRecord<T>(typeSerializer.deserialize(source));
 			return record;
@@ -242,7 +242,7 @@ public final class StreamElementSerializer<T> extends TypeSerializer<StreamEleme
 			T value = typeSerializer.deserialize(source);
 			StreamRecord<T> reuseRecord = reuse.asRecord();
 			reuseRecord.replace(value, timestamp);
-			reuseRecord.setLatenyTimestamp(latencyTimestamp);
+			reuseRecord.setLatencyTimestamp(latencyTimestamp);
 			reuseRecord.setKeyGroup(keyGroup);
 			return reuseRecord;
 		}
@@ -252,7 +252,7 @@ public final class StreamElementSerializer<T> extends TypeSerializer<StreamEleme
 			T value = typeSerializer.deserialize(source);
 			StreamRecord<T> reuseRecord = reuse.asRecord();
 			reuseRecord.replace(value);
-			reuseRecord.setLatenyTimestamp(latencyTimestamp);
+			reuseRecord.setLatencyTimestamp(latencyTimestamp);
 			reuseRecord.setKeyGroup(keyGroup);
 			return reuseRecord;
 		}
