@@ -132,7 +132,7 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 						func = IncreaseCommunicationOverheadMapClass.getConstructor(int.class)
 							.newInstance(random.nextInt(10) + 1);
 					} else {
-						func = IncreaseCommunicationOverheadMapClass.getConstructor(int.class)
+						func = IncreaseComputationOverheadMap.getConstructor(int.class)
 							.newInstance(random.nextInt(10));
 					}
 					System.out.println("\nnumber of function update test: " + i);
