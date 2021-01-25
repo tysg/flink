@@ -42,7 +42,7 @@ public class ReconfigurationProfiler {
 
 	public ReconfigurationProfiler() {
 		try {
-			outputStream = new FileOutputStream("/data/trisk/timer.output");
+			outputStream = new FileOutputStream("/data/flink/trisk/timer.output");
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 			outputStream = System.out;
