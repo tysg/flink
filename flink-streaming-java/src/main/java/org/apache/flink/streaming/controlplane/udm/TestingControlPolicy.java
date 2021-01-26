@@ -206,14 +206,48 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 
 		List<Integer> removedKeys = newKeyStateAllocation.remove(oldParallelism-2);
 		newKeyStateAllocation.get(oldParallelism-1).addAll(removedKeys);
+		removedKeys = newKeyStateAllocation.remove(oldParallelism-1);
+		newKeyStateAllocation.get(0).addAll(removedKeys);
 
 		System.out.println(newKeyStateAllocation);
 
-		getInstructionSet().rescale(testingOpID, oldParallelism-1, newKeyStateAllocation, this);
+		getInstructionSet().rescale(testingOpID, oldParallelism-2, newKeyStateAllocation, this);
 
 		synchronized (object) {
 			object.wait();
 		}
+	}
+
+	private void testScaling(int testingOpID, int newParallelism) throws InterruptedException {
+		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
+
+		Map<Integer, List<Integer>> curKeyStateAllocation = streamJobState.getKeyStateAllocation(testingOpID);
+		int oldParallelism = streamJobState.getParallelism(testingOpID);
+		assert oldParallelism == curKeyStateAllocation.size() : "old parallelism does not match the key set";
+
+		Map<Integer, List<Integer>> newKeyStateAllocation = preparePartitionAssignment(newParallelism);
+
+		int maxParallelism = 128;
+
+		for (int i = 0; i < maxParallelism; i++) {
+			newKeyStateAllocation.get(i%newParallelism).add(i);
+		}
+
+		System.out.println(newKeyStateAllocation);
+
+		getInstructionSet().rescale(testingOpID, newParallelism, newKeyStateAllocation, this);
+
+		synchronized (object) {
+			object.wait();
+		}
+	}
+
+	private Map<Integer, List<Integer>> preparePartitionAssignment(int parallleism) {
+		Map<Integer, List<Integer>> newKeyStateAllocation = new HashMap<>();
+		for (int i = 0; i < parallleism; i++) {
+			newKeyStateAllocation.put(i, new ArrayList<>());
+		}
+		return newKeyStateAllocation;
 	}
 
 	// WARNING: This only works without rebalance of the stateless operator
@@ -418,8 +452,8 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 //				System.out.println("\nstart synchronize source test...");
 //				testPauseSource(sourceOp);
 
-				System.out.println("\nstart stateful scale out test");
-				testScaleOutStateful(statefulOpID);
+//				System.out.println("\nstart stateful scale out test");
+//				testScaleOutStateful(statefulOpID);
 
 				// todo, for some reason. if no sleep here, it may be loss some data
 //				Thread.sleep(3000);
@@ -453,6 +487,13 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 //					System.out.println("\nstart no op frequency test...");
 //					testNoOp(statefulOpID);
 //				}
+
+				testScaling(statefulOpID, 10);
+				testScaling(statefulOpID, 2);
+				testScaling(statefulOpID, 5);
+				testScaling(statefulOpID, 7);
+				testScaling(statefulOpID, 3);
+				testScaling(statefulOpID, 9);
 
 			} catch (InterruptedException e) {
 				e.printStackTrace();
