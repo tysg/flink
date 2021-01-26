@@ -86,7 +86,7 @@ public interface PrimitiveOperation<M> {
 	 * @param destOpID the operator id of destination operator
 	 * @return
 	 */
-	CompletableFuture<M> updateUpstreamKeyMapping(int destOpID, M message);
+	CompletableFuture<M> updateKeyMapping(int destOpID, M message);
 
 	/**
 	 * update the key state in destination operator

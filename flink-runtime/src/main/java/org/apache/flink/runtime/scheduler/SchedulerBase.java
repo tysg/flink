@@ -427,6 +427,10 @@ public abstract class SchedulerBase implements SchedulerNG {
 		return executionGraph.getAllVertices().get(executionVertexId.getJobVertexId()).getTaskVertices()[executionVertexId.getSubtaskIndex()];
 	}
 
+	protected Boolean checkExecutionVertex(final ExecutionVertexID executionVertexId) {
+		return executionGraph.getAllVertices().get(executionVertexId.getJobVertexId()).getTaskVertices().length <= executionVertexId.getSubtaskIndex();
+	}
+
 	protected JobGraph getJobGraph() {
 		return jobGraph;
 	}
@@ -519,11 +523,12 @@ public abstract class SchedulerBase implements SchedulerNG {
 			final TaskExecutionState taskExecutionState) {
 
 		// if executionVertex not in the current ejv, skip, otherwise will have nullpointerexception
-		if (executionGraph.checkValidityOfExecutionState(taskExecutionState)) {
-			return false;
-		}
-
-		log.info("++++++ execution vertex id: " + executionVertexId);
+//		if (!checkExecutionVertex(executionVertexId)) {
+//			log.info("++++++not exists, skip" + executionVertexId);
+//			return false;
+//		}
+//
+//		log.info("++++++ execution vertex id: " + executionVertexId);
 
 		final ExecutionVertex executionVertex = getExecutionVertex(executionVertexId);
 

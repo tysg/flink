@@ -371,7 +371,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					.thenCompose(o -> {
 						reconfigurationProfiler.onOtherEnd(SYN);
 						reconfigurationProfiler.onOtherStart(UPDATE_MAPPING);
-						return enforcement.updateUpstreamKeyMapping(operatorID, o);
+						return enforcement.updateKeyMapping(operatorID, o);
 					})
 					.thenCompose(o -> {
 						reconfigurationProfiler.onOtherEnd(UPDATE_MAPPING);
@@ -442,7 +442,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						.thenCompose(o -> {
 							reconfigurationProfiler.onOtherEnd(SYN);
 							reconfigurationProfiler.onOtherStart(UPDATE_MAPPING);
-							return enforcement.updateUpstreamKeyMapping(operatorID, o);
+							return enforcement.updateKeyMapping(operatorID, o);
 						})
 						.thenCompose(o -> {
 							reconfigurationProfiler.onOtherEnd(UPDATE_MAPPING);
@@ -467,7 +467,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 				runAsync(() -> jobMasterGateway.callOperations(
 					enforcement -> FutureUtils.completedVoidFuture()
 						.thenCompose(o -> enforcement.prepareExecutionPlan(jobExecutionPlan))
-						.thenCompose(o -> enforcement.updateUpstreamKeyMapping(operatorID, o))
+						.thenCompose(o -> enforcement.updateKeyMapping(operatorID, o))
 						.whenComplete((o, failure) -> {
 							if (failure != null) {
 								failure.printStackTrace();

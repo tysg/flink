@@ -976,14 +976,14 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 	public void updateProducedPartitions(RescaleID rescaleId) {
 		// update produced partitions for sync.
 		getVertex().updateRescaleId(rescaleId);
-		for (Map.Entry producedPartition : producedPartitions.entrySet()) {
-			IntermediateResultPartitionID intermediateResultPartitionID = (IntermediateResultPartitionID) producedPartition.getKey();
-			ResultPartitionDeploymentDescriptor resultPartitionDeploymentDescriptor = (ResultPartitionDeploymentDescriptor) producedPartition.getValue();
+		for (Map.Entry<IntermediateResultPartitionID, ResultPartitionDeploymentDescriptor> entry : producedPartitions.entrySet()) {
+			IntermediateResultPartitionID key = entry.getKey();
+			ResultPartitionDeploymentDescriptor resultPartitionDeploymentDescriptor = entry.getValue();
 			// update shuffle descriptor
 			resultPartitionDeploymentDescriptor.getShuffleDescriptor()
 				.updateResultPartitionId(vertex.getRescaleId());
 			// update partition descriptor
-			IntermediateResultPartition intermediateResultPartition = vertex.getProducedPartitions().get(intermediateResultPartitionID);
+			IntermediateResultPartition intermediateResultPartition = vertex.getProducedPartitions().get(key);
 			resultPartitionDeploymentDescriptor.setNumberOfSubpartitions(intermediateResultPartition.getConsumers().get(0).size());
 		}
 	}
@@ -1074,6 +1074,7 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 		RescaleOptions rescaleOptions,
 		@Nullable KeyGroupRange keyGroupRange) throws ExecutionGraphException {
 
+		getVertex().updateRescaleId(rescaleId);
 		vertex.assignKeyGroupRange(keyGroupRange);
 
 		assertRunningInJobMasterMainThread();

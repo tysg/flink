@@ -225,7 +225,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 	 * @return
 	 */
 	@Override
-	public CompletableFuture<Map<Integer, Map<Integer, Diff>>> updateUpstreamKeyMapping(
+	public CompletableFuture<Map<Integer, Map<Integer, Diff>>> updateKeyMapping(
 		int destOpID,
 		@Nonnull Map<Integer, Map<Integer, Diff>> diff) {
 
@@ -252,7 +252,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 				Execution execution = vertex.getCurrentExecutionAttempt();
 				if (execution != null && execution.getState() == ExecutionState.RUNNING) {
 					rescaleCandidatesFutures.add(execution.scheduleRescale(
-						null,
+						rescaleID,
 						RescaleOptions.RESCALE_KEYGROUP_RANGE_ONLY,
 						remappingAssignment.getAlignedKeyGroupRange(subtaskIndex)));
 				} else {
@@ -292,7 +292,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 				Execution execution = vertex.getCurrentExecutionAttempt();
 				if (!vertex.getRescaleId().equals(rescaleID) && execution != null && execution.getState() == ExecutionState.RUNNING) {
 					execution.updateProducedPartitions(rescaleID);
-					updatePartitionsFuture.add(execution.scheduleRescale(null, RescaleOptions.RESCALE_PARTITIONS_ONLY, null));
+					updatePartitionsFuture.add(execution.scheduleRescale(rescaleID, RescaleOptions.RESCALE_PARTITIONS_ONLY, null));
 				}
 			}
 		}
@@ -319,7 +319,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 		for (ExecutionVertex vertex : jobVertex.getTaskVertices()) {
 			Execution execution = vertex.getCurrentExecutionAttempt();
 			if (execution != null && execution.getState() == ExecutionState.RUNNING) {
-				futureList.add(execution.scheduleRescale(null, RescaleOptions.RESCALE_GATES_ONLY, null));
+				futureList.add(execution.scheduleRescale(rescaleID, RescaleOptions.RESCALE_GATES_ONLY, null));
 			}
 		}
 	}
@@ -399,13 +399,13 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 					// for those unmodified tasks, update keygroup range, for those modified tasks, update state.
 					if (!remappingAssignment.isTaskModified(subtaskIndex)) {
 //						try {
-//							System.out.println(operatorID + " update keygroup range at: " + i);
-//							CompletableFuture<Void> stateUpdateFuture = execution.scheduleRescale(null,
+//							System.out.println(operatorID + " update keygroup range at: " + subtaskIndex);
+//							CompletableFuture<Void> stateUpdateFuture = execution.scheduleRescale(rescaleID,
 //								RescaleOptions.RESCALE_KEYGROUP_RANGE_ONLY,
-//								remappingAssignment.getAlignedKeyGroupRange(execution.getParallelSubtaskIndex()));
+//								remappingAssignment.getAlignedKeyGroupRange(subtaskIndex));
 //							if (diffMap.isEmpty()) {
 //								checkNotNull(syncOp, "have you call sync before");
-//								final int taskOffset = i;
+//								final int taskOffset = subtaskIndex;
 //								stateUpdateFuture.thenAccept(
 //									v -> syncOp.resumeTasks(Collections.singletonList(Tuple2.of(operatorID, taskOffset))));
 //							}
@@ -418,7 +418,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 						try {
 							System.out.println(operatorID + " update state at: " + subtaskIndex + " id in model: " + remappingAssignment.getIdInModel(subtaskIndex));
 							CompletableFuture<Void> stateUpdateFuture = execution.scheduleRescale(
-								null,
+								rescaleID,
 								RescaleOptions.RESCALE_STATE_ONLY,
 								remappingAssignment.getAlignedKeyGroupRange(subtaskIndex),
 								remappingAssignment.getIdInModel(subtaskIndex)
@@ -593,7 +593,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 				Execution execution = executionVertex.getCurrentExecutionAttempt();
 				if (execution != null && execution.getState() == ExecutionState.RUNNING) {
 					execution.updateProducedPartitions(rescaleID);
-					futureList.add(execution.scheduleRescale(null, RescaleOptions.PREPARE_ONLY, null));
+					futureList.add(execution.scheduleRescale(rescaleID, RescaleOptions.PREPARE_ONLY, null));
 					notYetAcknowledgedTasks.add(execution.getAttemptId());
 				}
 			}
