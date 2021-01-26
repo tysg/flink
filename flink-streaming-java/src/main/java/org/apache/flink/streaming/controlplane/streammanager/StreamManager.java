@@ -165,7 +165,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 //		this.controlPolicyList.add(new TestingControlPolicy(this));
 		this.controlPolicyList.add(new PerformanceEvaluator(this, streamManagerConfiguration.getConfiguration()));
 
-		reconfigurationProfiler = new ReconfigurationProfiler();
+		reconfigurationProfiler = new ReconfigurationProfiler(streamManagerConfiguration.getConfiguration());
 	}
 
 	/**
@@ -356,6 +356,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			final String SYN = "synchronize timer";
 			final String UPDATE_MAPPING = "updateKeyMapping timer";
 			final String UPDATE_STATE = "updateState timer";
+			log.info("++++++ start update");
 			runAsync(() -> jobMasterGateway.callOperations(
 				enforcement -> FutureUtils.completedVoidFuture()
 					.thenCompose(o -> {
@@ -387,6 +388,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						}
 						try {
 							System.out.println("++++++ finished update");
+							log.info("++++++ finished update");
 							// TODO: extract the deployment overhead
 							reconfigurationProfiler.onOtherEnd(UPDATE_STATE);
 							this.jobExecutionPlan.notifyUpdateFinished(failure);

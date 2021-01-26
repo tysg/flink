@@ -101,7 +101,8 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 
 		OutputStream outputStream;
 		try {
-			outputStream = new FileOutputStream("/data/flink/trisk/" + getJobVertexId() + ".output");
+			String expDir = jobConfiguration.getString("trisk.exp.dir", "/data/flink");
+			outputStream = new FileOutputStream(expDir + "/trisk/" + getJobVertexId() + ".output");
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 			outputStream = System.out;

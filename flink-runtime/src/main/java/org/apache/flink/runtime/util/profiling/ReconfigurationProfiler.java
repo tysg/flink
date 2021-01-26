@@ -18,6 +18,8 @@
 
 package org.apache.flink.runtime.util.profiling;
 
+import org.apache.flink.configuration.Configuration;
+
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
@@ -40,9 +42,10 @@ public class ReconfigurationProfiler {
 	private final Map<String, Timer> otherTimers;
 	OutputStream outputStream;
 
-	public ReconfigurationProfiler() {
+	public ReconfigurationProfiler(Configuration configuration) {
 		try {
-			outputStream = new FileOutputStream("/data/flink/trisk/timer.output");
+			String expDir = configuration.getString("trisk.exp.dir", "/data/flink");
+			outputStream = new FileOutputStream(expDir + "/trisk/timer.output");
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 			outputStream = System.out;
