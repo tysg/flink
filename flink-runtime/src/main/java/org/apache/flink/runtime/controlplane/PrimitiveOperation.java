@@ -57,7 +57,7 @@ public interface PrimitiveOperation<M> {
 	 * @param taskList The list of task id, each id is a tuple which the first element is operator id and the second element is offset
 	 * @return
 	 */
-	CompletableFuture<M> synchronizePauseTasks(List<Tuple2<Integer, Integer>> taskList, M message);
+	CompletableFuture<M> synchronizeTasks(List<Tuple2<Integer, Integer>> taskList, M message);
 
 	/**
 	 * Resume the paused tasks by synchronize.

@@ -1176,7 +1176,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 			}
 			LOG.info("++++++ trigger target vertex rescaling: " + this.toString());
 			// this line is to record the time to redistribute
-//		long start = System.nanoTime();
+			// long start = System.nanoTime();
 
 			try {
 				// update gate

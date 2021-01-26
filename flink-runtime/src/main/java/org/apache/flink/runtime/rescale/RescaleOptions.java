@@ -88,6 +88,6 @@ public class RescaleOptions implements Serializable {
 
 	@Override
 	public String toString() {
-		return "repartition: " + repartition + ", rescale partition: " + scalingPartitions + ", rescale gate: " + scalingGates;
+		return "repartition: " + repartition + ", rescale partition: " + scalingPartitions + ", rescale gate: " + scalingGates + ", updateKeyGroupRange: " + updateKeyGroupRange;
 	}
 }

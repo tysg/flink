@@ -94,7 +94,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 	public final CompletableFuture<Map<Integer, Map<Integer, Diff>>> prepareExecutionPlan(StreamJobExecutionPlan jobExecutionPlan) {
 		rescaleID = RescaleID.generateNextID();
 		Map<Integer, Map<Integer, Diff>> differenceMap = new HashMap<>();
-		for (Iterator<OperatorDescriptor> it = jobExecutionPlan.getAllOperatorDescriptor(); it.hasNext(); ) {
+		for (Iterator<OperatorDescriptor> it = jobExecutionPlan.getAllOperatorDescriptor(); it.hasNext();) {
 			OperatorDescriptor descriptor = it.next();
 			int operatorID = descriptor.getOperatorID();
 			OperatorDescriptor heldDescriptor = heldExecutionPlan.getOperatorDescriptorByID(operatorID);

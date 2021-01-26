@@ -7,7 +7,6 @@ import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
 import org.apache.flink.streaming.api.windowing.triggers.CountTrigger;
 import org.apache.flink.streaming.api.windowing.triggers.PurgingTrigger;
 import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
-import org.apache.flink.streaming.runtime.operators.windowing.WindowOperator;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -205,7 +204,7 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 			newKeyStateAllocation.put(taskId, new ArrayList<>(curKeyStateAllocation.get(taskId)));
 		}
 
-		List<Integer> removedKeys = newKeyStateAllocation.remove(oldParallelism-3);
+		List<Integer> removedKeys = newKeyStateAllocation.remove(oldParallelism-2);
 		newKeyStateAllocation.get(oldParallelism-1).addAll(removedKeys);
 
 		System.out.println(newKeyStateAllocation);
@@ -285,7 +284,7 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 	private void testPauseSource(int sourceID) throws InterruptedException {
 		getInstructionSet().callCustomizeOperations(
 			enforcement -> FutureUtils.completedVoidFuture()
-				.thenCompose(o -> enforcement.synchronizePauseTasks(Collections.singletonList(Tuple2.of(sourceID, -1)), null))
+				.thenCompose(o -> enforcement.synchronizeTasks(Collections.singletonList(Tuple2.of(sourceID, -1)), null))
 				.thenCompose(o -> {
 					try {
 						Thread.sleep(3);
@@ -336,7 +335,7 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 		getInstructionSet().callCustomizeOperations(
 			enforcement -> FutureUtils.completedVoidFuture()
 				.thenCompose(o -> enforcement.prepareExecutionPlan(getInstructionSet().getJobExecutionPlan()))
-				.thenCompose(o -> enforcement.synchronizePauseTasks(Collections.singletonList(Tuple2.of(rawVertexID, -1)), o))
+				.thenCompose(o -> enforcement.synchronizeTasks(Collections.singletonList(Tuple2.of(rawVertexID, -1)), o))
 				.thenCompose(o -> enforcement.updateFunction(rawVertexID, o))
 				.whenComplete((o, failure) -> {
 					if(failure != null){
@@ -419,19 +418,20 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 //				System.out.println("\nstart synchronize source test...");
 //				testPauseSource(sourceOp);
 
-//				System.out.println("\nstart stateful scale out test");
-//				testScaleOutStateful(statefulOpID);
+				System.out.println("\nstart stateful scale out test");
+				testScaleOutStateful(statefulOpID);
 
-//				System.out.println("\nstart stateful scale out test");
-//				testScaleOutStateful2(statefulOpID);
 				// todo, for some reason. if no sleep here, it may be loss some data
 //				Thread.sleep(3000);
 
 //				System.out.println("\nstart stateful scale out 2 more test");
 //				testScaleOutStateful(statelessOpID);
 
-				System.out.println("\nstart stateful scale in test2");
-				testScaleInStateful2(statefulOpID);
+//				System.out.println("\nstart stateful scale in test2");
+//				testScaleInStateful2(statefulOpID);
+//
+//				System.out.println("\nstart stateful scale out test");
+//				testScaleOutStateful2(statefulOpID);
 
 //				System.out.println("\nstart rescale window join test...");
 //				testScaleOutWindowJoin();
@@ -442,11 +442,11 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 //				System.out.println("\nstart update function related test...");
 //				testCustomizeWindowUpdateAPI();
 //
-				System.out.println("\nstart stateful scale in test3");
-				testScaleInStateful2(statefulOpID);
+//				System.out.println("\nstart stateful scale in test3");
+//				testScaleInStateful2(statefulOpID);
 
-				System.out.println("\nstart stateful scale in test4");
-				testScaleInStateful2(statefulOpID);
+//				System.out.println("\nstart stateful scale in test4");
+//				testScaleInStateful2(statefulOpID);
 
 //				while (true) {
 //					sleep(1000/frequency);

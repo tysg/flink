@@ -366,7 +366,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					.thenCompose(o -> {
 						reconfigurationProfiler.onOtherEnd(PREPARE);
 						reconfigurationProfiler.onOtherStart(SYN);
-						return enforcement.synchronizePauseTasks(affectedTasks, o);
+						return enforcement.synchronizeTasks(affectedTasks, o);
 					})
 					.thenCompose(o -> {
 						reconfigurationProfiler.onOtherEnd(SYN);
@@ -437,7 +437,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						.thenCompose(o -> {
 							reconfigurationProfiler.onOtherEnd(PREPARE);
 							reconfigurationProfiler.onOtherStart(SYN);
-							return enforcement.synchronizePauseTasks(affectedTasks, o);
+							return enforcement.synchronizeTasks(affectedTasks, o);
 						})
 						.thenCompose(o -> {
 							reconfigurationProfiler.onOtherEnd(SYN);
@@ -507,7 +507,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					.thenCompose(o -> {
 						reconfigurationProfiler.onOtherEnd(PREPARE);
 						reconfigurationProfiler.onOtherStart(SYN);
-						return enforcement.synchronizePauseTasks(Collections.singletonList(Tuple2.of(operatorID, -1)), o);
+						return enforcement.synchronizeTasks(Collections.singletonList(Tuple2.of(operatorID, -1)), o);
 					})
 					.thenCompose(o -> {
 						reconfigurationProfiler.onOtherEnd(SYN);
@@ -543,7 +543,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 				enforcement -> FutureUtils.completedVoidFuture()
 					.thenCompose(o -> {
 						reconfigurationProfiler.onOtherStart(SYN);
-						return enforcement.synchronizePauseTasks(Collections.singletonList(Tuple2.of(operatorID, -1)), null);
+						return enforcement.synchronizeTasks(Collections.singletonList(Tuple2.of(operatorID, -1)), null);
 					})
 					.thenCompose(o -> {
 						reconfigurationProfiler.onOtherEnd(SYN);
