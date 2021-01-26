@@ -107,6 +107,7 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 			e.printStackTrace();
 			outputStream = System.out;
 		}
+		LOG.info("###### " + getJobVertexId() + " new task created");
 		outputStreamDecorator = new OutputStreamDecorator(outputStream);
 	}
 
@@ -491,8 +492,9 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 //						+ " totalRecordsIn: " + totalRecordsIn + ","
 //						+ " totalRecordsOut: " + totalRecordsOut;
 
+			LOG.info("###### " + getJobVertexId() + ": receive barrier, dump current metrics");
 			outputStreamDecorator.println(ratesLine);
-//			System.out.println(ratesLine);
+			System.out.println(ratesLine);
 
 //			if (taskId.contains("MatchMaker")) {
 //				LOG.info("++++++force update - worker: " + workerName + "-" + instanceId + " keygroups processed:" + keyGroupinput);

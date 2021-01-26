@@ -115,13 +115,14 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 		System.out.println("deploying... tasks of " + operatorID);
 		JobVertexID tgtJobVertexID = rawVertexIDToJobVertexID(operatorID);
 		ExecutionJobVertex tgtJobVertex = executionGraph.getJobVertex(tgtJobVertexID);
+		OperatorWorkloadsAssignment remappingAssignment = workloadsAssignmentHandler.getHeldOperatorWorkloadsAssignment(operatorID);
 		Preconditions.checkNotNull(tgtJobVertex, "can not found this execution job vertex");
 		tgtJobVertex.cleanBeforeRescale();
 
 		Collection<CompletableFuture<Execution>> allocateSlotFutures =
 			new ArrayList<>(tgtJobVertex.getParallelism() - oldParallelism);
 
-		ExecutionVertex[] taskVertices = tgtJobVertex.getTaskVertices();
+//		ExecutionVertex[] taskVertices = tgtJobVertex.getTaskVertices();
 //		List<ExecutionVertex> createdVertex = new ArrayList<>();
 //		for (int i = oldParallelism; i < srcJobVertex.getParallelism(); i++) {
 //			createdVertex.add(taskVertices[i]);
@@ -139,22 +140,22 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 
 			allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(rescaleID));
 		}
-		final SynchronizeOperation syncOp = currentSyncOp;
 		return FutureUtils.combineAll(allocateSlotFutures)
 			.whenComplete((executions, throwable) -> {
 					if (throwable != null) {
 						throwable.printStackTrace();
 						throw new CompletionException(throwable);
 					}
-					System.out.println("allocated resource for new tasks of " + operatorID);
 				}
 			).thenCompose(executions -> {
-					Collection<CompletableFuture<Acknowledge>> deployFutures =
+					Collection<CompletableFuture<Void>> deployFutures =
 						new ArrayList<>(tgtJobVertex.getParallelism() - oldParallelism);
 					for (Execution execution : executions) {
 						try {
 							System.out.println("++++++ deploy: " + execution.getVertex().getID());
-							deployFutures.add(execution.deploy());
+							deployFutures.add(execution.deploy(
+								remappingAssignment.getAlignedKeyGroupRange(execution.getParallelSubtaskIndex()),
+								remappingAssignment.getIdInModel(execution.getParallelSubtaskIndex())));
 						} catch (JobException e) {
 							e.printStackTrace();
 						}
@@ -212,7 +213,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 					checkpointCoordinator.startCheckpointScheduler();
 				}
 
-				return CompletableFuture.completedFuture(checkpointCoordinator);
+				return FutureUtils.waitForAll(removeFutures);
 			});
 		return CompletableFuture.completedFuture(null);
 	}
@@ -246,16 +247,16 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 //			);
 
 			OperatorWorkloadsAssignment remappingAssignment = workloadsAssignmentHandler.getHeldOperatorWorkloadsAssignment(destOpID);
-			for (int i = 0; i < destJobVertex.getParallelism(); i++) {
-				ExecutionVertex vertex = destJobVertex.getTaskVertices()[i];
+			for (int subtaskIndex = 0; subtaskIndex < destJobVertex.getParallelism(); subtaskIndex++) {
+				ExecutionVertex vertex = destJobVertex.getTaskVertices()[subtaskIndex];
 				Execution execution = vertex.getCurrentExecutionAttempt();
 				if (execution != null && execution.getState() == ExecutionState.RUNNING) {
 					rescaleCandidatesFutures.add(execution.scheduleRescale(
 						null,
 						RescaleOptions.RESCALE_KEYGROUP_RANGE_ONLY,
-						remappingAssignment.getAlignedKeyGroupRange(i)));
+						remappingAssignment.getAlignedKeyGroupRange(subtaskIndex)));
 				} else {
-					vertex.assignKeyGroupRange(remappingAssignment.getAlignedKeyGroupRange(i));
+					vertex.assignKeyGroupRange(remappingAssignment.getAlignedKeyGroupRange(subtaskIndex));
 				}
 			}
 			final SynchronizeOperation syncOp = this.currentSyncOp;
@@ -393,10 +394,10 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 		final CompletableFuture<Void> finalUpdateTargetPartitionFuture = updateTargetPartitionFuture;
 		return assignStateFuture.thenCompose(o -> {
 				final List<CompletableFuture<?>> rescaleCandidatesFutures = new ArrayList<>();
-				for (int i = 0; i < executionJobVertex.getParallelism(); i++) {
-					Execution execution = executionJobVertex.getTaskVertices()[i].getCurrentExecutionAttempt();
+				for (int subtaskIndex = 0; subtaskIndex < executionJobVertex.getParallelism(); subtaskIndex++) {
+					Execution execution = executionJobVertex.getTaskVertices()[subtaskIndex].getCurrentExecutionAttempt();
 					// for those unmodified tasks, update keygroup range, for those modified tasks, update state.
-					if (!remappingAssignment.isTaskModified(i)) {
+					if (!remappingAssignment.isTaskModified(subtaskIndex)) {
 //						try {
 //							System.out.println(operatorID + " update keygroup range at: " + i);
 //							CompletableFuture<Void> stateUpdateFuture = execution.scheduleRescale(null,
@@ -415,16 +416,17 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 					}
 					if (execution != null && execution.getState() == ExecutionState.RUNNING) {
 						try {
-							System.out.println(operatorID + " update state at: " + i);
+							System.out.println(operatorID + " update state at: " + subtaskIndex + " id in model: " + remappingAssignment.getIdInModel(subtaskIndex));
 							CompletableFuture<Void> stateUpdateFuture = execution.scheduleRescale(
 								null,
 								RescaleOptions.RESCALE_STATE_ONLY,
-								remappingAssignment.getAlignedKeyGroupRange(execution.getParallelSubtaskIndex())
+								remappingAssignment.getAlignedKeyGroupRange(subtaskIndex),
+								remappingAssignment.getIdInModel(subtaskIndex)
 							);
 							rescaleCandidatesFutures.add(stateUpdateFuture);
 							if (diffMap.isEmpty()) {
 								checkNotNull(syncOp, "have you call sync before?");
-								final int taskOffset = i;
+								final int taskOffset = subtaskIndex;
 								stateUpdateFuture.runAfterBoth(
 									finalUpdateTargetPartitionFuture,
 									() -> syncOp.resumeTasks(Collections.singletonList(Tuple2.of(operatorID, taskOffset)))
