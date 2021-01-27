@@ -235,7 +235,11 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 
 		System.out.println(newKeyStateAllocation);
 
-		getInstructionSet().rescale(testingOpID, newParallelism, newKeyStateAllocation, this);
+		if (oldParallelism == newParallelism) {
+			getInstructionSet().rebalance(testingOpID, newKeyStateAllocation, true, this);
+		} else {
+			getInstructionSet().rescale(testingOpID, newParallelism, newKeyStateAllocation, this);
+		}
 
 		synchronized (object) {
 			object.wait();
@@ -488,12 +492,14 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 //					testNoOp(statefulOpID);
 //				}
 
-				testScaling(statefulOpID, 4);
+//				testScaling(statefulOpID, 4);
 //				testScaling(statefulOpID, 5);
 //				testScaling(statefulOpID, 7);
 //				testScaling(statefulOpID, 3);
 //				testScaling(statefulOpID, 9);
 				testScaling(statefulOpID, 10);
+
+
 
 			} catch (InterruptedException e) {
 				e.printStackTrace();
