@@ -59,6 +59,7 @@ import org.apache.flink.runtime.io.network.partition.ResultPartitionID;
 import org.apache.flink.runtime.io.network.partition.TaskExecutorPartitionInfo;
 import org.apache.flink.runtime.io.network.partition.TaskExecutorPartitionTracker;
 import org.apache.flink.runtime.jobgraph.OperatorID;
+import org.apache.flink.runtime.jobgraph.tasks.AbstractInvokable;
 import org.apache.flink.runtime.jobgraph.tasks.InputSplitProvider;
 import org.apache.flink.runtime.jobmaster.AllocatedSlotInfo;
 import org.apache.flink.runtime.jobmaster.AllocatedSlotReport;
@@ -613,7 +614,8 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 					tdd.getJobId(),
 					tdd.getProducedPartitions(),
 					task.getTerminationFuture());
-				return CompletableFuture.completedFuture(Acknowledge.get());
+
+				return task.getRunningFuture();
 			} else {
 				final String message = "TaskManager already contains a task for id " +
 					task.getExecutionId() + '.';

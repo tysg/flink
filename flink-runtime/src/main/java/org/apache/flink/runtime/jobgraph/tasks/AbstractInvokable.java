@@ -25,6 +25,7 @@ import org.apache.flink.runtime.checkpoint.CheckpointMetrics;
 import org.apache.flink.runtime.checkpoint.CheckpointOptions;
 import org.apache.flink.runtime.execution.Environment;
 import org.apache.flink.runtime.jobgraph.OperatorID;
+import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.state.KeyGroupRange;
 
 import java.util.concurrent.CompletableFuture;
@@ -274,5 +275,9 @@ public abstract class AbstractInvokable {
 
 	public CompletableFuture<Void> finalizeRescale(){
 		throw new UnsupportedOperationException(String.format("updateOperatorConfig not supported by %s", this.getClass().getName()));
+	}
+
+	public void setRunningFuture(CompletableFuture<Acknowledge> runningFuture){
+		runningFuture.complete(Acknowledge.get());
 	}
 }

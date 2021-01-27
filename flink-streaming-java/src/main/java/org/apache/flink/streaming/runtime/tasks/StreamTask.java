@@ -43,6 +43,7 @@ import org.apache.flink.runtime.io.network.partition.consumer.InputGate;
 import org.apache.flink.runtime.io.network.partition.consumer.SingleInputGate;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobgraph.tasks.AbstractInvokable;
+import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.metrics.groups.OperatorMetricGroup;
 import org.apache.flink.runtime.plugable.SerializationDelegate;
 import org.apache.flink.runtime.rescale.TaskRescaleManager;
@@ -193,6 +194,8 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 	 * so that early cancel() before invoke() behaves correctly.
 	 */
 	private volatile boolean isRunning;
+
+	private volatile CompletableFuture<Acknowledge> runningFuture;
 
 	/** Flag to mark this task as canceled. */
 	private volatile boolean canceled;
@@ -483,6 +486,8 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 
 			// let the task do its work
 			isRunning = true;
+			runningFuture.complete(Acknowledge.get());
+
 			runMailboxLoop();
 
 			// if this left the run() method cleanly despite the fact that this was canceled,
@@ -605,6 +610,10 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 			mailboxProcessor.allActionsCompleted();
 			cancelables.close();
 		}
+	}
+
+	public void setRunningFuture(CompletableFuture<Acknowledge> runningFuture){
+		this.runningFuture = runningFuture;
 	}
 
 	public CompletableFuture<Long> updateOperator(Configuration updatedConfig, OperatorID operatorID) {

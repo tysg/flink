@@ -58,6 +58,7 @@ import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobgraph.tasks.AbstractInvokable;
 import org.apache.flink.runtime.jobgraph.tasks.InputSplitProvider;
 import org.apache.flink.runtime.memory.MemoryManager;
+import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.metrics.groups.TaskMetricGroup;
 import org.apache.flink.runtime.query.TaskKvStateRegistry;
 import org.apache.flink.runtime.rescale.RescaleID;
@@ -281,6 +282,8 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 	@Nullable
 	private KeyGroupRange keyGroupRange;
 
+	private CompletableFuture<Acknowledge> runningFuture = new CompletableFuture<>();
+
 	/**
 	 * <p><b>IMPORTANT:</b> This constructor may not start any work that would need to
 	 * be undone in the case of a failing task deployment.</p>
@@ -497,6 +500,10 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 	@VisibleForTesting
 	AbstractInvokable getInvokable() {
 		return invokable;
+	}
+
+	public CompletableFuture<Acknowledge> getRunningFuture() {
+		return runningFuture;
 	}
 
 	@Override
@@ -738,6 +745,7 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 			// make sure the user code classloader is accessible thread-locally
 			executingThread.setContextClassLoader(userCodeClassLoader);
 
+			invokable.setRunningFuture(this.runningFuture);
 			// run the invokable
 			invokable.invoke();
 
@@ -766,6 +774,7 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 		}
 		catch (Throwable t) {
 
+			runningFuture.completeExceptionally(t);
 			// unwrap wrapped exceptions to make stack traces more compact
 			if (t instanceof WrappingRuntimeException) {
 				t = ((WrappingRuntimeException) t).unwrap();
