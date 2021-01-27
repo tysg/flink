@@ -1074,9 +1074,9 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 		RescaleOptions rescaleOptions,
 		@Nullable KeyGroupRange keyGroupRange) throws ExecutionGraphException {
 
-		System.out.println(getVertex() + " : rescale id: " + getVertex().getRescaleId() + " , option: " + rescaleOptions);
+//		System.out.println(getVertex() + " : rescale id: " + getVertex().getRescaleId() + " , option: " + rescaleOptions);
 //		getVertex().updateRescaleId(rescaleId);
-		System.out.println(getVertex() + " : updated rescale id: " + getVertex().getRescaleId());
+//		System.out.println(getVertex() + " : updated rescale id: " + getVertex().getRescaleId());
 		vertex.assignKeyGroupRange(keyGroupRange);
 
 		assertRunningInJobMasterMainThread();

@@ -73,7 +73,7 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 	private HashMap<Integer, Integer> kgNRecordsMap = new HashMap<>(); // keygroup -> nRecords
 	private long lastTimeSlot = 0l;
 
-	private OutputStreamDecorator outputStreamDecorator;
+	private final OutputStreamDecorator outputStreamDecorator;
 
 	/**
 	 * @param taskDescription the String describing the owner operator instance
@@ -193,20 +193,19 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 //				totalRecordsIn += recordsIn;
 //				totalRecordsOut += recordsOut;
 
-				String keyGroupOutput = new String();
+				StringBuilder keyGroupOutput = new StringBuilder();
 				if (!status.outputKeyGroup.isEmpty()) {
 					for (Map.Entry<Integer, Long> entry : status.outputKeyGroupState.entrySet()) {
 						int partitionId = entry.getKey();
-						keyGroupOutput += partitionId + ":"
-							+ status.outputKeyGroup.getOrDefault(partitionId, 0l) + "&";
-						totalRecordsOut += status.outputKeyGroup.getOrDefault(partitionId, 0l);
+						keyGroupOutput.append(partitionId).append(":").append(status.outputKeyGroup.getOrDefault(partitionId, 0L)).append("&");
+						totalRecordsOut += status.outputKeyGroup.getOrDefault(partitionId, 0L);
 					}
-					keyGroupOutput = keyGroupOutput.substring(0, keyGroupOutput.length() - 1);
+					keyGroupOutput = new StringBuilder(keyGroupOutput.substring(0, keyGroupOutput.length() - 1));
 				} else {
-					keyGroupOutput = "0";
+					keyGroupOutput = new StringBuilder("0");
 				}
 
-				String keyGroupinput = new String();
+				String keyGroupinput = "";
 				if (!status.inputKeyGroup.isEmpty()) {
 					for (Map.Entry<Integer, Long> entry : status.inputKeyGroupState.entrySet()) {
 						int partitionId = entry.getKey();
@@ -257,7 +256,7 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 				latency = 0;
 				epoch++;
 				// clear keygroups every time, because we are using delta here
-				status.clearKeygroups();
+//				status.clearKeygroups();
 			}
 		}
 	}
@@ -360,17 +359,16 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 					double observedOutputRate = (recordsOut / (duration / 1000.0)) * 1000;
 	//				totalRecordsOut += recordsOut;
 
-					String keyGroupOutput = new String();
+					StringBuilder keyGroupOutput = new StringBuilder("");
 					if (!status.outputKeyGroup.isEmpty()) {
 						for (Map.Entry<Integer, Long> entry : status.outputKeyGroupState.entrySet()) {
 							int partitionId = entry.getKey();
-							keyGroupOutput += partitionId + ":"
-								+ status.outputKeyGroup.getOrDefault(partitionId, 0l) + "&";
-							totalRecordsOut += status.outputKeyGroup.getOrDefault(partitionId, 0l);
+							keyGroupOutput.append(partitionId).append(":").append(status.outputKeyGroup.getOrDefault(partitionId, 0L)).append("&");
+							totalRecordsOut += status.outputKeyGroup.getOrDefault(partitionId, 0L);
 						}
-						keyGroupOutput = keyGroupOutput.substring(0, keyGroupOutput.length() - 1);
+						keyGroupOutput = new StringBuilder(keyGroupOutput.substring(0, keyGroupOutput.length() - 1));
 					} else {
-						keyGroupOutput = "0";
+						keyGroupOutput = new StringBuilder("0");
 					}
 
 					// log the rates: one file per epoch
@@ -405,7 +403,7 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 					currentWindowStart = 0;
 					epoch++;
 					// clear keygroups for delta
-					status.clearKeygroups();
+//					status.clearKeygroups();
 				}
 			}
 		}
@@ -440,31 +438,28 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 
 			double utilization = (double) usefulTime / duration;
 
-			String keyGroupOutput = new String();
+			StringBuilder keyGroupOutput = new StringBuilder();
 			if (!status.outputKeyGroup.isEmpty()) {
 				for (Map.Entry<Integer, Long> entry : status.outputKeyGroupState.entrySet()) {
 					int partitionId = entry.getKey();
-					keyGroupOutput += partitionId + ":"
-						+ status.outputKeyGroup.getOrDefault(partitionId, 0l) + "&";
-					totalRecordsOut += status.outputKeyGroup.getOrDefault(partitionId, 0l);
+					keyGroupOutput.append(partitionId).append(":").append(status.outputKeyGroup.getOrDefault(partitionId, 0L)).append("&");
+					totalRecordsOut += status.outputKeyGroup.getOrDefault(partitionId, 0L);
 				}
-				keyGroupOutput = keyGroupOutput.substring(0, keyGroupOutput.length() - 1);
+				keyGroupOutput = new StringBuilder(keyGroupOutput.substring(0, keyGroupOutput.length() - 1));
 			} else {
-				keyGroupOutput = "0";
+				keyGroupOutput = new StringBuilder("0");
 			}
 
-			String keyGroupinput = new String();
+			StringBuilder keyGroupinput = new StringBuilder("");
 			if (!status.inputKeyGroup.isEmpty()) {
 				for (Map.Entry<Integer, Long> entry : status.inputKeyGroupState.entrySet()) {
 					int partitionId = entry.getKey();
-					keyGroupinput += partitionId + ":"
-						+ status.inputKeyGroup.getOrDefault(partitionId, 0l) + "&";
-
-					totalRecordsIn += status.inputKeyGroup.getOrDefault(partitionId, 0l);
+					keyGroupinput.append(partitionId).append(":").append(status.inputKeyGroup.getOrDefault(partitionId, 0L)).append("&");
+					totalRecordsIn += status.inputKeyGroup.getOrDefault(partitionId, 0L);
 				}
-				keyGroupinput = keyGroupinput.substring(0, keyGroupinput.length() - 1);
+				keyGroupinput = new StringBuilder(keyGroupinput.substring(0, keyGroupinput.length() - 1));
 			} else {
-				keyGroupinput = "0";
+				keyGroupinput = new StringBuilder("0");
 			}
 
 			// log the rates: one file per epoch

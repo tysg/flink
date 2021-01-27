@@ -488,12 +488,12 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 //					testNoOp(statefulOpID);
 //				}
 
+				testScaling(statefulOpID, 4);
+//				testScaling(statefulOpID, 5);
+//				testScaling(statefulOpID, 7);
+//				testScaling(statefulOpID, 3);
+//				testScaling(statefulOpID, 9);
 				testScaling(statefulOpID, 10);
-				testScaling(statefulOpID, 2);
-				testScaling(statefulOpID, 5);
-				testScaling(statefulOpID, 7);
-				testScaling(statefulOpID, 3);
-				testScaling(statefulOpID, 9);
 
 			} catch (InterruptedException e) {
 				e.printStackTrace();
