@@ -21,6 +21,7 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 	public final static String AFFECTED_TASK = "trisk.reconfig.affected_tasks";
 	public final static String TEST_OPERATOR_NAME = "trisk.reconfig.operator.name";
 	public final static String RECONFIG_FREQUENCY = "trisk.reconfig.frequency";
+	public final static String RECONFIG_INTERVAL = "trisk.reconfig.interval";
 	public final static String TEST_TYPE = "trisk.reconfig.type";
 
 	private final static String REMAP = "remap";
@@ -66,29 +67,31 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 	protected void generateTest() throws InterruptedException {
 		String testOperatorName = experimentConfig.getOrDefault(TEST_OPERATOR_NAME, "filter");
 		int numAffectedTasks = Integer.parseInt(experimentConfig.getOrDefault(AFFECTED_TASK, "3"));
-		int reconfigFreq = Integer.parseInt(experimentConfig.getOrDefault(RECONFIG_FREQUENCY, "5"));
+		int reconfigInterval = Integer.parseInt(experimentConfig.getOrDefault(RECONFIG_INTERVAL, "10000"));
+//		int reconfigFreq = Integer.parseInt(experimentConfig.getOrDefault(RECONFIG_FREQUENCY, "5"));
 		int testOpID = findOperatorByName(testOperatorName);
 		latestUnusedSubTaskIdx = getInstructionSet().getJobExecutionPlan().getParallelism(testOpID);
 		switch (experimentConfig.getOrDefault(TEST_TYPE, RESCALE)) {
 			case REMAP:
-				measureRebalance(testOpID, numAffectedTasks, reconfigFreq);
+				measureRebalance(testOpID, numAffectedTasks, reconfigInterval);
 				break;
 			case RESCALE:
-				measureRescale(testOpID, numAffectedTasks, 10, reconfigFreq);
+				measureRescale(testOpID, numAffectedTasks, 10, reconfigInterval);
 				break;
 			case EXECUTION_LOGIC:
-				measureFunctionUpdate(testOpID, reconfigFreq);
+				measureFunctionUpdate(testOpID, reconfigInterval);
 				break;
 			case NOOP:
-				measureNoOP(testOpID, reconfigFreq);
+				measureNoOP(testOpID, reconfigInterval);
 				break;
 		}
 	}
 
-	private void measureRebalance(int testOpID, int numAffectedTasks, int reconfigFreq) throws InterruptedException {
+	private void measureRebalance(int testOpID, int numAffectedTasks, int reconfigInterval) throws InterruptedException {
 		StreamJobExecutionPlan executionPlan = getInstructionSet().getJobExecutionPlan();
-		if (reconfigFreq > 0) {
-			int timeInterval = 1000 / reconfigFreq;
+		if (reconfigInterval > 0) {
+//			int timeInterval = 1000 / reconfigInterval;
+			int timeInterval = reconfigInterval;
 			int i = 0;
 			long start;
 			while (true) {
@@ -115,14 +118,15 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 		}
 	}
 
-	private void measureFunctionUpdate(int testOpID, int reconfigFreq) throws InterruptedException {
+	private void measureFunctionUpdate(int testOpID, int reconfigInterval) throws InterruptedException {
 		StreamJobExecutionPlan executionPlan = getInstructionSet().getJobExecutionPlan();
 		try {
 			ClassLoader userClassLoader = executionPlan.getUserFunction(testOpID).getClass().getClassLoader();
 			Class IncreaseCommunicationOverheadMapClass = userClassLoader.loadClass("flinkapp.StatefulDemoLongRun$IncreaseCommunicationOverheadMap");
 			Class IncreaseComputationOverheadMap = userClassLoader.loadClass("flinkapp.StatefulDemoLongRun$IncreaseComputationOverheadMap");
-			if (reconfigFreq > 0) {
-				int timeInterval = 1000 / reconfigFreq;
+			if (reconfigInterval > 0) {
+//				int timeInterval = 1000 / reconfigInterval;
+				int timeInterval = reconfigInterval;
 				int i = 0;
 				Random random = new Random();
 				while (true) {
@@ -152,10 +156,11 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 		}
 	}
 
-	private void measureRescale(int testOpID, int numAffectedTasks, int maxParallelism, int reconfigFreq) throws InterruptedException {
+	private void measureRescale(int testOpID, int numAffectedTasks, int maxParallelism, int reconfigInterval) throws InterruptedException {
 		StreamJobExecutionPlan executionPlan = getInstructionSet().getJobExecutionPlan();
-		if (reconfigFreq > 0) {
-			int timeInterval = 1000 / reconfigFreq;
+		if (reconfigInterval > 0) {
+//			int timeInterval = 1000 / reconfigInterval;
+			int timeInterval = reconfigInterval;
 			int i = 0;
 			long start;
 			while (true) {
@@ -199,10 +204,11 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 		}
 	}
 
-	private void measureNoOP(int testOpID, int reconfigFreq) throws InterruptedException {
+	private void measureNoOP(int testOpID, int reconfigInterval) throws InterruptedException {
 		StreamJobExecutionPlan executionPlan = getInstructionSet().getJobExecutionPlan();
-		if (reconfigFreq > 0) {
-			int timeInterval = 1000 / reconfigFreq;
+		if (reconfigInterval > 0) {
+//			int timeInterval = 1000 / reconfigInterval;
+			int timeInterval = reconfigInterval;
 			int i = 0;
 			long start;
 			while (true) {
