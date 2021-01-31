@@ -200,7 +200,7 @@ public class OneInputStreamTask<IN, OUT> extends StreamTask<OUT, OneInputStreamO
 				numRecordsIn.inc();
 
 				metricsManager.incRecordIn(record.getKeyGroup());
-//				metricsManager.groundTruth(record.getKeyGroup(), record.getLatencyTimestamp(), System.currentTimeMillis());
+				metricsManager.groundTruth(record.getKeyGroup(), record.getLatencyTimestamp(), System.currentTimeMillis());
 				endToEndLatency += System.currentTimeMillis() - record.getLatencyTimestamp();
 				recordsProcessed++;
 
