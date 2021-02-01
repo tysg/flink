@@ -117,7 +117,9 @@ public abstract class RecordWriter<T extends IOReadableWritable> implements Avai
 	protected void emit(T record, int targetChannel) throws IOException, InterruptedException {
 		checkErroneous();
 
+		long start = System.nanoTime();
 		serializer.serializeRecord(record);
+		metricsManager.addSerialization(System.nanoTime() - start);
 
 		// Make sure we don't hold onto the large intermediate serialization buffer for too long
 		if (copyFromSerializerToTargetChannel(targetChannel)) {
@@ -134,7 +136,6 @@ public abstract class RecordWriter<T extends IOReadableWritable> implements Avai
 		// copying, so the serialization results can be copied to multiple target buffers.
 
 		metricsManager.incRecordsOut();
-		metricsManager.outputBufferFull(System.nanoTime());
 
 		serializer.reset();
 
@@ -153,8 +154,22 @@ public abstract class RecordWriter<T extends IOReadableWritable> implements Avai
 				break;
 			}
 
+			long bufferStart = System.nanoTime();
+
 			bufferBuilder = requestNewBufferBuilder(targetChannel);
+
+			long bufferEnd = System.nanoTime();
+
+			if (bufferEnd - bufferStart > 0) {
+				// add waiting duration to the MetricsManager
+				metricsManager.addWaitingForWriteBufferDuration(bufferEnd - bufferStart);
+			}
+
 			result = serializer.copyToBufferBuilder(bufferBuilder);
+
+			// inform the MetricsManager that the buffer is full
+			metricsManager.outputBufferFull(System.nanoTime());
+
 		}
 		checkState(!serializer.hasSerializedData(), "All data should be written at once");
 

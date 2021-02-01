@@ -34,6 +34,7 @@ public class ProcessingStatus implements Serializable {
 
 	// the total time spent on serialization for this buffer so far
 	private long serializationDuration;
+	private long deserializationDuration;
 
 	private long outputRecords;
 
@@ -54,6 +55,7 @@ public class ProcessingStatus implements Serializable {
 		processingStart = System.nanoTime();
 		processingEnd = System.nanoTime();
 		serializationDuration = 0;
+		deserializationDuration = 0;
 		waitingForReadBufferDuration = 0;
 		waitingForWriteBufferDuration = 0;
 		outputRecords = 0;
@@ -68,6 +70,7 @@ public class ProcessingStatus implements Serializable {
 		processingStart = System.nanoTime();
 		processingEnd = System.nanoTime();
 		serializationDuration = 0;
+		deserializationDuration = 0;
 		waitingForReadBufferDuration = 0;
 		waitingForWriteBufferDuration = 0;
 		outputRecords = 0;
@@ -109,8 +112,16 @@ public class ProcessingStatus implements Serializable {
 		return serializationDuration;
 	}
 
+	long getDeserializationDuration() {
+		return deserializationDuration;
+	}
+
 	void addSerialization(long duration) {
 		serializationDuration += duration;
+	}
+
+	void addDeserialization(long duration) {
+		deserializationDuration += duration;
 	}
 
 	long getWaitingForWriteBufferDuration() {
@@ -131,6 +142,7 @@ public class ProcessingStatus implements Serializable {
 
 	void clearCounters() {
 		serializationDuration = 0;
+		deserializationDuration = 0;
 		waitingForWriteBufferDuration = 0;
 		waitingForReadBufferDuration = 0;
 		outputRecords = 0;

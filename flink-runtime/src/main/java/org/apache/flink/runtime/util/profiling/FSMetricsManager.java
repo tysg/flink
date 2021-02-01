@@ -168,9 +168,11 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 			// aggregate the metrics
 			recordsIn += numRecords;
 			recordsOut += status.getNumRecordsOut();
-			usefulTime += processing + deserializationDuration;
-	//			usefulTime += processing + status.getSerializationDuration()
-	//				- status.getWaitingForWriteBufferDuration();
+//			usefulTime += processing + deserializationDuration;
+//				usefulTime += processing + status.getSerializationDuration()
+//					- status.getWaitingForWriteBufferDuration();
+			usefulTime += processing + status.getSerializationDuration() + status.getDeserializationDuration()
+				- status.getWaitingForWriteBufferDuration();
 
 			latency += endToEndLatency;
 
@@ -181,10 +183,10 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 			if (timestamp - currentWindowStart > windowSize) {
 				// compute rates
 				long duration = timestamp - currentWindowStart;
-				double trueProcessingRate = (recordsIn / (usefulTime / 1000.0)) * 1000;
-				double trueOutputRate = (recordsOut / (usefulTime / 1000.0)) * 1000;
-				double observedProcessingRate = (recordsIn / (duration / 1000.0)) * 1000;
-				double observedOutputRate = (recordsOut / (duration / 1000.0)) * 1000;
+				double trueProcessingRate = (recordsIn / (usefulTime / 1000.0)) * 1000000;
+				double trueOutputRate = (recordsOut / (usefulTime / 1000.0)) * 1000000;
+				double observedProcessingRate = (recordsIn / (duration / 1000.0)) * 1000000;
+				double observedOutputRate = (recordsOut / (duration / 1000.0)) * 1000000;
 				float endToEndLantecy = (float) latency/recordsIn;
 
 				double utilization = (double) usefulTime / duration;
@@ -205,18 +207,17 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 					keyGroupOutput = new StringBuilder("0");
 				}
 
-				String keyGroupinput = "";
+				StringBuilder keyGroupinput = new StringBuilder();
 				if (!status.inputKeyGroup.isEmpty()) {
 					for (Map.Entry<Integer, Long> entry : status.inputKeyGroupState.entrySet()) {
 						int partitionId = entry.getKey();
-						keyGroupinput += partitionId + ":"
-							+ status.inputKeyGroup.getOrDefault(partitionId, 0l) + "&";
+						keyGroupinput.append(partitionId).append(":").append(status.inputKeyGroup.getOrDefault(partitionId, 0L)).append("&");
 
-						totalRecordsIn += status.inputKeyGroup.getOrDefault(partitionId, 0l);
+						totalRecordsIn += status.inputKeyGroup.getOrDefault(partitionId, 0L);
 					}
-					keyGroupinput = keyGroupinput.substring(0, keyGroupinput.length() - 1);
+					keyGroupinput = new StringBuilder(keyGroupinput.substring(0, keyGroupinput.length() - 1));
 				} else {
-					keyGroupinput = "0";
+					keyGroupinput = new StringBuilder("0");
 				}
 
 				// log the rates: one file per epoch
@@ -239,8 +240,9 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 						+ workerName + "-" + instanceId + ","
 //						+ " trueProcessingRate: " + trueProcessingRate + ","
 						+ " observedProcessingRate: " + observedProcessingRate + ","
-						+ " endToEndLantecy: " + endToEndLantecy;
-//						+ ","
+						+ " endToEndLantecy: " + endToEndLantecy + ","
+						+ " trueProcessingRate: " + trueProcessingRate + ","
+						+ " utilization: " + String.format("%.2f", utilization);
 //						+ " totalRecordsIn: " + totalRecordsIn + ","
 //						+ " totalRecordsOut: " + totalRecordsOut;
 
@@ -284,7 +286,7 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 //			kgNRecordsMap.getOrDefault(keyGroup, 0)+1);
 //		kgLatencyMap.put(keyGroup,
 //			kgLatencyMap.getOrDefault(keyGroup, 0L)+(completionTs - arrivalTs));
-		outputStreamDecorator.println(String.format("keygroup: %d, latency: %d", keyGroup, (completionTs - arrivalTs)));
+//		outputStreamDecorator.println(String.format("keygroup: %d, latency: %d", keyGroup, (completionTs - arrivalTs)));
 	}
 
 
@@ -301,6 +303,11 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 	@Override
 	public void addSerialization(long serializationDuration) {
 		status.addSerialization(serializationDuration);
+	}
+
+	@Override
+	public void addDeserialization(long deserializationDuration) {
+		status.addDeserialization(deserializationDuration);
 	}
 
 	@Override
@@ -355,8 +362,8 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 					// compute rates
 					long duration = timestamp - currentWindowStart;
 					usefulTime = duration - waitingTime;
-					double trueOutputRate = (recordsOut / (usefulTime / 1000.0)) * 1000;
-					double observedOutputRate = (recordsOut / (duration / 1000.0)) * 1000;
+					double trueOutputRate = (recordsOut / (usefulTime / 1000.0)) * 1000000;
+					double observedOutputRate = (recordsOut / (duration / 1000.0)) * 1000000;
 	//				totalRecordsOut += recordsOut;
 
 					StringBuilder keyGroupOutput = new StringBuilder("");
@@ -392,7 +399,8 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 					String ratesLine = jobVertexId + ","
 						+ workerName + "-" + instanceId + ","
 						+ " observedOutputRate: " + observedOutputRate + ","
-						+ " totalRecordsOut: " + totalRecordsOut;
+						+ " totalRecordsOut: " + totalRecordsOut + ","
+						+ " trueOutputRate: " + trueOutputRate;
 
 					outputStreamDecorator.println(ratesLine);
 

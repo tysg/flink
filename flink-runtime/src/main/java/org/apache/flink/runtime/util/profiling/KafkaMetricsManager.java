@@ -314,6 +314,11 @@ public class KafkaMetricsManager implements Serializable, MetricsManager {
 	}
 
 	@Override
+	public void addDeserialization(long deserializationDuration) {
+
+	}
+
+	@Override
 	public void incRecordsOut() {
 		status.incRecordsOut();
 	}

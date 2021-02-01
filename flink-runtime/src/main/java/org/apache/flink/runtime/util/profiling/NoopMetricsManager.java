@@ -30,6 +30,11 @@ public class NoopMetricsManager implements Serializable, MetricsManager {
 	}
 
 	@Override
+	public void addDeserialization(long deserializationDuration) {
+
+	}
+
+	@Override
 	public void incRecordsOut() {
 
 	}

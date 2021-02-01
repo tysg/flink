@@ -204,15 +204,18 @@ public class OneInputStreamTask<IN, OUT> extends StreamTask<OUT, OneInputStreamO
 				endToEndLatency += System.currentTimeMillis() - record.getLatencyTimestamp();
 				recordsProcessed++;
 
-				metricsManager.inputBufferConsumed(System.nanoTime(),
-					deserializationDuration, processingDuration,
-					recordsProcessed, endToEndLatency);
-
 				operator.setKeyContextElement1(record);
 //				if (metricsManager instanceof KafkaMetricsManager) {
 //					System.out.println(metricsManager.getJobVertexId() + ": processing record: " + record.toString() + " keygroup: " + record.getKeyGroup());
 //				}
+
+				long processingStart = System.nanoTime();
 				operator.processElement(record);
+				processingDuration += System.nanoTime() - processingStart;
+
+				metricsManager.inputBufferConsumed(System.nanoTime(),
+					deserializationDuration, processingDuration,
+					recordsProcessed, endToEndLatency);
 
 				// TODO: by far, we only need to measure the latency and throughput, other things are left for future measurement
 				processingDuration = 0;

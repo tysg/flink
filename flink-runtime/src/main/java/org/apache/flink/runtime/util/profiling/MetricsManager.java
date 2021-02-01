@@ -9,6 +9,8 @@ public interface MetricsManager {
 
 	void addSerialization(long serializationDuration);
 
+	void addDeserialization(long deserializationDuration);
+
 	void incRecordsOut();
 
 	void incRecordsOutKeyGroup(int targetKeyGroup);

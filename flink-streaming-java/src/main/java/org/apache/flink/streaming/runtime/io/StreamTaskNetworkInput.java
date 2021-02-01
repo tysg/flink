@@ -135,7 +135,10 @@ public final class StreamTaskNetworkInput<T> implements StreamTaskInput<T> {
 		while (true) {
 			// get the stream element from the deserializer
 			if (currentRecordDeserializer != null) {
+				long start = System.nanoTime();
 				DeserializationResult result = currentRecordDeserializer.getNextRecord(deserializationDelegate);
+				metricsManager.addDeserialization(System.nanoTime() - start);
+
 				if (result.isBufferConsumed()) {
 					currentRecordDeserializer.getCurrentBuffer().recycleBuffer();
 					currentRecordDeserializer = null;
@@ -189,6 +192,9 @@ public final class StreamTaskNetworkInput<T> implements StreamTaskInput<T> {
 				"currentRecordDeserializer has already been released");
 
 			currentRecordDeserializer.setNextBuffer(bufferOrEvent.getBuffer());
+
+			// inform the MetricsManager that we got a new input buffer
+			metricsManager.newInputBuffer(System.nanoTime());
 		}
 		else {
 			// Event received
