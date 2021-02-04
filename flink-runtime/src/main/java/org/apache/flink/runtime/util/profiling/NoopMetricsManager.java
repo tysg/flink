@@ -65,6 +65,11 @@ public class NoopMetricsManager implements Serializable, MetricsManager {
 	}
 
 	@Override
+	public void groundTruth(int keyGroup, long latency) {
+
+	}
+
+	@Override
 	public void outputBufferFull(long timestamp) {
 
 	}

@@ -199,29 +199,30 @@ public class OneInputStreamTask<IN, OUT> extends StreamTask<OUT, OneInputStreamO
 			synchronized (lock) {
 				numRecordsIn.inc();
 
-				metricsManager.incRecordIn(record.getKeyGroup());
-				metricsManager.groundTruth(record.getKeyGroup(), record.getLatencyTimestamp(), System.currentTimeMillis());
-				endToEndLatency += System.currentTimeMillis() - record.getLatencyTimestamp();
-				recordsProcessed++;
+//				metricsManager.incRecordIn(record.getKeyGroup());
+//
+//				recordsProcessed++;
 
 				operator.setKeyContextElement1(record);
-//				if (metricsManager instanceof KafkaMetricsManager) {
-//					System.out.println(metricsManager.getJobVertexId() + ": processing record: " + record.toString() + " keygroup: " + record.getKeyGroup());
-//				}
+
+				long queuingDelay = System.currentTimeMillis() - record.getLatencyTimestamp();
 
 				long processingStart = System.nanoTime();
 				operator.processElement(record);
 				processingDuration += System.nanoTime() - processingStart;
 
-				metricsManager.inputBufferConsumed(System.nanoTime(),
-					deserializationDuration, processingDuration,
-					recordsProcessed, endToEndLatency);
+				metricsManager.groundTruth(record.getKeyGroup(), processingDuration + queuingDelay);
+//				endToEndLatency += System.currentTimeMillis() - record.getLatencyTimestamp();
+
+//				metricsManager.inputBufferConsumed(System.nanoTime(),
+//					deserializationDuration, processingDuration,
+//					recordsProcessed, endToEndLatency);
 
 				// TODO: by far, we only need to measure the latency and throughput, other things are left for future measurement
-				processingDuration = 0;
-				recordsProcessed = 0;
-				endToEndLatency = 0;
-				deserializationDuration = 0;
+//				processingDuration = 0;
+//				recordsProcessed = 0;
+//				endToEndLatency = 0;
+//				deserializationDuration = 0;
 			}
 		}
 
