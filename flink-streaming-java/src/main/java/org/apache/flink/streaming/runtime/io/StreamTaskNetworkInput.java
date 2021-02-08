@@ -191,11 +191,15 @@ public final class StreamTaskNetworkInput<T> implements StreamTaskInput<T> {
 		if (recordOrMark.isRecord()){
 			StreamRecord<T> record = recordOrMark.asRecord();
 			metricsManager.incRecordIn(record.getKeyGroup());
-			endToEndLatency += System.currentTimeMillis() - record.getLatencyTimestamp();
+			long queuingDelay = System.currentTimeMillis() - record.getLatencyTimestamp();
 			long processingStart = System.nanoTime();
 			output.emitRecord(record);
 			recordsProcessed++;
-			processingDuration += System.nanoTime() - processingStart;
+			long processingDelay = System.nanoTime() - processingStart;
+			processingDuration += processingDelay;
+			long latency = queuingDelay + processingDelay/1000000;
+			endToEndLatency += latency;
+			metricsManager.groundTruth(record.getKeyGroup(), latency);
 		} else if (recordOrMark.isWatermark()) {
 			statusWatermarkValve.inputWatermark(recordOrMark.asWatermark(), lastChannel);
 		} else if (recordOrMark.isLatencyMarker()) {

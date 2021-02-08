@@ -205,13 +205,14 @@ public class OneInputStreamTask<IN, OUT> extends StreamTask<OUT, OneInputStreamO
 
 				operator.setKeyContextElement1(record);
 
-				long queuingDelay = System.currentTimeMillis() - record.getLatencyTimestamp();
+//				long queuingDelay = System.currentTimeMillis() - record.getLatencyTimestamp();
 
-				long processingStart = System.nanoTime();
+//				long processingStart = System.nanoTime();
+//				long processingStart = System.currentTimeMillis();
 				operator.processElement(record);
-				processingDuration += System.nanoTime() - processingStart;
+//				long processingDelay = System.currentTimeMillis() - processingStart;
 
-				metricsManager.groundTruth(record.getKeyGroup(), processingDuration + queuingDelay);
+//				metricsManager.groundTruth(record.getKeyGroup(), processingDelay + queuingDelay);
 //				endToEndLatency += System.currentTimeMillis() - record.getLatencyTimestamp();
 
 //				metricsManager.inputBufferConsumed(System.nanoTime(),

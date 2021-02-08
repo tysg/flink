@@ -168,7 +168,6 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 			// aggregate the metrics
 			recordsIn += numRecords;
 			latency += endToEndLatency;
-			outputStreamDecorator.println(latency + " - " + endToEndLatency);
 			recordsOut += status.getNumRecordsOut();
 //			usefulTime += processing + deserializationDuration;
 //				usefulTime += processing + status.getSerializationDuration()
@@ -177,7 +176,8 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 //				+ status.getDeserializationDuration()
 				- status.getWaitingForWriteBufferDuration();
 
-
+//			outputStreamDecorator.println(String.format("%d+%d+%d-%d",
+//				processing, status.getSerializationDuration(), deserializationDuration, status.getWaitingForWriteBufferDuration()));
 
 			// clear status counters
 			status.clearCounters();
@@ -242,10 +242,11 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 
 					String ratesLine = jobVertexId + ","
 						+ workerName + "-" + instanceId + ","
-//						+ " trueProcessingRate: " + trueProcessingRate + ","
 						+ " observedProcessingRate: " + observedProcessingRate + ","
-						+ " endToEndLantecy: " + endToEndLantecy + ","
 						+ " trueProcessingRate: " + trueProcessingRate + ","
+//						+ " observedOutputRate: " + observedOutputRate + ","
+//						+ " trueOutputRate: " + trueOutputRate + ","
+						+ " endToEndLantecy: " + endToEndLantecy + ","
 						+ " utilization: " + String.format("%.2f", utilization);
 //						+ " totalRecordsIn: " + totalRecordsIn + ","
 //						+ " totalRecordsOut: " + totalRecordsOut;
@@ -497,8 +498,9 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 			String ratesLine = jobVertexId + ","
 				+ workerName + "-" + instanceId + ","
 //						+ " trueProcessingRate: " + trueProcessingRate + ","
-				+ " observedProcessingRate: " + observedProcessingRate + ","
-				+ " endToEndLantecy: " + endToEndLantecy;
+				+ " observedProcessingRate: " + observedProcessingRate;
+//				+ ","
+//				+ " endToEndLantecy: " + endToEndLantecy;
 //						+ ","
 //						+ " totalRecordsIn: " + totalRecordsIn + ","
 //						+ " totalRecordsOut: " + totalRecordsOut;
