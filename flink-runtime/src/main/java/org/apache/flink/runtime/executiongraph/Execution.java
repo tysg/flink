@@ -1090,8 +1090,11 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 
 		try {
 			if (LOG.isInfoEnabled()) {
-				LOG.info(String.format("Deploying %s (attempt #%d) to %s", vertex.getTaskNameWithSubtaskIndex(),
-					attemptNumber, getAssignedResourceLocation()));
+				LOG.info(String.format("SechduleRescaling %s rescale option: %s", vertex.getTaskNameWithSubtaskIndex(), rescaleOptions));
+			}
+
+			if (rescaleOptions.isRepartition()) {
+				Preconditions.checkNotNull(taskRestore, "task restore should not be null");
 			}
 
 			final TaskDeploymentDescriptor deployment = TaskDeploymentDescriptorFactory

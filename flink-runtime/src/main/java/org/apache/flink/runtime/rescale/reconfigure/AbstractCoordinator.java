@@ -40,7 +40,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 
 	// fields for deploy cancel tasks, OperatorID -> created/removed candidates
 	protected volatile Map<Integer, List<ExecutionVertex>> removedCandidates;
-	protected volatile Map<Integer, List<ExecutionVertex>> createCandidates;
+	protected volatile Map<Integer, List<ExecutionVertex>> createdCandidates;
 
 	// rescaleID should be maintained to identify number of reconfiguration that has been applied
 	protected volatile RescaleID rescaleID;
@@ -51,7 +51,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 		this.executionGraph = executionGraph;
 		this.userCodeClassLoader = executionGraph.getUserClassLoader();
 		this.removedCandidates = new HashMap<>();
-		this.createCandidates = new HashMap<>();
+		this.createdCandidates = new HashMap<>();
 	}
 
 	public void setStreamRelatedInstanceFactory(StreamRelatedInstanceFactory streamRelatedInstanceFactory) {
@@ -187,7 +187,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 		// TODO: when doing scale out/in, we need to update the checkpointCoordinator accordingly
 		if (oldParallelism < targetJobVertex.getParallelism()) {
 			// scale out, we assume every time only one scale out will be called. Otherwise it will subsitute current candidates
-			this.createCandidates.put(rawVertexID, targetVertex.scaleOut(executionGraph.getRpcTimeout(), executionGraph.getGlobalModVersion(), System.currentTimeMillis()));
+			this.createdCandidates.put(rawVertexID, targetVertex.scaleOut(executionGraph.getRpcTimeout(), executionGraph.getGlobalModVersion(), System.currentTimeMillis()));
 
 			for (JobVertexID downstreamID : updatedDownstream) {
 				ExecutionJobVertex downstream = executionGraph.getJobVertex(downstreamID);

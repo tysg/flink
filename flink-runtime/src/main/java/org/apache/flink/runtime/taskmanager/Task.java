@@ -70,6 +70,7 @@ import org.apache.flink.runtime.shuffle.ShuffleIOOwnerContext;
 import org.apache.flink.runtime.state.CheckpointListener;
 import org.apache.flink.runtime.state.KeyGroupRange;
 import org.apache.flink.runtime.state.TaskStateManager;
+import org.apache.flink.runtime.state.TaskStateManagerImpl;
 import org.apache.flink.runtime.taskexecutor.BackPressureSampleableTask;
 import org.apache.flink.runtime.taskexecutor.GlobalAggregateManager;
 import org.apache.flink.runtime.taskexecutor.KvStateService;
@@ -1273,17 +1274,21 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 
 	public void assignNewState(KeyGroupRange keyGroupRange, int idInModel, JobManagerTaskRestore taskRestore) {
 		try {
+			LOG.info("++++++ assign new state");
 			taskStateManager.updateTaskRestore(taskRestore);
-		}catch (NullPointerException e){
+		} catch (NullPointerException e){
 			e.printStackTrace();
+			LOG.error("++++++ rescaleTask err", e);
 			System.err.println("may not generate state now or it is a stateless task");
-		}finally {
+		} finally {
+			LOG.info("++++++ reinitialize state");
 			invokable.reinitializeState(keyGroupRange, idInModel);
 			taskRescaleManager.finish();
 		}
 	}
 
 	public void updateKeyGroupRange(KeyGroupRange keyGroupRange) {
+		LOG.info("++++++ update keyGroupRange : " + keyGroupRange);
 		// it is better to keep those two be consistent.
 		this.keyGroupRange = keyGroupRange;
 		invokable.updateKeyGroupRange(keyGroupRange);

@@ -13,7 +13,6 @@ import org.apache.flink.runtime.executiongraph.*;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
-import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.rescale.RescaleID;
 import org.apache.flink.runtime.rescale.RescaleOptions;
 import org.apache.flink.runtime.rescale.RescalepointAcknowledgeListener;
@@ -63,6 +62,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 		// we should first check if the tasks is stateless
 		// if stateless, do not need to synchronize,
 		System.out.println("start synchronizing..." + taskList);
+		LOG.info("++++++ start synchronizing..." + taskList);
 		// stateful tasks, inject barrier
 		SynchronizeOperation syncOp = new SynchronizeOperation(taskList);
 		try {
@@ -113,6 +113,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 	public CompletableFuture<Void> deployTasks(int operatorID, int oldParallelism) {
 		// TODO: add the task to the checkpointCoordinator
 		System.out.println("deploying... tasks of " + operatorID);
+		LOG.info("++++++ deploying tasks" + operatorID);
 		JobVertexID jobVertexID = rawVertexIDToJobVertexID(operatorID);
 		ExecutionJobVertex jobVertex = executionGraph.getJobVertex(jobVertexID);
 		OperatorWorkloadsAssignment remappingAssignment = workloadsAssignmentHandler.getHeldOperatorWorkloadsAssignment(operatorID);
@@ -134,7 +135,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 //			Execution executionAttempt = taskVertices[i].getCurrentExecutionAttempt();
 //			allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(rescaleID));
 //		}
-		for (ExecutionVertex vertex : createCandidates.get(operatorID)) {
+		for (ExecutionVertex vertex : createdCandidates.get(operatorID)) {
 			Execution executionAttempt = vertex.getCurrentExecutionAttempt();
 			allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(rescaleID));
 		}
@@ -163,7 +164,11 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 			).thenCompose(executions -> {
 				CheckpointCoordinator checkpointCoordinator = executionGraph.getCheckpointCoordinator();
 				checkNotNull(checkpointCoordinator);
-				checkpointCoordinator.addVertices(createCandidates.get(operatorID).toArray(new ExecutionVertex[0]), false);
+				checkpointCoordinator.addVertices(createdCandidates.get(operatorID).toArray(new ExecutionVertex[0]), false);
+
+				// clear all created candidates
+				createdCandidates.get(operatorID).clear();
+
 				// only deploy success that downstream task could start receiving data in its input gates
 				return updateDownstreamGates(operatorID);
 			});
@@ -191,6 +196,8 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 //		return FutureUtils.completeAll(removeFutures)
 //			.thenCompose(o -> updateDownstreamGates(operatorID));
 
+		LOG.info("++++++ canceling tasks" + operatorID);
+
 		updateDownstreamGates(operatorID)
 			.thenCompose(executions -> {
 				Collection<CompletableFuture<?>> removeFutures =
@@ -211,6 +218,9 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 					checkpointCoordinator.startCheckpointScheduler();
 				}
 
+				// clear all removed candidates
+				removedCandidates.get(operatorID).clear();
+
 				return FutureUtils.waitForAll(removeFutures);
 			});
 		return CompletableFuture.completedFuture(null);
@@ -228,6 +238,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 		@Nonnull Map<Integer, Map<Integer, Diff>> diff) {
 
 		System.out.println("update mapping...");
+		LOG.info("++++++ update Key Mapping");
 		final List<CompletableFuture<Void>> rescaleCandidatesFutures = new ArrayList<>();
 		try {
 			for (OperatorDescriptor upstreamOperator : heldExecutionPlan.getOperatorDescriptorByID(targetOperatorID).getParents()) {
@@ -334,6 +345,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 		Map<Integer, Map<Integer, AbstractCoordinator.Diff>> diff) {
 
 		System.out.println("update state...");
+		LOG.info("++++++ update State");
 		checkNotNull(currentSyncOp, "have you call sync before");
 		final SynchronizeOperation syncOp = this.currentSyncOp;
 
@@ -383,7 +395,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 				// think about latter
 				stateAssignmentOperation.setRedistributeStrategy(remappingAssignment);
 
-//				LOG.info("++++++ start to assign states");
+				LOG.info("++++++ start to assign states " + state);
 				stateAssignmentOperation.assignStates();
 				// can safely sync the some old parameters because all modifications in JobMaster is completed.
 				executionJobVertex.syncOldConfigInfo();
@@ -552,6 +564,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 					// this is source task vertex
 					affectedExecutionPrepareSyncFutures.add(pauseSourceStreamTask(executionJobVertex, operatedVertex));
 				} else {
+					// sync affected existing tasks
 					operatedVertex.stream()
 						.map(ExecutionVertex::getCurrentExecutionAttempt)
 						.filter(execution -> execution != null &&
@@ -563,6 +576,16 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 						);
 				}
 			}
+
+			// sync tasks to be removed in the new configuration
+			for (Map.Entry<Integer, List<ExecutionVertex>> entry : removedCandidates.entrySet()) {
+				for (ExecutionVertex vertex :  entry.getValue()) {
+					Execution execution = vertex.getCurrentExecutionAttempt();
+					affectedExecutionPrepareSyncFutures.add(execution.scheduleForInterTaskSync(TaskOperatorManager.NEED_SYNC_REQUEST));
+					notYetAcknowledgedTasks.add(execution.getAttemptId());
+				}
+			}
+
 			// make affected task prepare synchronization
 			FutureUtils.completeAll(affectedExecutionPrepareSyncFutures)
 				.thenRunAsync(() -> {
@@ -653,10 +676,13 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 								CheckpointCoordinator checkpointCoordinator = executionGraph.getCheckpointCoordinator();
 								checkNotNull(checkpointCoordinator);
 								if (checkpointCoordinator.isPeriodicCheckpointingConfigured()) {
+									LOG.info("++++++ resume checkpoint coordinator");
 									checkpointCoordinator.startCheckpointScheduler();
 								}
 
+								LOG.info("++++++ received operator states" + checkpoint.getOperatorStates() + " : " + finishedFuture);
 								finishedFuture.complete(new HashMap<>(checkpoint.getOperatorStates()));
+								LOG.info("++++++ after received " + finishedFuture);
 							}
 						}
 					} catch (Exception e) {
