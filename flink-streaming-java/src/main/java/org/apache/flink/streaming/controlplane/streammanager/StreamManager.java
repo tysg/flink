@@ -41,6 +41,7 @@ import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.registration.RegistrationResponse;
 import org.apache.flink.runtime.rescale.JobRescaleAction;
 import org.apache.flink.runtime.rescale.reconfigure.AbstractCoordinator;
+import org.apache.flink.runtime.rescale.reconfigure.ReconfigurationCoordinator;
 import org.apache.flink.runtime.resourcemanager.JobLeaderIdActions;
 import org.apache.flink.runtime.resourcemanager.JobLeaderIdService;
 import org.apache.flink.runtime.resourcemanager.registration.JobManagerRegistration;
@@ -63,6 +64,8 @@ import org.apache.flink.streaming.controlplane.udm.DummyController;
 import org.apache.flink.streaming.controlplane.udm.PerformanceEvaluator;
 import org.apache.flink.streaming.controlplane.udm.TestingControlPolicy;
 import org.apache.flink.util.OptionalConsumer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -84,6 +87,8 @@ import static org.apache.flink.util.Preconditions.checkState;
  */
 public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements StreamManagerGateway, StreamManagerService, ReconfigurationAPI {
 
+
+	private static final Logger LOG = LoggerFactory.getLogger(StreamManager.class);
 	/**
 	 * Default names for Flink's distributed components.
 	 */
@@ -164,8 +169,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 //		this.controlPolicyList.add(new FlinkStreamSwitchAdaptor(this, jobGraph));
 //		this.controlPolicyList.add(new TestingCFManager(this));
 //		this.controlPolicyList.add(new TestingControlPolicy(this));
-		this.controlPolicyList.add(new DummyController(this));
-//		this.controlPolicyList.add(new PerformanceEvaluator(this, streamManagerConfiguration.getConfiguration()));
+//		this.controlPolicyList.add(new DummyController(this));
+		this.controlPolicyList.add(new PerformanceEvaluator(this, streamManagerConfiguration.getConfiguration()));
 
 		reconfigurationProfiler = new ReconfigurationProfiler(streamManagerConfiguration.getConfiguration());
 	}
@@ -386,6 +391,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					.thenCompose(o -> enforcement.resumeTasks())
 					.whenComplete((o, failure) -> {
 						if (failure != null) {
+							LOG.error("Reconfiguration failed: ", failure);
 							failure.printStackTrace();
 						}
 						try {
@@ -401,6 +407,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					})
 			));
 		} catch (Exception e) {
+			LOG.error("Reconfiguration failed: ", e);
 			e.printStackTrace();
 		}
 	}

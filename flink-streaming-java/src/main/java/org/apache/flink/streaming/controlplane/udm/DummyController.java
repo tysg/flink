@@ -441,9 +441,28 @@ public class DummyController extends AbstractControlPolicy {
 				// todo, if the time of sleep is too short, may cause receiving not belong key
 				Thread.sleep(2000);
 
+//				for (int i=0; i<100; i++) {
 
-				testScaling(statefulOpID, 10);
+				int i = 0;
+				while(true) {
+					testScaling(statefulOpID, (i%2 + 1));
+					sleep(100);
+					i++;
+				}
 
+//				testScaling(statefulOpID, 5);
+//				sleep(100);
+//				testScaling(statefulOpID, 3);
+//				sleep(100);
+//				testScaling(statefulOpID, 6);
+//				sleep(100);
+//				testScaling(statefulOpID, 2);
+//				sleep(100);
+//
+//				testScaling(statefulOpID, 8);
+//				sleep(100);
+//
+//				testScaling(statefulOpID, 4);
 
 
 			} catch (InterruptedException e) {

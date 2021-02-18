@@ -359,17 +359,17 @@ public class OperatorChain<OUT, OP extends StreamOperator<OUT>> implements Strea
 			@SuppressWarnings("unchecked")
 			StreamOperator<T> operator = (StreamOperator<T>) operatorMap.get(operatorConfig.getOperatorID());
 
-//			for (StreamEdge edge : operatorConfig.getNonChainedOutputs(userCodeClassloader)) {
-//				@SuppressWarnings("unchecked")
-//				RecordWriterOutput<T> output = (RecordWriterOutput<T>) streamOutputMap.get(edge);
-//				operator.updateOutput(containingTask, output);
-//				// TODO scaling : what if multiple output, this is a problem!!!! @hya
-//			}
-			WatermarkGaugeExposingOutput<StreamRecord<T>> output =
-					generateOutputBaseExistOperator(containingTask, operatorConfig, streamOutputMap, watermarkGaugeExposingOutputMap);
-			watermarkGaugeExposingOutputMap.put(operatorConfig.getVertexID(), output);
-			operator.updateOutput(containingTask, output);
-			// todo not update chainEntryPoint
+			for (StreamEdge edge : operatorConfig.getNonChainedOutputs(userCodeClassloader)) {
+				@SuppressWarnings("unchecked")
+				RecordWriterOutput<T> output = (RecordWriterOutput<T>) streamOutputMap.get(edge);
+				operator.updateOutput(containingTask, output);
+				// TODO scaling : what if multiple output, this is a problem!!!! @hya
+			}
+//			WatermarkGaugeExposingOutput<StreamRecord<T>> output =
+//					generateOutputBaseExistOperator(containingTask, operatorConfig, streamOutputMap, watermarkGaugeExposingOutputMap);
+//			watermarkGaugeExposingOutputMap.put(operatorConfig.getVertexID(), output);
+//			operator.updateOutput(containingTask, output);
+//			// todo not update chainEntryPoint
 		}
 
 		return oldStreamOutputCopies;
