@@ -682,7 +682,6 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 
 								LOG.info("++++++ received operator states" + checkpoint.getOperatorStates() + " : " + finishedFuture);
 								finishedFuture.complete(new HashMap<>(checkpoint.getOperatorStates()));
-								LOG.info("++++++ after received " + finishedFuture);
 							}
 						}
 					} catch (Exception e) {
