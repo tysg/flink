@@ -18,12 +18,13 @@
 
 package org.apache.flink.runtime.controlplane.streammanager;
 
+import java.util.concurrent.CompletableFuture;
+
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.controlplane.StreamRelatedInstanceFactory;
-import org.apache.flink.runtime.controlplane.StreamingClassGroup;
 import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobmaster.JobMaster;
@@ -31,8 +32,6 @@ import org.apache.flink.runtime.jobmaster.JobMasterId;
 import org.apache.flink.runtime.registration.RegistrationResponse;
 import org.apache.flink.runtime.rpc.FencedRpcGateway;
 import org.apache.flink.runtime.rpc.RpcTimeout;
-
-import java.util.concurrent.CompletableFuture;
 
 /**
  * rpc gateway interface

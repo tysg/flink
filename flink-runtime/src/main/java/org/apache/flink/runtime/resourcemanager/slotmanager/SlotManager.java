@@ -18,6 +18,9 @@
 
 package org.apache.flink.runtime.resourcemanager.slotmanager;
 
+import java.util.Collection;
+import java.util.concurrent.Executor;
+
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.runtime.clusterframework.types.AllocationID;
 import org.apache.flink.runtime.clusterframework.types.ResourceProfile;
@@ -28,8 +31,6 @@ import org.apache.flink.runtime.resourcemanager.SlotRequest;
 import org.apache.flink.runtime.resourcemanager.exceptions.ResourceManagerException;
 import org.apache.flink.runtime.resourcemanager.registration.TaskExecutorConnection;
 import org.apache.flink.runtime.taskexecutor.SlotReport;
-
-import java.util.concurrent.Executor;
 
 /**
  * The slot manager is responsible for maintaining a view on all registered task manager slots,
@@ -55,6 +56,8 @@ public interface SlotManager extends AutoCloseable {
 
 	int getNumberPendingSlotRequests();
 
+	Collection<TaskManagerSlot> getAllSlots();
+
 	/**
 	 * Starts the slot manager with the given leader id and resource manager actions.
 	 *
@@ -77,6 +80,8 @@ public interface SlotManager extends AutoCloseable {
 	 * @throws ResourceManagerException if the slot request failed (e.g. not enough resources left)
 	 */
 	boolean registerSlotRequest(SlotRequest slotRequest) throws ResourceManagerException;
+
+	void allocateSlot(SlotRequest slotRequest, SlotID slotID);
 
 	/**
 	 * Cancels and removes a pending slot request with the given allocation id. If there is no such

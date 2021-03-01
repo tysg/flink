@@ -18,6 +18,38 @@
 
 package org.apache.flink.runtime.executiongraph;
 
+import static org.apache.flink.runtime.deployment.TaskDeploymentDescriptorFactory.getConsumedPartitionShuffleDescriptor;
+import static org.apache.flink.runtime.execution.ExecutionState.CANCELED;
+import static org.apache.flink.runtime.execution.ExecutionState.CANCELING;
+import static org.apache.flink.runtime.execution.ExecutionState.CREATED;
+import static org.apache.flink.runtime.execution.ExecutionState.DEPLOYING;
+import static org.apache.flink.runtime.execution.ExecutionState.FAILED;
+import static org.apache.flink.runtime.execution.ExecutionState.FINISHED;
+import static org.apache.flink.runtime.execution.ExecutionState.RUNNING;
+import static org.apache.flink.runtime.execution.ExecutionState.SCHEDULED;
+import static org.apache.flink.runtime.scheduler.ExecutionVertexSchedulingRequirementsMapper.getPhysicalSlotResourceProfile;
+import static org.apache.flink.util.Preconditions.checkNotNull;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.Archiveable;
 import org.apache.flink.api.common.InputDependencyConstraint;
@@ -32,6 +64,7 @@ import org.apache.flink.runtime.checkpoint.CheckpointType;
 import org.apache.flink.runtime.checkpoint.JobManagerTaskRestore;
 import org.apache.flink.runtime.clusterframework.types.AllocationID;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
+import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.clusterframework.types.SlotProfile;
 import org.apache.flink.runtime.concurrent.ComponentMainThreadExecutor;
 import org.apache.flink.runtime.concurrent.FutureUtils;
@@ -70,40 +103,7 @@ import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.OptionalFailure;
 import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.function.ThrowingRunnable;
-
 import org.slf4j.Logger;
-
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.Executor;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
-import static org.apache.flink.runtime.deployment.TaskDeploymentDescriptorFactory.getConsumedPartitionShuffleDescriptor;
-import static org.apache.flink.runtime.execution.ExecutionState.CANCELED;
-import static org.apache.flink.runtime.execution.ExecutionState.CANCELING;
-import static org.apache.flink.runtime.execution.ExecutionState.CREATED;
-import static org.apache.flink.runtime.execution.ExecutionState.DEPLOYING;
-import static org.apache.flink.runtime.execution.ExecutionState.FAILED;
-import static org.apache.flink.runtime.execution.ExecutionState.FINISHED;
-import static org.apache.flink.runtime.execution.ExecutionState.RUNNING;
-import static org.apache.flink.runtime.execution.ExecutionState.SCHEDULED;
-import static org.apache.flink.runtime.scheduler.ExecutionVertexSchedulingRequirementsMapper.getPhysicalSlotResourceProfile;
-import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
  * A single execution of a vertex. While an {@link ExecutionVertex} can be executed multiple times
@@ -507,6 +507,24 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 			.thenCompose(slot -> registerProducedPartitions(slot.getTaskManagerLocation(), false));
 	}
 
+	public CompletableFuture<Execution> allocateAndAssignSlotForExecution(RescaleID rescaleId, SlotID slotId) {
+		final ExecutionGraph executionGraph = getVertex().getExecutionGraph();
+		getVertex().updateRescaleId(rescaleId);
+		return allocateAndAssignSlotForExecution(
+			executionGraph.getSlotProviderStrategy(),
+			LocationPreferenceConstraint.ANY,
+			Collections.emptySet(),
+			slotId)
+			.thenCompose(slot -> registerProducedPartitions(slot.getTaskManagerLocation(), false));
+	}
+
+	private CompletableFuture<LogicalSlot> allocateAndAssignSlotForExecution(
+		SlotProviderStrategy slotProviderStrategy,
+		LocationPreferenceConstraint locationPreferenceConstraint,
+		@Nonnull Set<AllocationID> allPreviousExecutionGraphAllocationIds) {
+		return allocateAndAssignSlotForExecution(slotProviderStrategy, locationPreferenceConstraint, allPreviousExecutionGraphAllocationIds, null);
+	}
+
 	/**
 	 * Allocates and assigns a slot obtained from the slot provider to the execution.
 	 *
@@ -520,7 +538,8 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 	private CompletableFuture<LogicalSlot> allocateAndAssignSlotForExecution(
 			SlotProviderStrategy slotProviderStrategy,
 			LocationPreferenceConstraint locationPreferenceConstraint,
-			@Nonnull Set<AllocationID> allPreviousExecutionGraphAllocationIds) {
+			@Nonnull Set<AllocationID> allPreviousExecutionGraphAllocationIds,
+			SlotID slotId) {
 
 		checkNotNull(slotProviderStrategy);
 
@@ -568,7 +587,8 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 								getPhysicalSlotResourceProfile(vertex),
 								preferredLocations,
 								previousAllocationIDs,
-								allPreviousExecutionGraphAllocationIds)));
+								allPreviousExecutionGraphAllocationIds),
+							slotId));
 
 			// register call back to cancel slot request in case that the execution gets canceled
 			releaseFuture.whenComplete(

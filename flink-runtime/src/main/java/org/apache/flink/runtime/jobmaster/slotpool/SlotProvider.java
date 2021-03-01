@@ -18,16 +18,17 @@
 
 package org.apache.flink.runtime.jobmaster.slotpool;
 
+import java.util.concurrent.CompletableFuture;
+
+import javax.annotation.Nullable;
+
 import org.apache.flink.api.common.time.Time;
+import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.clusterframework.types.SlotProfile;
 import org.apache.flink.runtime.instance.SlotSharingGroupId;
 import org.apache.flink.runtime.jobmanager.scheduler.ScheduledUnit;
 import org.apache.flink.runtime.jobmaster.LogicalSlot;
 import org.apache.flink.runtime.jobmaster.SlotRequestId;
-
-import javax.annotation.Nullable;
-
-import java.util.concurrent.CompletableFuture;
 
 /**
  * The slot provider is responsible for preparing slots for ready-to-run tasks.
@@ -56,6 +57,13 @@ public interface SlotProvider {
 		ScheduledUnit scheduledUnit,
 		SlotProfile slotProfile,
 		Time allocationTimeout);
+
+	CompletableFuture<LogicalSlot> allocateSlot(
+		SlotRequestId slotRequestId,
+		ScheduledUnit scheduledUnit,
+		SlotProfile slotProfile,
+		Time allocationTimeout,
+		SlotID slotId);
 
 	/**
 	 * Allocating batch slot with specific requirement.

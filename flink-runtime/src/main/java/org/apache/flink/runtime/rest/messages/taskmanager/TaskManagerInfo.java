@@ -18,21 +18,20 @@
 
 package org.apache.flink.runtime.rest.messages.taskmanager;
 
+import java.io.Serializable;
+import java.util.Objects;
+
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.instance.HardwareDescription;
 import org.apache.flink.runtime.rest.messages.ResponseBody;
 import org.apache.flink.runtime.rest.messages.json.ResourceIDDeserializer;
 import org.apache.flink.runtime.rest.messages.json.ResourceIDSerializer;
 import org.apache.flink.runtime.taskexecutor.TaskExecutor;
-import org.apache.flink.util.Preconditions;
-
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonCreator;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.annotation.JsonSerialize;
-
-import java.io.Serializable;
-import java.util.Objects;
+import org.apache.flink.util.Preconditions;
 
 /**
  * Base class containing information for a {@link TaskExecutor}.
@@ -121,6 +120,11 @@ public class TaskManagerInfo implements ResponseBody, Serializable {
 
 	public HardwareDescription getHardwareDescription() {
 		return hardwareDescription;
+	}
+
+	@Override
+	public String toString() {
+		return String.format("resource id: %s\naddress: %s\ndataport: %d\nlast heartbeat %d\nnumber slots: %d\nnumber available slots: %d\nhardware: %s", resourceId.toString(), address, dataPort, lastHeartbeat, numberSlots, numberAvailableSlots, hardwareDescription.toString());
 	}
 
 	@Override

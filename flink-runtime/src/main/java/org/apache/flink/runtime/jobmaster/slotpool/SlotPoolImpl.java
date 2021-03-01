@@ -18,6 +18,29 @@
 
 package org.apache.flink.runtime.jobmaster.slotpool;
 
+import static org.apache.flink.util.Preconditions.checkNotNull;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Time;
@@ -39,40 +62,16 @@ import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.resourcemanager.ResourceManagerGateway;
 import org.apache.flink.runtime.resourcemanager.SlotRequest;
 import org.apache.flink.runtime.resourcemanager.exceptions.UnfulfillableSlotRequestException;
+import org.apache.flink.runtime.resourcemanager.slotmanager.TaskManagerSlot;
 import org.apache.flink.runtime.taskexecutor.slot.SlotOffer;
 import org.apache.flink.runtime.taskmanager.TaskManagerLocation;
 import org.apache.flink.runtime.util.clock.Clock;
+import org.apache.flink.shaded.guava18.com.google.common.collect.Iterables;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkException;
 import org.apache.flink.util.Preconditions;
-
-import org.apache.flink.shaded.guava18.com.google.common.collect.Iterables;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.function.Function;
-import java.util.function.Predicate;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
-import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
  * The slot pool serves slot request issued by {@link ExecutionGraph}. It will attempt to acquire new slots
@@ -407,6 +406,68 @@ public class SlotPoolImpl implements SlotPool {
 		} else {
 			return Optional.empty();
 		}
+	}
+
+	public CompletableFuture<PhysicalSlot> requestAllocatedSlot(
+		@Nonnull SlotRequestId slotRequestId,
+		@Nonnull ResourceProfile resourceProfile,
+		Time timeout,
+		SlotID slotId) {
+
+		componentMainThreadExecutor.assertRunningInMainThread();
+
+		final PendingRequest pendingRequest = PendingRequest.createStreamingRequest(slotRequestId, resourceProfile);
+
+		// register request timeout
+		FutureUtils
+			.orTimeout(
+				pendingRequest.getAllocatedSlotFuture(),
+				timeout.toMilliseconds(),
+				TimeUnit.MILLISECONDS,
+				componentMainThreadExecutor)
+			.whenComplete(
+				(AllocatedSlot ignored, Throwable throwable) -> {
+					if (throwable instanceof TimeoutException) {
+						timeoutPendingSlotRequest(slotRequestId);
+					}
+				});
+
+		checkNotNull(resourceManagerGateway);
+		checkNotNull(pendingRequest);
+
+		log.info("Requesting slotId {} slot [{}] and profile {} from resource manager.", slotId, pendingRequest.getSlotRequestId(), pendingRequest.getResourceProfile());
+
+		final AllocationID allocationId = new AllocationID();
+
+		pendingRequests.put(pendingRequest.getSlotRequestId(), allocationId, pendingRequest);
+
+		pendingRequest.getAllocatedSlotFuture().whenComplete(
+			(AllocatedSlot allocatedSlot, Throwable throwable) -> {
+				if (throwable != null || !allocationId.equals(allocatedSlot.getAllocationId())) {
+					// cancel the slot request if there is a failure or if the pending request has
+					// been completed with another allocated slot
+					resourceManagerGateway.cancelSlotRequest(allocationId);
+				}
+			});
+
+		CompletableFuture<Acknowledge> rmResponse = resourceManagerGateway.requestSlot(
+			jobMasterId,
+			new SlotRequest(jobId, allocationId, pendingRequest.getResourceProfile(), jobManagerAddress),
+			rpcTimeout,
+			slotId);
+
+		FutureUtils.whenCompleteAsyncIfNotDone(
+			rmResponse,
+			componentMainThreadExecutor,
+			(Acknowledge ignored, Throwable failure) -> {
+				// on failure, fail the request future
+				if (failure != null) {
+					slotRequestToResourceManagerFailed(pendingRequest.getSlotRequestId(), failure);
+				}
+			});
+
+		return pendingRequest.getAllocatedSlotFuture()
+			.thenApply((Function.identity()));
 	}
 
 	@Nonnull
@@ -745,6 +806,14 @@ public class SlotPoolImpl implements SlotPool {
 	// ------------------------------------------------------------------------
 	//  Resource
 	// ------------------------------------------------------------------------
+
+	@Override
+	public CompletableFuture<Collection<TaskManagerSlot>> getAllSlots() {
+		if (resourceManagerGateway == null) {
+			return CompletableFuture.completedFuture(null);
+		}
+		return resourceManagerGateway.getAllSlots();
+	}
 
 	/**
 	 * Register TaskManager to this pool, only those slots come from registered TaskManager will be considered valid.

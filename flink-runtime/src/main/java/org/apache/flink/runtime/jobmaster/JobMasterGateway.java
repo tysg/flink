@@ -18,6 +18,13 @@
 
 package org.apache.flink.runtime.jobmaster;
 
+import java.util.Collection;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
+
+import javax.annotation.Nullable;
+
 import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.api.common.functions.AggregateFunction;
 import org.apache.flink.api.common.time.Time;
@@ -40,8 +47,8 @@ import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.messages.webmonitor.JobDetails;
 import org.apache.flink.runtime.registration.RegistrationResponse;
 import org.apache.flink.runtime.rescale.JobRescaleAction;
-import org.apache.flink.runtime.rescale.reconfigure.AbstractCoordinator;
 import org.apache.flink.runtime.resourcemanager.ResourceManagerId;
+import org.apache.flink.runtime.resourcemanager.slotmanager.TaskManagerSlot;
 import org.apache.flink.runtime.rest.handler.legacy.backpressure.OperatorBackPressureStatsResponse;
 import org.apache.flink.runtime.rpc.FencedRpcGateway;
 import org.apache.flink.runtime.rpc.RpcTimeout;
@@ -49,14 +56,6 @@ import org.apache.flink.runtime.taskexecutor.AccumulatorReport;
 import org.apache.flink.runtime.taskexecutor.slot.SlotOffer;
 import org.apache.flink.runtime.taskmanager.TaskExecutionState;
 import org.apache.flink.runtime.taskmanager.TaskManagerLocation;
-
-import javax.annotation.Nullable;
-
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.function.Function;
 
 /**
  * {@link JobMaster} rpc gateway interface.
@@ -294,4 +293,6 @@ public interface JobMasterGateway extends
 	default <M>void callOperations(Function<PrimitiveOperation<M>, CompletableFuture<?>> operationCaller){
 
 	}
+
+	CompletableFuture<Collection<TaskManagerSlot>> getAllSlots();
 }

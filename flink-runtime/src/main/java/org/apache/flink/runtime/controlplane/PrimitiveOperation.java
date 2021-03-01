@@ -18,16 +18,18 @@
 
 package org.apache.flink.runtime.controlplane;
 
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+
+import javax.annotation.Nullable;
+
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.messages.Acknowledge;
-
-import javax.annotation.Nullable;
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
 
 /**
  * The low level primitive operations.
@@ -78,7 +80,7 @@ public interface PrimitiveOperation<M> {
 	 * @param oldParallelism  the old parallelism to make a comparison
 	 * @return
 	 */
-	CompletableFuture<Void> updateTaskResources(int operatorID, int oldParallelism);
+	CompletableFuture<Void> updateTaskResources(int operatorID, int oldParallelism, List<SlotID> slotIds);
 
 	/**
 	 * Update key mappings between destOp and its parents

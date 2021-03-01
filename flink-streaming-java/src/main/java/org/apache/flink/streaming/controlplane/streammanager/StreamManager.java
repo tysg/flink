@@ -18,11 +18,28 @@
 
 package org.apache.flink.streaming.controlplane.streammanager;
 
+import static org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor.ApplicationLogic.UDF;
+import static org.apache.flink.util.Preconditions.checkNotNull;
+import static org.apache.flink.util.Preconditions.checkState;
+
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
+import org.apache.flink.runtime.clusterframework.types.ResourceProfile;
+import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.controlplane.PrimitiveOperation;
 import org.apache.flink.runtime.controlplane.StreamRelatedInstanceFactory;
@@ -41,9 +58,11 @@ import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.registration.RegistrationResponse;
 import org.apache.flink.runtime.rescale.JobRescaleAction;
 import org.apache.flink.runtime.rescale.reconfigure.AbstractCoordinator;
+import org.apache.flink.runtime.rescale.reconfigure.JobGraphRescaler;
 import org.apache.flink.runtime.resourcemanager.JobLeaderIdActions;
 import org.apache.flink.runtime.resourcemanager.JobLeaderIdService;
 import org.apache.flink.runtime.resourcemanager.registration.JobManagerRegistration;
+import org.apache.flink.runtime.resourcemanager.slotmanager.TaskManagerSlot;
 import org.apache.flink.runtime.rpc.FatalErrorHandler;
 import org.apache.flink.runtime.rpc.FencedRpcEndpoint;
 import org.apache.flink.runtime.rpc.RpcService;
@@ -51,7 +70,6 @@ import org.apache.flink.runtime.rpc.RpcUtils;
 import org.apache.flink.runtime.rpc.akka.AkkaRpcServiceUtils;
 import org.apache.flink.runtime.util.profiling.ReconfigurationProfiler;
 import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
-import org.apache.flink.runtime.rescale.reconfigure.JobGraphRescaler;
 import org.apache.flink.streaming.controlplane.jobgraph.NormalInstantiateFactory;
 import org.apache.flink.streaming.controlplane.rescale.StreamJobGraphRescaler;
 import org.apache.flink.streaming.controlplane.streammanager.exceptions.StreamManagerException;
@@ -59,18 +77,8 @@ import org.apache.flink.streaming.controlplane.streammanager.insts.Reconfigurati
 import org.apache.flink.streaming.controlplane.streammanager.insts.StreamJobExecutionPlanWithUpdatingFlag;
 import org.apache.flink.streaming.controlplane.streammanager.insts.StreamJobExecutionPlanWithUpdatingFlagImpl;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
-import org.apache.flink.streaming.controlplane.udm.PerformanceEvaluator;
 import org.apache.flink.streaming.controlplane.udm.TestingControlPolicy;
 import org.apache.flink.util.OptionalConsumer;
-
-import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
-import static org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor.ApplicationLogic.UDF;
-import static org.apache.flink.util.Preconditions.checkNotNull;
-import static org.apache.flink.util.Preconditions.checkState;
 
 /**
  * @author trx
@@ -128,6 +136,10 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 	private JobID jobId = null;
 
+//	private ResourceManagerGateway resourceManagerGateway = null;
+
+	private Map<String, List<TaskManagerSlot>> slotMap = null;
+
 	// ------------------------------------------------------------------------
 
 	public StreamManager(RpcService rpcService,
@@ -150,6 +162,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		this.fatalErrorHandler = checkNotNull(fatalErrorHandler);
 		this.jobLeaderIdService = checkNotNull(jobLeaderIdService);
 		this.dispatcherGatewayRetriever = checkNotNull(dispatcherGatewayRetriever);
+		this.slotMap = new HashMap<>();
 
 		final String jobName = jobGraph.getName();
 		final JobID jid = jobGraph.getJobID();
@@ -162,8 +175,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		/* now the policy is temporary hard coded added */
 //		this.controlPolicyList.add(new FlinkStreamSwitchAdaptor(this, jobGraph));
 //		this.controlPolicyList.add(new TestingCFManager(this));
-//		this.controlPolicyList.add(new TestingControlPolicy(this));
-		this.controlPolicyList.add(new PerformanceEvaluator(this, streamManagerConfiguration.getConfiguration()));
+		this.controlPolicyList.add(new TestingControlPolicy(this));
+//		this.controlPolicyList.add(new PerformanceEvaluator(this, streamManagerConfiguration.getConfiguration()));
 
 		reconfigurationProfiler = new ReconfigurationProfiler(streamManagerConfiguration.getConfiguration());
 	}
@@ -326,7 +339,76 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		runAsync(() -> jobMasterGateway.triggerJobRescale(wrapper, jobGraph, upDownStream.f0, upDownStream.f1));
 	}
 
+	public void printSlots() {
+//		assert(resourceManagerGateway != null);
+////		resourceManagerGateway.getNumberOfRegisteredTaskManagers().thenAccept(num -> System.out.println("------ num registered task managers: " + num));
+//		resourceManagerGateway.requestTaskManagerInfo(Time.days(1)).thenAccept(taskManagerInfos -> {
+//			System.out.println("++++++ TaskManagerInfos:");
+//			taskManagerInfos.forEach(taskManagerInfo -> {
+//				System.out.println(taskManagerInfo);
+//			});
+//			System.out.println();
+//		});
+//
+//		resourceManagerGateway.getAllSlots().thenAccept(taskManagerSlots -> {
+//			System.out.println("++++++ TaskManagerSlots:");
+//			taskManagerSlots.forEach(taskManagerSlot -> {
+//				System.out.println(taskManagerSlot);
+//			});
+//			System.out.println();
+//		});
+		System.out.println("++++++ Printing Slots");
+		slotMap.forEach((taskManagerId, taskManagerSlots) -> {
+			System.out.println("++++++ TaskManagerId: " + taskManagerId);
+			taskManagerSlots.forEach(taskManagerSlot -> {
+				System.out.println(taskManagerSlot);
+			});
+		});
+	}
+
+	private void acquireSlots() {
+		jobManagerRegistration.getJobManagerGateway().getAllSlots().thenAccept(taskManagerSlots -> {
+			if (taskManagerSlots == null) {
+				// TODO: retry for slots
+				return;
+			}
+			taskManagerSlots.forEach(taskManagerSlot -> {
+				String taskManagerId = taskManagerSlot.getSlotId().getResourceID().getResourceIdString();
+
+				List<TaskManagerSlot> slots = slotMap.get(taskManagerId);
+				if (slots == null) {
+					slots = new LinkedList<>();
+					slotMap.put(taskManagerId, slots);
+				}
+				slots.add(taskManagerSlot);
+			});
+			printSlots();
+		});
+	}
+
+	public SlotID findBestSlot(double cpuCores, int taskMemory, int taskOffHeapMemory, int managedMemory, int networkMemory) {
+		ResourceProfile requirements = ResourceProfile.newBuilder()
+			.setCpuCores(cpuCores)
+			.setTaskHeapMemoryMB(taskMemory)
+			.setTaskOffHeapMemoryMB(taskOffHeapMemory)
+			.setManagedMemoryMB(managedMemory)
+			.setNetworkMemoryMB(networkMemory)
+			.build();
+		for (List<TaskManagerSlot> slots: slotMap.values()) {
+			for (TaskManagerSlot slot: slots) {
+				if (slot.getState() == TaskManagerSlot.State.FREE && slot.isMatchingRequirement(requirements)) {
+					System.out.println("++++++ choosing slot: " + slot);
+					slots.remove(slot);
+					return slot.getSlotId();
+				}
+			}
+		}
+
+		return null;
+	}
+
 	public void rescale(int operatorID, int newParallelism, Map<Integer, List<Integer>> keyStateAllocation, ControlPolicy waitingController) {
+		acquireSlots();
 		try {
 			reconfigurationProfiler.onReconfigurationStart();
 			// scale in is not support now
@@ -343,6 +425,15 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 				.forEach(c -> affectedTasks.add(Tuple2.of(c.getOperatorID(), -1)));
 
 			int oldParallelism = targetDescriptor.getParallelism();
+			List<SlotID> slotIds = new LinkedList<>();
+
+			if (newParallelism > oldParallelism) {
+				for (int i = 0; i < newParallelism - oldParallelism; i++) {
+					slotIds.add(findBestSlot(0, 0, 0, 0, 0));
+				}
+				System.out.println("++++++ allocated slot IDs: " + slotIds);
+			}
+
 			// update the parallelism
 			targetDescriptor.setParallelism(newParallelism);
 
@@ -379,7 +470,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						return enforcement.updateState(operatorID, o);
 					})
 					.thenCompose(o -> {
-						return enforcement.updateTaskResources(operatorID, oldParallelism);
+						return enforcement.updateTaskResources(operatorID, oldParallelism, slotIds);
 					})
 					.thenCompose(o -> enforcement.resumeTasks())
 					.whenComplete((o, failure) -> {
@@ -653,6 +744,25 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		log.info("Registered job manager {}@{} for job {}.", jobMasterGateway.getFencingToken(), jobManagerAddress, jobId);
 
 		// TODO: HeartBeatService
+
+//		TODO: Task manager not registered/Resource manager not registered when job master is registered.
+//		jobMasterGateway.getAllSlots().thenAccept(taskManagerSlots -> {
+//			if (taskManagerSlots == null) {
+//				// TODO: retry for slots
+//				return;
+//			}
+//			taskManagerSlots.forEach(taskManagerSlot -> {
+//				String taskManagerId = taskManagerSlot.getSlotId().getResourceID().getResourceIdString();
+//
+//				List<TaskManagerSlot> slots = slotMap.get(taskManagerId);
+//				if (slots == null) {
+//					slots = new LinkedList<>();
+//					slotMap.put(taskManagerId, slots);
+//				}
+//				slots.add(taskManagerSlot);
+//			});
+//			printSlots();
+//		});
 
 		return new JobMasterRegistrationSuccess<StreamManagerId>(
 			getFencingToken(),

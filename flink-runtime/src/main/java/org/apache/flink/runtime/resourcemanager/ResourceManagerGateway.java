@@ -18,6 +18,11 @@
 
 package org.apache.flink.runtime.resourcemanager;
 
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+
+import javax.annotation.Nullable;
+
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.tuple.Tuple2;
@@ -33,6 +38,7 @@ import org.apache.flink.runtime.jobmaster.JobMasterId;
 import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.metrics.dump.MetricQueryService;
 import org.apache.flink.runtime.registration.RegistrationResponse;
+import org.apache.flink.runtime.resourcemanager.slotmanager.TaskManagerSlot;
 import org.apache.flink.runtime.rest.messages.taskmanager.TaskManagerInfo;
 import org.apache.flink.runtime.rpc.FencedRpcGateway;
 import org.apache.flink.runtime.rpc.RpcTimeout;
@@ -40,11 +46,6 @@ import org.apache.flink.runtime.taskexecutor.FileType;
 import org.apache.flink.runtime.taskexecutor.SlotReport;
 import org.apache.flink.runtime.taskexecutor.TaskExecutor;
 import org.apache.flink.runtime.taskexecutor.TaskExecutorHeartbeatPayload;
-
-import javax.annotation.Nullable;
-
-import java.util.Collection;
-import java.util.concurrent.CompletableFuture;
 
 /**
  * The {@link ResourceManager}'s RPC gateway interface.
@@ -79,6 +80,12 @@ public interface ResourceManagerGateway extends FencedRpcGateway<ResourceManager
 		JobMasterId jobMasterId,
 		SlotRequest slotRequest,
 		@RpcTimeout Time timeout);
+
+	CompletableFuture<Acknowledge> requestSlot(
+		JobMasterId jobMasterId,
+		SlotRequest slotRequest,
+		@RpcTimeout Time timeout,
+		SlotID slotId);
 
 	/**
 	 * Cancel the slot allocation requests from the resource manager.
@@ -216,4 +223,6 @@ public interface ResourceManagerGateway extends FencedRpcGateway<ResourceManager
 	 * {@link BlobServer}.
 	 */
 	CompletableFuture<TransientBlobKey> requestTaskManagerFileUpload(ResourceID taskManagerId, FileType fileType, @RpcTimeout Time timeout);
+
+	CompletableFuture<Collection<TaskManagerSlot>> getAllSlots();
 }

@@ -18,6 +18,24 @@
 
 package org.apache.flink.runtime.resourcemanager.slotmanager;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Time;
@@ -40,27 +58,8 @@ import org.apache.flink.runtime.taskexecutor.exceptions.SlotOccupiedException;
 import org.apache.flink.util.FlinkException;
 import org.apache.flink.util.OptionalConsumer;
 import org.apache.flink.util.Preconditions;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.concurrent.CancellationException;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 /**
  * Implementation of {@link SlotManager}.
@@ -290,6 +289,10 @@ public class SlotManagerImpl implements SlotManager {
 	// Public API
 	// ---------------------------------------------------------------------------------------------
 
+	public Collection<TaskManagerSlot> getAllSlots() {
+		return slots.values();
+	}
+
 	/**
 	 * Requests a slot with the respective resource profile.
 	 *
@@ -321,6 +324,25 @@ public class SlotManagerImpl implements SlotManager {
 
 			return true;
 		}
+	}
+
+	public void allocateSlot(SlotRequest slotRequest, SlotID slotId) {
+		checkInit();
+
+		TaskManagerSlot taskManagerSlot = freeSlots.get(slotId);
+
+		Preconditions.checkNotNull(taskManagerSlot);
+		// sanity check
+		Preconditions.checkState(
+			taskManagerSlot.getState() == TaskManagerSlot.State.FREE,
+			"TaskManagerSlot %s is not in state FREE but %s.",
+			taskManagerSlot.getSlotId(), taskManagerSlot.getState());
+
+		PendingSlotRequest pendingSlotRequest = new PendingSlotRequest(slotRequest);
+		freeSlots.remove(taskManagerSlot.getSlotId());
+
+		pendingSlotRequests.put(slotRequest.getAllocationId(), pendingSlotRequest);
+		allocateSlot(taskManagerSlot, pendingSlotRequest);
 	}
 
 	/**

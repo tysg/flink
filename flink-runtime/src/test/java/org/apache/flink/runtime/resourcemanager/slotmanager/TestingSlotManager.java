@@ -18,6 +18,10 @@
 
 package org.apache.flink.runtime.resourcemanager.slotmanager;
 
+import java.util.Collection;
+import java.util.concurrent.Executor;
+import java.util.function.Consumer;
+
 import org.apache.flink.runtime.clusterframework.types.AllocationID;
 import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.instance.InstanceID;
@@ -25,9 +29,6 @@ import org.apache.flink.runtime.resourcemanager.ResourceManagerId;
 import org.apache.flink.runtime.resourcemanager.SlotRequest;
 import org.apache.flink.runtime.resourcemanager.registration.TaskExecutorConnection;
 import org.apache.flink.runtime.taskexecutor.SlotReport;
-
-import java.util.concurrent.Executor;
-import java.util.function.Consumer;
 
 /**
  * Implementation of {@link SlotManager} for testing purpose.
@@ -122,6 +123,16 @@ public class TestingSlotManager implements SlotManager {
 
 	@Override
 	public void close() throws Exception {
+
+	}
+
+	@Override
+	public Collection<TaskManagerSlot> getAllSlots() {
+		return null;
+	}
+
+	@Override
+	public void allocateSlot(SlotRequest slotRequest, SlotID slotID) {
 
 	}
 }

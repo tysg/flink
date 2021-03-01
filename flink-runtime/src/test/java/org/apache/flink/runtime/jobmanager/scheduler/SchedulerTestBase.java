@@ -18,11 +18,20 @@
 
 package org.apache.flink.runtime.jobmanager.scheduler;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
+
+import javax.annotation.Nullable;
+
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.runtime.clusterframework.types.AllocationID;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.clusterframework.types.ResourceProfile;
+import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.clusterframework.types.SlotProfile;
 import org.apache.flink.runtime.concurrent.ComponentMainThreadExecutor;
 import org.apache.flink.runtime.executiongraph.utils.SimpleAckingTaskManagerGateway;
@@ -42,17 +51,8 @@ import org.apache.flink.runtime.taskmanager.LocalTaskManagerLocation;
 import org.apache.flink.runtime.taskmanager.TaskManagerLocation;
 import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.TestLogger;
-
 import org.junit.After;
 import org.junit.Before;
-
-import javax.annotation.Nullable;
-
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Supplier;
 
 /**
  * Test base for scheduler related test cases. The test are
@@ -189,6 +189,16 @@ public abstract class SchedulerTestBase extends TestLogger {
 
 		public void shutdown() {
 			runInMainThreadExecutor(() -> slotPool.close());
+		}
+
+		@Override
+		public CompletableFuture<LogicalSlot> allocateSlot(
+			SlotRequestId slotRequestId,
+			ScheduledUnit scheduledUnit,
+			SlotProfile slotProfile,
+			Time allocationTimeout,
+			SlotID slotId) {
+			return null;
 		}
 
 		@Override

@@ -18,18 +18,8 @@
 
 package org.apache.flink.runtime.executiongraph;
 
-import org.apache.flink.api.common.time.Time;
-import org.apache.flink.runtime.clusterframework.types.SlotProfile;
-import org.apache.flink.runtime.concurrent.ComponentMainThreadExecutor;
-import org.apache.flink.runtime.instance.SlotSharingGroupId;
-import org.apache.flink.runtime.jobgraph.JobVertexID;
-import org.apache.flink.runtime.jobmanager.scheduler.ScheduledUnit;
-import org.apache.flink.runtime.jobmaster.LogicalSlot;
-import org.apache.flink.runtime.jobmaster.SlotRequestId;
-import org.apache.flink.runtime.jobmaster.slotpool.Scheduler;
-
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import static org.apache.flink.util.Preconditions.checkArgument;
+import static org.apache.flink.util.Preconditions.checkNotNull;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -38,8 +28,19 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
-import static org.apache.flink.util.Preconditions.checkArgument;
-import static org.apache.flink.util.Preconditions.checkNotNull;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
+import org.apache.flink.api.common.time.Time;
+import org.apache.flink.runtime.clusterframework.types.SlotID;
+import org.apache.flink.runtime.clusterframework.types.SlotProfile;
+import org.apache.flink.runtime.concurrent.ComponentMainThreadExecutor;
+import org.apache.flink.runtime.instance.SlotSharingGroupId;
+import org.apache.flink.runtime.jobgraph.JobVertexID;
+import org.apache.flink.runtime.jobmanager.scheduler.ScheduledUnit;
+import org.apache.flink.runtime.jobmaster.LogicalSlot;
+import org.apache.flink.runtime.jobmaster.SlotRequestId;
+import org.apache.flink.runtime.jobmaster.slotpool.Scheduler;
 
 /**
  * A slot provider where one can pre-set the slot futures for tasks based on
@@ -110,6 +111,16 @@ class ProgrammedSlotProvider implements Scheduler {
 
 	public Set<SlotRequestId> getCanceledSlotRequests() {
 		return Collections.unmodifiableSet(canceledSlotRequests);
+	}
+
+	@Override
+	public CompletableFuture<LogicalSlot> allocateSlot(
+		SlotRequestId slotRequestId,
+		ScheduledUnit scheduledUnit,
+		SlotProfile slotProfile,
+		Time allocationTimeout,
+		SlotID slotId) {
+		return null;
 	}
 
 	@Override

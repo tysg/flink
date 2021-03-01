@@ -18,6 +18,21 @@
 
 package org.apache.flink.runtime.resourcemanager;
 
+import static org.apache.flink.util.Preconditions.checkNotNull;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
+
+import javax.annotation.Nullable;
+
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Time;
@@ -54,6 +69,7 @@ import org.apache.flink.runtime.resourcemanager.registration.JobManagerRegistrat
 import org.apache.flink.runtime.resourcemanager.registration.WorkerRegistration;
 import org.apache.flink.runtime.resourcemanager.slotmanager.ResourceActions;
 import org.apache.flink.runtime.resourcemanager.slotmanager.SlotManager;
+import org.apache.flink.runtime.resourcemanager.slotmanager.TaskManagerSlot;
 import org.apache.flink.runtime.rest.messages.taskmanager.TaskManagerInfo;
 import org.apache.flink.runtime.rpc.FatalErrorHandler;
 import org.apache.flink.runtime.rpc.FencedRpcEndpoint;
@@ -65,21 +81,6 @@ import org.apache.flink.runtime.taskexecutor.TaskExecutorHeartbeatPayload;
 import org.apache.flink.runtime.taskexecutor.TaskExecutorRegistrationSuccess;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkException;
-
-import javax.annotation.Nullable;
-
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
-
-import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
  * ResourceManager implementation. The resource manager is responsible for resource de-/allocation
@@ -267,6 +268,10 @@ public abstract class ResourceManager<WorkerType extends ResourceIDRetrievable>
 	//  RPC methods
 	// ------------------------------------------------------------------------
 
+	public CompletableFuture<Collection<TaskManagerSlot>> getAllSlots() {
+		return CompletableFuture.completedFuture(slotManager.getAllSlots());
+	}
+
 	@Override
 	public CompletableFuture<RegistrationResponse> registerJobManager(
 			final JobMasterId jobMasterId,
@@ -432,6 +437,31 @@ public abstract class ResourceManager<WorkerType extends ResourceIDRetrievable>
 				} catch (ResourceManagerException e) {
 					return FutureUtils.completedExceptionally(e);
 				}
+
+				return CompletableFuture.completedFuture(Acknowledge.get());
+			} else {
+				return FutureUtils.completedExceptionally(new ResourceManagerException("The job leader's id " +
+					jobManagerRegistration.getJobMasterId() + " does not match the received id " + jobMasterId + '.'));
+			}
+
+		} else {
+			return FutureUtils.completedExceptionally(new ResourceManagerException("Could not find registered job manager for job " + jobId + '.'));
+		}
+	}
+
+	public CompletableFuture<Acknowledge> requestSlot(JobMasterId jobMasterId, SlotRequest slotRequest, final Time timeout, SlotID slotID) {
+		JobID jobId = slotRequest.getJobId();
+		JobManagerRegistration jobManagerRegistration = jobManagerRegistrations.get(jobId);
+
+		if (null != jobManagerRegistration) {
+			if (Objects.equals(jobMasterId, jobManagerRegistration.getJobMasterId())) {
+				log.info("Request slot {} with profile {} for job {} with allocation id {}.",
+					slotID,
+					slotRequest.getResourceProfile(),
+					slotRequest.getJobId(),
+					slotRequest.getAllocationId());
+
+				slotManager.allocateSlot(slotRequest, slotID);
 
 				return CompletableFuture.completedFuture(Acknowledge.get());
 			} else {

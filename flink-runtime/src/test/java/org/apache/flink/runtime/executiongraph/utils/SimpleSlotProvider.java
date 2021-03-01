@@ -18,11 +18,22 @@
 
 package org.apache.flink.runtime.executiongraph.utils;
 
+import static org.apache.flink.util.Preconditions.checkArgument;
+import static org.apache.flink.util.Preconditions.checkNotNull;
+
+import java.net.InetAddress;
+import java.util.ArrayDeque;
+import java.util.HashMap;
+import java.util.concurrent.CompletableFuture;
+
+import javax.annotation.Nullable;
+
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.runtime.clusterframework.types.AllocationID;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.clusterframework.types.ResourceProfile;
+import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.clusterframework.types.SlotProfile;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.instance.SimpleSlotContext;
@@ -39,16 +50,6 @@ import org.apache.flink.runtime.jobmaster.TestingLogicalSlotBuilder;
 import org.apache.flink.runtime.jobmaster.slotpool.SlotProvider;
 import org.apache.flink.runtime.taskmanager.TaskManagerLocation;
 import org.apache.flink.util.FlinkRuntimeException;
-
-import javax.annotation.Nullable;
-
-import java.net.InetAddress;
-import java.util.ArrayDeque;
-import java.util.HashMap;
-import java.util.concurrent.CompletableFuture;
-
-import static org.apache.flink.util.Preconditions.checkArgument;
-import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
  * A testing utility slot provider that simply has a predefined pool of slots.
@@ -82,6 +83,16 @@ public class SimpleSlotProvider implements SlotProvider, SlotOwner {
 		}
 
 		allocatedSlots = new HashMap<>(slots.size());
+	}
+
+	@Override
+	public CompletableFuture<LogicalSlot> allocateSlot(
+		SlotRequestId slotRequestId,
+		ScheduledUnit scheduledUnit,
+		SlotProfile slotProfile,
+		Time allocationTimeout,
+		SlotID slotId) {
+		return null;
 	}
 
 	@Override

@@ -18,6 +18,19 @@
 
 package org.apache.flink.runtime.jobmaster.utils;
 
+import java.net.InetSocketAddress;
+import java.util.Collection;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Supplier;
+
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.api.common.time.Time;
@@ -47,6 +60,7 @@ import org.apache.flink.runtime.query.KvStateLocation;
 import org.apache.flink.runtime.registration.RegistrationResponse;
 import org.apache.flink.runtime.rescale.JobRescaleAction;
 import org.apache.flink.runtime.resourcemanager.ResourceManagerId;
+import org.apache.flink.runtime.resourcemanager.slotmanager.TaskManagerSlot;
 import org.apache.flink.runtime.rest.handler.legacy.backpressure.OperatorBackPressureStatsResponse;
 import org.apache.flink.runtime.state.KeyGroupRange;
 import org.apache.flink.runtime.taskexecutor.AccumulatorReport;
@@ -55,19 +69,6 @@ import org.apache.flink.runtime.taskmanager.TaskExecutionState;
 import org.apache.flink.runtime.taskmanager.TaskManagerLocation;
 import org.apache.flink.util.function.TriConsumer;
 import org.apache.flink.util.function.TriFunction;
-
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-
-import java.net.InetSocketAddress;
-import java.util.Collection;
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
-import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.function.Supplier;
 
 /**
  * {@link JobMasterGateway} implementation for testing purposes.
@@ -360,5 +361,10 @@ public class TestingJobMasterGateway implements JobMasterGateway {
 	@Override
 	public void triggerOperatorUpdate(JobGraph jobGraph, JobVertexID targetVertexID, OperatorID operatorID) {
 
+	}
+
+	@Override
+	public CompletableFuture<Collection<TaskManagerSlot>> getAllSlots() {
+		return null;
 	}
 }

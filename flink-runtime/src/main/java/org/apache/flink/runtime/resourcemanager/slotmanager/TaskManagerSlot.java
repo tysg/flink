@@ -18,6 +18,12 @@
 
 package org.apache.flink.runtime.resourcemanager.slotmanager;
 
+import static org.apache.flink.util.Preconditions.checkNotNull;
+
+import java.util.Objects;
+
+import javax.annotation.Nullable;
+
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.runtime.clusterframework.types.AllocationID;
 import org.apache.flink.runtime.clusterframework.types.ResourceProfile;
@@ -25,12 +31,6 @@ import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.instance.InstanceID;
 import org.apache.flink.runtime.resourcemanager.registration.TaskExecutorConnection;
 import org.apache.flink.util.Preconditions;
-
-import javax.annotation.Nullable;
-
-import java.util.Objects;
-
-import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
  * A TaskManagerSlot represents a slot located in a TaskManager. It has a unique identification and
@@ -168,5 +168,10 @@ public class TaskManagerSlot implements TaskManagerSlotInformation {
 		FREE,
 		PENDING,
 		ALLOCATED
+	}
+
+	@Override
+	public String toString() {
+		return String.format("slot id: %s\nstate: %s\nallocation id: %s\nresource profile: %s\n", slotId.toString(), state, allocationId, resourceProfile.toString());
 	}
 }

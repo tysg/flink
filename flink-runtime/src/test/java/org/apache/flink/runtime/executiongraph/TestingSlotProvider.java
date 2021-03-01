@@ -18,7 +18,16 @@
 
 package org.apache.flink.runtime.executiongraph;
 
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.function.Consumer;
+import java.util.function.Function;
+
+import javax.annotation.Nullable;
+
 import org.apache.flink.api.common.time.Time;
+import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.clusterframework.types.SlotProfile;
 import org.apache.flink.runtime.instance.SlotSharingGroupId;
 import org.apache.flink.runtime.jobmanager.scheduler.ScheduledUnit;
@@ -26,14 +35,6 @@ import org.apache.flink.runtime.jobmaster.LogicalSlot;
 import org.apache.flink.runtime.jobmaster.SlotRequestId;
 import org.apache.flink.runtime.jobmaster.slotpool.SlotProvider;
 import org.apache.flink.util.Preconditions;
-
-import javax.annotation.Nullable;
-
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.function.Consumer;
-import java.util.function.Function;
 
 /**
  * {@link SlotProvider} implementation for testing purposes.
@@ -53,6 +54,16 @@ public class TestingSlotProvider implements SlotProvider {
 
 	public void setSlotCanceller(Consumer<SlotRequestId> slotCanceller) {
 		this.slotCanceller = slotCanceller;
+	}
+
+	@Override
+	public CompletableFuture<LogicalSlot> allocateSlot(
+		SlotRequestId slotRequestId,
+		ScheduledUnit scheduledUnit,
+		SlotProfile slotProfile,
+		Time allocationTimeout,
+		SlotID slotId) {
+		return null;
 	}
 
 	@Override

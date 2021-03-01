@@ -18,6 +18,15 @@
 
 package org.apache.flink.runtime.resourcemanager.utils;
 
+import java.util.Collection;
+import java.util.Collections;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Function;
+
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.tuple.Tuple2;
@@ -40,21 +49,14 @@ import org.apache.flink.runtime.resourcemanager.ResourceManagerId;
 import org.apache.flink.runtime.resourcemanager.ResourceOverview;
 import org.apache.flink.runtime.resourcemanager.SlotRequest;
 import org.apache.flink.runtime.resourcemanager.TaskExecutorRegistration;
+import org.apache.flink.runtime.resourcemanager.slotmanager.TaskManagerSlot;
 import org.apache.flink.runtime.rest.messages.taskmanager.TaskManagerInfo;
+import org.apache.flink.runtime.rpc.RpcTimeout;
 import org.apache.flink.runtime.taskexecutor.FileType;
 import org.apache.flink.runtime.taskexecutor.SlotReport;
 import org.apache.flink.runtime.taskexecutor.TaskExecutorHeartbeatPayload;
 import org.apache.flink.runtime.taskexecutor.TaskExecutorRegistrationSuccess;
 import org.apache.flink.util.Preconditions;
-
-import java.util.Collection;
-import java.util.Collections;
-import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
-import java.util.function.Function;
 
 /**
  * Implementation of the {@link ResourceManagerGateway} for testing purposes solely.
@@ -322,5 +324,19 @@ public class TestingResourceManagerGateway implements ResourceManagerGateway {
 	@Override
 	public String getHostname() {
 		return hostname;
+	}
+
+	@Override
+	public CompletableFuture<Collection<TaskManagerSlot>> getAllSlots() {
+		return CompletableFuture.completedFuture(null);
+	}
+
+	@Override
+	public CompletableFuture<Acknowledge> requestSlot(
+		JobMasterId jobMasterId,
+		SlotRequest slotRequest,
+		@RpcTimeout Time timeout,
+		SlotID slotId) {
+		return CompletableFuture.completedFuture(Acknowledge.get());
 	}
 }

@@ -1,35 +1,50 @@
 package org.apache.flink.runtime.rescale.reconfigure;
 
+import static org.apache.flink.util.Preconditions.checkArgument;
+import static org.apache.flink.util.Preconditions.checkNotNull;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.stream.Collectors;
+
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.JobException;
 import org.apache.flink.runtime.checkpoint.CheckpointCoordinator;
 import org.apache.flink.runtime.checkpoint.OperatorState;
 import org.apache.flink.runtime.checkpoint.PendingCheckpoint;
 import org.apache.flink.runtime.checkpoint.StateAssignmentOperation;
+import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
 import org.apache.flink.runtime.execution.ExecutionState;
-import org.apache.flink.runtime.executiongraph.*;
+import org.apache.flink.runtime.executiongraph.Execution;
+import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
+import org.apache.flink.runtime.executiongraph.ExecutionGraph;
+import org.apache.flink.runtime.executiongraph.ExecutionGraphException;
+import org.apache.flink.runtime.executiongraph.ExecutionJobVertex;
+import org.apache.flink.runtime.executiongraph.ExecutionVertex;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
-import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.rescale.RescaleID;
 import org.apache.flink.runtime.rescale.RescaleOptions;
 import org.apache.flink.runtime.rescale.RescalepointAcknowledgeListener;
 import org.apache.flink.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-import java.util.stream.Collectors;
-
-import static org.apache.flink.util.Preconditions.checkArgument;
-import static org.apache.flink.util.Preconditions.checkNotNull;
 
 public class ReconfigurationCoordinator extends AbstractCoordinator {
 
@@ -95,7 +110,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 	}
 
 	@Override
-	public CompletableFuture<Void> updateTaskResources(int operatorID, int oldParallelism) {
+	public CompletableFuture<Void> updateTaskResources(int operatorID, int oldParallelism, List<SlotID> slotIds) {
 		// TODO: By far we only support horizontal scaling, vertival scaling is not included.
 //		System.out.println("++++++ re-allocate resources for tasks" + operatorID);
 		JobVertexID tgtJobVertexID = rawVertexIDToJobVertexID(operatorID);
@@ -104,13 +119,13 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 		if (tgtJobVertex.getParallelism() < oldParallelism) {
 			return cancelTasks(operatorID, 0);
 		} else if (tgtJobVertex.getParallelism() > oldParallelism) {
-			return deployTasks(operatorID, oldParallelism);
+			return deployTasks(operatorID, oldParallelism, slotIds);
 		} else {
 			throw new IllegalStateException("none of new tasks has been created");
 		}
 	}
 
-	public CompletableFuture<Void> deployTasks(int operatorID, int oldParallelism) {
+	public CompletableFuture<Void> deployTasks(int operatorID, int oldParallelism, List<SlotID> slotIds) {
 		// TODO: add the task to the checkpointCoordinator
 		System.out.println("deploying... tasks of " + operatorID);
 		JobVertexID jobVertexID = rawVertexIDToJobVertexID(operatorID);
@@ -134,9 +149,11 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 //			Execution executionAttempt = taskVertices[i].getCurrentExecutionAttempt();
 //			allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(rescaleID));
 //		}
-		for (ExecutionVertex vertex : createCandidates.get(operatorID)) {
-			Execution executionAttempt = vertex.getCurrentExecutionAttempt();
-			allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(rescaleID));
+//		for (ExecutionVertex vertex : createCandidates.get(operatorID)) {
+		List<ExecutionVertex> vertices = createCandidates.get(operatorID);
+		for (int i = 0; i < vertices.size(); i++) {
+			Execution executionAttempt = vertices.get(i).getCurrentExecutionAttempt();
+			allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(rescaleID, slotIds.get(i)));
 		}
 
 		return FutureUtils.combineAll(allocateSlotFutures)

@@ -18,6 +18,30 @@
 
 package org.apache.flink.runtime.jobmaster;
 
+import static org.apache.flink.util.Preconditions.checkNotNull;
+import static org.apache.flink.util.Preconditions.checkState;
+
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
+
+import javax.annotation.Nullable;
+
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.api.common.functions.AggregateFunction;
@@ -39,7 +63,11 @@ import org.apache.flink.runtime.execution.ExecutionState;
 import org.apache.flink.runtime.executiongraph.ArchivedExecutionGraph;
 import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
 import org.apache.flink.runtime.executiongraph.JobStatusListener;
-import org.apache.flink.runtime.heartbeat.*;
+import org.apache.flink.runtime.heartbeat.HeartbeatListener;
+import org.apache.flink.runtime.heartbeat.HeartbeatManager;
+import org.apache.flink.runtime.heartbeat.HeartbeatServices;
+import org.apache.flink.runtime.heartbeat.HeartbeatTarget;
+import org.apache.flink.runtime.heartbeat.NoOpHeartbeatManager;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
 import org.apache.flink.runtime.io.network.partition.JobMasterPartitionTracker;
 import org.apache.flink.runtime.io.network.partition.PartitionTrackerFactory;
@@ -75,6 +103,7 @@ import org.apache.flink.runtime.rescale.JobRescaleCoordinator;
 import org.apache.flink.runtime.rescale.reconfigure.AbstractCoordinator;
 import org.apache.flink.runtime.resourcemanager.ResourceManagerGateway;
 import org.apache.flink.runtime.resourcemanager.ResourceManagerId;
+import org.apache.flink.runtime.resourcemanager.slotmanager.TaskManagerSlot;
 import org.apache.flink.runtime.rest.handler.legacy.backpressure.BackPressureStatsTracker;
 import org.apache.flink.runtime.rest.handler.legacy.backpressure.OperatorBackPressureStats;
 import org.apache.flink.runtime.rest.handler.legacy.backpressure.OperatorBackPressureStatsResponse;
@@ -96,16 +125,6 @@ import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkException;
 import org.apache.flink.util.InstantiationUtil;
 import org.slf4j.Logger;
-
-import javax.annotation.Nullable;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.util.*;
-import java.util.concurrent.*;
-import java.util.function.Function;
-
-import static org.apache.flink.util.Preconditions.checkNotNull;
-import static org.apache.flink.util.Preconditions.checkState;
 
 /**
  * JobMaster implementation. The job master is responsible for the execution of a single
@@ -590,6 +609,11 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		}
 	}
 
+	@Override
+	public CompletableFuture<Collection<TaskManagerSlot>> getAllSlots() {
+		return slotPool.getAllSlots();
+	}
+
 	private void internalFailAllocation(AllocationID allocationId, Exception cause) {
 		final Optional<ResourceID> resourceIdOptional = slotPool.failAllocation(allocationId, cause);
 		resourceIdOptional.ifPresent(taskManagerId -> {
@@ -940,6 +964,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		}
 	}
 
+	// TODO: update resource distribution from here
 	private void jobStatusChanged(
 		final JobStatus newJobStatus,
 		long timestamp,
@@ -1055,6 +1080,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 				resourceManagerResourceId);
 
 			slotPool.connectToResourceManager(resourceManagerGateway);
+//			streamManagerGatewayFuture.thenAccept(gateway -> gateway.connectToResourceManager(resourceManagerGateway));
 
 			resourceManagerHeartbeatManager.monitorTarget(resourceManagerResourceId, new HeartbeatTarget<Void>() {
 				@Override
@@ -1100,6 +1126,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		ResourceManagerGateway resourceManagerGateway = establishedResourceManagerConnection.getResourceManagerGateway();
 		resourceManagerGateway.disconnectJobManager(jobGraph.getJobID(), cause);
 		slotPool.disconnectResourceManager();
+//		streamManagerGatewayFuture.thenAccept(gateway -> gateway.disconnectResourceManager());
 	}
 
 	//----------------------------------------------------------------------------------------------
