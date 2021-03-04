@@ -167,14 +167,17 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 
 			// aggregate the metrics
 			recordsIn += numRecords;
+			latency += endToEndLatency;
 			recordsOut += status.getNumRecordsOut();
 //			usefulTime += processing + deserializationDuration;
 //				usefulTime += processing + status.getSerializationDuration()
 //					- status.getWaitingForWriteBufferDuration();
-			usefulTime += processing + status.getSerializationDuration() + status.getDeserializationDuration()
+			usefulTime += processing + status.getSerializationDuration() + deserializationDuration
+//				+ status.getDeserializationDuration()
 				- status.getWaitingForWriteBufferDuration();
 
-			latency += endToEndLatency;
+//			outputStreamDecorator.println(String.format("%d+%d+%d-%d",
+//				processing, status.getSerializationDuration(), deserializationDuration, status.getWaitingForWriteBufferDuration()));
 
 			// clear status counters
 			status.clearCounters();
@@ -187,6 +190,7 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 				double trueOutputRate = (recordsOut / (usefulTime / 1000.0)) * 1000000;
 				double observedProcessingRate = (recordsIn / (duration / 1000.0)) * 1000000;
 				double observedOutputRate = (recordsOut / (duration / 1000.0)) * 1000000;
+				outputStreamDecorator.println(latency + " : " + recordsIn);
 				float endToEndLantecy = (float) latency/recordsIn;
 
 				double utilization = (double) usefulTime / duration;
@@ -238,10 +242,11 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 
 					String ratesLine = jobVertexId + ","
 						+ workerName + "-" + instanceId + ","
-//						+ " trueProcessingRate: " + trueProcessingRate + ","
 						+ " observedProcessingRate: " + observedProcessingRate + ","
-						+ " endToEndLantecy: " + endToEndLantecy + ","
 						+ " trueProcessingRate: " + trueProcessingRate + ","
+//						+ " observedOutputRate: " + observedOutputRate + ","
+//						+ " trueOutputRate: " + trueOutputRate + ","
+						+ " endToEndLantecy: " + endToEndLantecy + ","
 						+ " utilization: " + String.format("%.2f", utilization);
 //						+ " totalRecordsIn: " + totalRecordsIn + ","
 //						+ " totalRecordsOut: " + totalRecordsOut;
@@ -286,9 +291,13 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 //			kgNRecordsMap.getOrDefault(keyGroup, 0)+1);
 //		kgLatencyMap.put(keyGroup,
 //			kgLatencyMap.getOrDefault(keyGroup, 0L)+(completionTs - arrivalTs));
-//		outputStreamDecorator.println(String.format("keygroup: %d, latency: %d", keyGroup, (completionTs - arrivalTs)));
+		outputStreamDecorator.println(String.format("keygroup: %d, latency: %d", keyGroup, (completionTs - arrivalTs)));
 	}
 
+	@Override
+	public void groundTruth(int keyGroup, long latency) {
+		outputStreamDecorator.println(String.format("keygroup: %d, latency: %d", keyGroup, latency));
+	}
 
 	/**
 	 * A new input buffer has been retrieved with the given timestamp.
@@ -489,8 +498,9 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 			String ratesLine = jobVertexId + ","
 				+ workerName + "-" + instanceId + ","
 //						+ " trueProcessingRate: " + trueProcessingRate + ","
-				+ " observedProcessingRate: " + observedProcessingRate + ","
-				+ " endToEndLantecy: " + endToEndLantecy;
+				+ " observedProcessingRate: " + observedProcessingRate;
+//				+ ","
+//				+ " endToEndLantecy: " + endToEndLantecy;
 //						+ ","
 //						+ " totalRecordsIn: " + totalRecordsIn + ","
 //						+ " totalRecordsOut: " + totalRecordsOut;

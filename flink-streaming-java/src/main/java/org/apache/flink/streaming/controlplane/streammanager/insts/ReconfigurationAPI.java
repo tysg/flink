@@ -19,7 +19,7 @@
 package org.apache.flink.streaming.controlplane.streammanager.insts;
 
 import org.apache.flink.runtime.controlplane.PrimitiveOperation;
-import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
+import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.runtime.rescale.JobRescaleAction;
 import org.apache.flink.runtime.rescale.reconfigure.AbstractCoordinator;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
@@ -40,7 +40,7 @@ public interface ReconfigurationAPI {
 	 *
 	 * @return the stream job state maintained in some place (e.g. {@link org.apache.flink.streaming.controlplane.streammanager.StreamManager})
 	 */
-	StreamJobExecutionPlan getJobExecutionPlan();
+	ExecutionPlan getJobExecutionPlan();
 
 	@Deprecated
 	void rescaleStreamJob(JobRescaleAction.RescaleParamsWrapper wrapper);

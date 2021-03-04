@@ -289,6 +289,11 @@ public class DefaultMetricsManager implements Serializable, MetricsManager {
 			kgLatencyMap.getOrDefault(keyGroup, 0L)+(completionTs - arrivalTs));
 	}
 
+	@Override
+	public void groundTruth(int keyGroup, long latency) {
+
+	}
+
 
 	/**
 	 * A new input buffer has been retrieved with the given timestamp.

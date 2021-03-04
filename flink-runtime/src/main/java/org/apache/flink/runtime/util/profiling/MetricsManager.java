@@ -23,6 +23,8 @@ public interface MetricsManager {
 
 	void groundTruth(int keyGroup, long arrivalTs, long completionTs);
 
+	void groundTruth(int keyGroup, long latency);
+
 	void outputBufferFull(long timestamp);
 
 	void updateMetrics();

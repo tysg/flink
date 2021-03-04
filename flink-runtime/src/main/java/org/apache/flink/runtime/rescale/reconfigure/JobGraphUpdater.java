@@ -15,7 +15,7 @@ public interface JobGraphUpdater extends JobGraphRescaler{
 	 * @return
 	 * @throws Exception
 	 */
-	<OUT> JobVertexID updateOperator(int operatorID, OperatorDescriptor.ApplicationLogic applicationLogic) throws Exception;
+	<OUT> JobVertexID updateOperator(int operatorID, OperatorDescriptor.ExecutionLogic executionLogic) throws Exception;
 
 	Map<Integer, OperatorID> getOperatorIDMap();
 }

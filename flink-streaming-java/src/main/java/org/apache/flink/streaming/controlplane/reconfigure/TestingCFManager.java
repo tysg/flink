@@ -1,14 +1,9 @@
 package org.apache.flink.streaming.controlplane.reconfigure;
 
-import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
-import org.apache.flink.runtime.controlplane.abstraction.JobGraphConfig;
-import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
+import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.streaming.controlplane.reconfigure.operator.ControlFunction;
 import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
-
-import javax.annotation.Nonnull;
-import java.util.Iterator;
 
 public class TestingCFManager extends ControlFunctionManager implements ControlPolicy {
 
@@ -21,7 +16,7 @@ public class TestingCFManager extends ControlFunctionManager implements ControlP
 	public void startControllerInternal() {
 		System.out.println("Testing Control Function Manager starting...");
 
-		StreamJobExecutionPlan jobState = getInstructionSet().getJobExecutionPlan();
+		ExecutionPlan jobState = getInstructionSet().getJobExecutionPlan();
 
 		int secondOperatorId = findOperatorByName("filte");
 

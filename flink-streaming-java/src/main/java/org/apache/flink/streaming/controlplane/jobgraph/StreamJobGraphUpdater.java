@@ -1,7 +1,5 @@
 package org.apache.flink.streaming.controlplane.jobgraph;
 
-import org.apache.flink.annotation.VisibleForTesting;
-import org.apache.flink.api.common.functions.Function;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
@@ -11,13 +9,10 @@ import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.SimpleOperatorFactory;
-import org.apache.flink.streaming.api.operators.SimpleUdfStreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.StreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
 import org.apache.flink.runtime.rescale.reconfigure.JobGraphRescaler;
 import org.apache.flink.runtime.rescale.reconfigure.JobGraphUpdater;
-import org.apache.flink.streaming.controlplane.reconfigure.operator.ControlFunction;
-import org.apache.flink.streaming.controlplane.reconfigure.operator.ControlOperatorFactory;
 import org.apache.flink.streaming.controlplane.rescale.StreamJobGraphRescaler;
 
 import java.lang.reflect.Field;
@@ -69,14 +64,14 @@ public class StreamJobGraphUpdater implements JobGraphRescaler, JobGraphUpdater 
 	}
 
 	@Override
-	public <OUT> JobVertexID updateOperator(int vertexId, OperatorDescriptor.ApplicationLogic applicationLogic) throws Exception {
+	public <OUT> JobVertexID updateOperator(int vertexId, OperatorDescriptor.ExecutionLogic executionLogic) throws Exception {
 		OperatorID operatorID = operatorIDMap.get(vertexId);
 		StreamConfig config = findStreamConfig(operatorID);
 		StreamOperatorFactory<?> factory = config.getStreamOperatorFactory(userClassLoader);
 		if(factory instanceof SimpleOperatorFactory){
 			StreamOperator<?> operator = ((SimpleOperatorFactory<?>) factory).getOperator();
-			Map<String, Field> fieldMap = applicationLogic.getControlAttributeFieldMap();
-			for(Map.Entry<String, Object> entry : applicationLogic.getControlAttributeMap().entrySet()){
+			Map<String, Field> fieldMap = executionLogic.getControlAttributeFieldMap();
+			for(Map.Entry<String, Object> entry : executionLogic.getControlAttributeMap().entrySet()){
 				Field field = fieldMap.get(entry.getKey());
 				boolean access = field.isAccessible();
 				field.setAccessible(true);

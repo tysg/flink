@@ -46,18 +46,18 @@ import java.lang.reflect.Field;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public final class StreamJobExecutionPlanImpl implements StreamJobExecutionPlan {
+public final class ExecutionPlanImpl implements ExecutionPlan {
+	// operatorId -> operator
+	private final Map<Integer, OperatorDescriptor> operatorsMap = new LinkedHashMap<>();
+	private final OperatorDescriptor[] headOperators;
 
-	private final Map<Integer, OperatorDescriptor> allOperatorsById = new LinkedHashMap<>();
-	private final OperatorDescriptor[] heads;
-
-	private final Map<Integer, List<ExecutionGraphConfig.OperatorTask>> operatorTaskListMap = new HashMap<>();
-	private final List<Host> hosts;
+	// operatorId -> task
+	private final Map<Integer, Map<Integer, Task>> operatorToTaskMap = new HashMap<>();
+	// node with resources
+	private final List<Node> resourceDistribution;
 
 	@Internal
-	public StreamJobExecutionPlanImpl(JobGraph jobGraph, ExecutionGraph executionGraph, ClassLoader userLoader) {
-		heads = initializeOperatorGraphState(jobGraph, userLoader);
-
+	public ExecutionPlanImpl(JobGraph jobGraph, ExecutionGraph executionGraph, ClassLoader userLoader) {
 		Map<OperatorID, Integer> operatorIdToVertexId = new HashMap<>();
 		for (JobVertex vertex : jobGraph.getVertices()) {
 			StreamConfig streamConfig = new StreamConfig(vertex.getConfiguration());
@@ -66,7 +66,8 @@ public final class StreamJobExecutionPlanImpl implements StreamJobExecutionPlan 
 				operatorIdToVertexId.put(config.getOperatorID(), config.getVertexID());
 			}
 		}
-		hosts = initDeploymentGraphState(executionGraph, operatorIdToVertexId);
+		resourceDistribution = initDeploymentGraphState(executionGraph, operatorIdToVertexId);
+		headOperators = initializeOperatorGraphState(jobGraph, userLoader);
 	}
 
 	// OperatorGraphState related
@@ -80,36 +81,38 @@ public final class StreamJobExecutionPlanImpl implements StreamJobExecutionPlan 
 			streamConfigMap.putAll(configMap);
 			for (StreamConfig config : configMap.values()) {
 				OperatorDescriptor operatorDescriptor = new OperatorDescriptor(
-					config.getVertexID(), config.getOperatorName(), vertex.getParallelism());
-				allOperatorsById.put(config.getVertexID(), operatorDescriptor);
-
+					config.getVertexID(),
+					config.getOperatorName(),
+					vertex.getParallelism(),
+					operatorToTaskMap.get(config.getVertexID()));
+				operatorsMap.put(config.getVertexID(), operatorDescriptor);
 			}
 		}
 		// build topology
-		for (OperatorDescriptor descriptor : allOperatorsById.values()) {
-			StreamConfig config = streamConfigMap.get(descriptor.getOperatorID());
+		for (OperatorDescriptor operatorDescriptor : operatorsMap.values()) {
+			StreamConfig config = streamConfigMap.get(operatorDescriptor.getOperatorID());
 			List<Tuple2<Integer, Integer>> outEdges = config.getOutEdges(userCodeLoader)
 				.stream()
 				.map(e -> Tuple2.of(e.getSourceId(), e.getTargetId()))
 				.collect(Collectors.toList());
-			OperatorDescriptorVisitor.attachOperator(descriptor).addChildren(outEdges, allOperatorsById);
+			OperatorDescriptorVisitor.attachOperator(operatorDescriptor).addChildren(outEdges, operatorsMap);
 
 			List<Tuple2<Integer, Integer>> inEdges = config.getInPhysicalEdges(userCodeLoader)
 				.stream()
 				.map(e -> Tuple2.of(e.getSourceId(), e.getTargetId()))
 				.collect(Collectors.toList());
-			OperatorDescriptorVisitor.attachOperator(descriptor).addParent(inEdges, allOperatorsById);
+			OperatorDescriptorVisitor.attachOperator(operatorDescriptor).addParent(inEdges, operatorsMap);
 		}
 		// find head
 		List<OperatorDescriptor> heads = new ArrayList<>();
-		for (OperatorDescriptor descriptor : allOperatorsById.values()) {
+		for (OperatorDescriptor descriptor : operatorsMap.values()) {
 			if (descriptor.getParents().isEmpty()) {
 				heads.add(descriptor);
 			}
 		}
-		checkRelationship(allOperatorsById.values());
+		checkRelationship(operatorsMap.values());
 		// finished other field
-		for (OperatorDescriptor descriptor : allOperatorsById.values()) {
+		for (OperatorDescriptor descriptor : operatorsMap.values()) {
 			StreamConfig streamConfig = streamConfigMap.get(descriptor.getOperatorID());
 			// add workload dimension info
 			Map<Integer, List<Integer>> keyStateAllocation = getKeyStateAllocation(streamConfig, userCodeLoader, descriptor.getParallelism());
@@ -126,45 +129,46 @@ public final class StreamJobExecutionPlanImpl implements StreamJobExecutionPlan 
 
 	@Override
 	public int getParallelism(Integer operatorID) {
-		return this.allOperatorsById.get(operatorID).getParallelism();
+		return this.operatorsMap.get(operatorID).getParallelism();
 	}
 
 	@Override
 	public Function getUserFunction(Integer operatorID) {
-		return allOperatorsById.get(operatorID).getUdf();
+		return operatorsMap.get(operatorID).getUdf();
 	}
 
 	@Override
 	public Map<Integer, List<Integer>> getKeyStateAllocation(Integer operatorID) {
-		return allOperatorsById.get(operatorID).getKeyStateAllocation();
+		return operatorsMap.get(operatorID).getKeyStateAllocation();
 	}
 
 	@Override
 	public Map<Integer, Map<Integer, List<Integer>>> getKeyMapping(Integer operatorID) {
-		return allOperatorsById.get(operatorID).getKeyMapping();
+		return operatorsMap.get(operatorID).getKeyMapping();
 	}
 
 	@Override
 	public Iterator<OperatorDescriptor> getAllOperatorDescriptor() {
-		return allOperatorsById.values().iterator();
+		return operatorsMap.values().iterator();
 	}
 
 	@Override
 	public OperatorDescriptor getOperatorDescriptorByID(Integer operatorID) {
-		return allOperatorsById.get(operatorID);
+		return operatorsMap.get(operatorID);
 	}
 
-	public OperatorDescriptor[] getHeads() {
-		return heads;
+	public OperatorDescriptor[] getHeadOperators() {
+		return headOperators;
 	}
 
 	// DeployGraphState related
-	private List<Host> initDeploymentGraphState(ExecutionGraph executionGraph, Map<OperatorID, Integer> operatorIdToVertexId) {
-		Map<ResourceID, org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan.Host> hosts = new HashMap<>();
+	private List<Node> initDeploymentGraphState(ExecutionGraph executionGraph, Map<OperatorID, Integer> operatorIdToVertexId) {
+		Map<ResourceID, Node> hosts = new HashMap<>();
 
 		for (ExecutionJobVertex jobVertex : executionGraph.getAllVertices().values()) {
 			// contains all tasks of the same parallel operator instances
-			List<ExecutionGraphConfig.OperatorTask> operatorTaskList = new ArrayList<>(jobVertex.getParallelism());
+//			List<Task> taskList = new ArrayList<>(jobVertex.getParallelism());
+			Map<Integer, Task> taskMap = new HashMap<>();
 			for (ExecutionVertex vertex : jobVertex.getTaskVertices()) {
 				Execution execution;
 				do {
@@ -177,30 +181,30 @@ public final class StreamJobExecutionPlanImpl implements StreamJobExecutionPlan 
 					}
 				} while (execution == null || execution.getState() != ExecutionState.RUNNING);
 				LogicalSlot slot = execution.getAssignedResource();
-				Host host = hosts.get(slot.getTaskManagerLocation().getResourceID());
-				if (host == null) {
-					host = new Host(slot.getTaskManagerLocation().address(), 0, 0);
-					hosts.put(slot.getTaskManagerLocation().getResourceID(), host);
+				Node node = hosts.get(slot.getTaskManagerLocation().getResourceID());
+				if (node == null) {
+					node = new Node(slot.getTaskManagerLocation().address(), 0);
+					hosts.put(slot.getTaskManagerLocation().getResourceID(), node);
 				}
-				// todo how to get cpu, number of threads, memory?
-				OperatorTask operatorTask = new OperatorTask(slot.getPhysicalSlotNumber(), host);
-				operatorTaskList.add(operatorTask);
+				// todo how to get number of slots?
+				Task task = new Task(slot.getPhysicalSlotNumber(), node);
+				taskMap.put(vertex.getParallelSubtaskIndex(), task);
 			}
 			for (OperatorID operatorID : jobVertex.getOperatorIDs()) {
-				operatorTaskListMap.put(operatorIdToVertexId.get(operatorID), operatorTaskList);
+				operatorToTaskMap.put(operatorIdToVertexId.get(operatorID), taskMap);
 			}
 		}
 		return new ArrayList<>(hosts.values());
 	}
 
 	@Override
-	public Host[] getHosts() {
-		return hosts.toArray(new Host[0]);
+	public Node[] getResourceDistribution() {
+		return resourceDistribution.toArray(new Node[0]);
 	}
 
 	@Override
-	public OperatorTask getTask(Integer operatorID, int offset) {
-		return operatorTaskListMap.get(operatorID).get(offset);
+	public Task getTask(Integer operatorID, int taskId) {
+		return operatorToTaskMap.get(operatorID).get(taskId);
 	}
 
 	private static void attachAppLogicToOperatorDescriptor(

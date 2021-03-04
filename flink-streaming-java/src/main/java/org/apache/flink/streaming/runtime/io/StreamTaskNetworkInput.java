@@ -36,6 +36,7 @@ import org.apache.flink.runtime.util.profiling.MetricsManager;
 import org.apache.flink.streaming.api.watermark.Watermark;
 import org.apache.flink.streaming.runtime.streamrecord.StreamElement;
 import org.apache.flink.streaming.runtime.streamrecord.StreamElementSerializer;
+import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.streamstatus.StatusWatermarkValve;
 import org.apache.flink.streaming.runtime.streamstatus.StreamStatus;
 
@@ -82,6 +83,11 @@ public final class StreamTaskNetworkInput<T> implements StreamTaskInput<T> {
 	private MetricsManager metricsManager;
 
 	private TaskOperatorManager.PauseActionController pauseActionController;
+
+	private long deserializationDuration = 0;
+	private long processingDuration = 0;
+	private long recordsProcessed = 0;
+	private long endToEndLatency = 0;
 
 	@SuppressWarnings("unchecked")
 	public StreamTaskNetworkInput(
@@ -137,7 +143,7 @@ public final class StreamTaskNetworkInput<T> implements StreamTaskInput<T> {
 			if (currentRecordDeserializer != null) {
 				long start = System.nanoTime();
 				DeserializationResult result = currentRecordDeserializer.getNextRecord(deserializationDelegate);
-				metricsManager.addDeserialization(System.nanoTime() - start);
+				deserializationDuration += System.nanoTime() - start;
 
 				if (result.isBufferConsumed()) {
 					currentRecordDeserializer.getCurrentBuffer().recycleBuffer();
@@ -166,12 +172,34 @@ public final class StreamTaskNetworkInput<T> implements StreamTaskInput<T> {
 				}
 				return InputStatus.NOTHING_AVAILABLE;
 			}
+
+			if (deserializationDuration > 0) {
+//				metricsManager.addDeserialization(deserializationDuration);
+				metricsManager.inputBufferConsumed(System.nanoTime(),
+					deserializationDuration, processingDuration,
+					recordsProcessed, endToEndLatency);
+
+				processingDuration = 0;
+				recordsProcessed = 0;
+				endToEndLatency = 0;
+				deserializationDuration = 0;
+			}
 		}
 	}
 
 	private void processElement(StreamElement recordOrMark, DataOutput<T> output) throws Exception {
 		if (recordOrMark.isRecord()){
-			output.emitRecord(recordOrMark.asRecord());
+			StreamRecord<T> record = recordOrMark.asRecord();
+			metricsManager.incRecordIn(record.getKeyGroup());
+			long queuingDelay = System.currentTimeMillis() - record.getLatencyTimestamp();
+			long processingStart = System.nanoTime();
+			output.emitRecord(record);
+			recordsProcessed++;
+			long processingDelay = System.nanoTime() - processingStart;
+			processingDuration += processingDelay;
+			long latency = queuingDelay + processingDelay/1000000;
+			endToEndLatency += latency;
+			metricsManager.groundTruth(record.getKeyGroup(), latency);
 		} else if (recordOrMark.isWatermark()) {
 			statusWatermarkValve.inputWatermark(recordOrMark.asWatermark(), lastChannel);
 		} else if (recordOrMark.isLatencyMarker()) {

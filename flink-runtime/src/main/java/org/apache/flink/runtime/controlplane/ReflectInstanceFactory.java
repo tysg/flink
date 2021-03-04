@@ -1,6 +1,6 @@
 package org.apache.flink.runtime.controlplane;
 
-import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
+import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.runtime.executiongraph.ExecutionGraph;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.rescale.reconfigure.JobGraphUpdater;
@@ -17,13 +17,13 @@ public class ReflectInstanceFactory implements StreamRelatedInstanceFactory {
 	}
 
 	@Override
-	public StreamJobExecutionPlan createExecutionPlan(
+	public ExecutionPlan createExecutionPlan(
 		JobGraph jobGraph,
 		ExecutionGraph executionGraph,
 		ClassLoader classLoader) {
 		try {
-			Class<? extends StreamJobExecutionPlan> StreamJobExecutionPlanClass = classGroup.getStreamJobExecutionPlanClass();
-			Constructor<? extends StreamJobExecutionPlan> constructor = StreamJobExecutionPlanClass
+			Class<? extends ExecutionPlan> StreamJobExecutionPlanClass = classGroup.getStreamJobExecutionPlanClass();
+			Constructor<? extends ExecutionPlan> constructor = StreamJobExecutionPlanClass
 				.getConstructor(JobGraph.class, ExecutionGraph.class, ClassLoader.class);
 			return constructor.newInstance(jobGraph, executionGraph, classLoader);
 		} catch (NoSuchMethodException | IllegalAccessException | InstantiationException | InvocationTargetException e) {

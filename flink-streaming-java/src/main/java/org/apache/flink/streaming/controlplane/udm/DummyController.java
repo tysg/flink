@@ -11,12 +11,12 @@ import org.apache.flink.streaming.controlplane.streammanager.insts.Reconfigurati
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class TestingControlPolicy extends AbstractControlPolicy {
+public class DummyController extends AbstractControlPolicy {
 
 	private final Object object = new Object();
 	private final TestingThread testingThread;
 
-	public TestingControlPolicy(ReconfigurationAPI reconfigurationAPI) {
+	public DummyController(ReconfigurationAPI reconfigurationAPI) {
 		super(reconfigurationAPI);
 		testingThread = new TestingThread();
 	}
@@ -435,70 +435,34 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 		public void run() {
 			// the testing jobGraph (workload) is in TestingWorkload.java, see that file to know how to use it.
 			int statefulOpID = findOperatorByName("Splitter FlatMap");
-			int statelessOpID = findOperatorByName("filter");
-			int sourceOp = findOperatorByName("Source: source");
-			// this operator is the downstream of actual source operator
-			int nearSourceMap = findOperatorByName("near source Flatmap");
-			int statelessMap = findOperatorByName("source stateless map");
-//			if (statefulOpID == -1 || statelessOpID == -1
-//				|| nearSourceMap == -1 || statelessMap == -1
-//				|| sourceOp == -1) {
-//				System.out.println("can not find operator with given name, corrupt");
-//				return;
-//			}
 
-			int frequency = 10;
 			try {
 				showOperatorInfo();
 				// todo, if the time of sleep is too short, may cause receiving not belong key
 				Thread.sleep(2000);
 
-//				System.out.println("\nstart synchronize source test...");
-//				testPauseSource(sourceOp);
+//				for (int i=0; i<100; i++) {
 
-//				System.out.println("\nstart stateful scale out test");
-//				testScaleOutStateful(statefulOpID);
-
-				// todo, for some reason. if no sleep here, it may be loss some data
-//				Thread.sleep(3000);
-
-//				System.out.println("\nstart stateful scale out 2 more test");
-//				testScaleOutStateful(statelessOpID);
-
-//				System.out.println("\nstart stateful scale in test2");
-//				testScaleInStateful2(statefulOpID);
-//
-//				System.out.println("\nstart stateful scale out test");
-//				testScaleOutStateful2(statefulOpID);
-
-//				System.out.println("\nstart rescale window join test...");
-//				testScaleOutWindowJoin();
-//
-//				System.out.println("\nstart source near stateful operator rebalance test...");
-//				testRebalanceStateful(nearSourceMap);
-//
-//				System.out.println("\nstart update function related test...");
-//				testCustomizeWindowUpdateAPI();
-//
-//				System.out.println("\nstart stateful scale in test3");
-//				testScaleInStateful2(statefulOpID);
-
-//				System.out.println("\nstart stateful scale in test4");
-//				testScaleInStateful2(statefulOpID);
-
-//				while (true) {
-//					sleep(1000/frequency);
-//					System.out.println("\nstart no op frequency test...");
-//					testNoOp(statefulOpID);
+//				int i = 0;
+//				while(true) {
+//					testScaling(statefulOpID, (i%2 + 1));
+//					sleep(100);
+//					i++;
 //				}
 
-//				testScaling(statefulOpID, 4);
-//				testScaling(statefulOpID, 5);
-//				testScaling(statefulOpID, 7);
-//				testScaling(statefulOpID, 3);
-//				testScaling(statefulOpID, 9);
-				testScaling(statefulOpID, 10);
+				testScaling(statefulOpID, 5);
+				sleep(100);
+				testScaling(statefulOpID, 3);
+				sleep(100);
+				testScaling(statefulOpID, 6);
+				sleep(100);
+				testScaling(statefulOpID, 2);
+				sleep(100);
 
+				testScaling(statefulOpID, 8);
+				sleep(100);
+
+				testScaling(statefulOpID, 4);
 
 
 			} catch (InterruptedException e) {
