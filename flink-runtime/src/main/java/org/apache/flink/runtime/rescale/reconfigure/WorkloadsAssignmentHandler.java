@@ -1,7 +1,7 @@
 package org.apache.flink.runtime.rescale.reconfigure;
 
+import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
-import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
 
 import java.util.HashMap;
 import java.util.Iterator;
@@ -13,14 +13,14 @@ public class WorkloadsAssignmentHandler {
 	private final Map<Integer, OperatorWorkloadsAssignment> heldWorkloadsAssignmentMap;
 	private final Map<Integer, Map<Integer, List<Integer>>> heldExecutorMapping;
 
-	public WorkloadsAssignmentHandler(StreamJobExecutionPlan jobExecutionPlan) {
+	public WorkloadsAssignmentHandler(ExecutionPlan jobExecutionPlan) {
 		heldWorkloadsAssignmentMap = new HashMap<>();
 		heldExecutorMapping = new HashMap<>();
 		setupWorkloadsAssignmentMapFromExecutionPlan(jobExecutionPlan);
 	}
 
-	public void setupWorkloadsAssignmentMapFromExecutionPlan(StreamJobExecutionPlan heldExecutionPlan) {
-//	public Map<Integer, OperatorWorkloadsAssignment> setupWorkloadsAssignmentMapFromExecutionPlan(StreamJobExecutionPlan heldExecutionPlan) {
+	public void setupWorkloadsAssignmentMapFromExecutionPlan(ExecutionPlan heldExecutionPlan) {
+//	public Map<Integer, OperatorWorkloadsAssignment> setupWorkloadsAssignmentMapFromExecutionPlan(ExecutionPlan heldExecutionPlan) {
 		for (Iterator<OperatorDescriptor> it = heldExecutionPlan.getAllOperatorDescriptor(); it.hasNext(); ) {
 			OperatorDescriptor descriptor = it.next();
 			int operatorID = descriptor.getOperatorID();

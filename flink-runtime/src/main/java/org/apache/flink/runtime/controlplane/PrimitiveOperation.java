@@ -19,7 +19,7 @@
 package org.apache.flink.runtime.controlplane;
 
 import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
+import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
@@ -27,6 +27,7 @@ import org.apache.flink.runtime.messages.Acknowledge;
 
 import javax.annotation.Nullable;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -49,7 +50,7 @@ public interface PrimitiveOperation<M> {
 	 * @param jobExecutionPlan the abstract execution plan which is maintained by some one
 	 * @return
 	 */
-	CompletableFuture<M> prepareExecutionPlan(StreamJobExecutionPlan jobExecutionPlan);
+	CompletableFuture<M> prepareExecutionPlan(ExecutionPlan jobExecutionPlan);
 
 	/**
 	 * Synchronize the whole dataflow of the streaming job, temporarily pause the affected tasks.
@@ -58,6 +59,8 @@ public interface PrimitiveOperation<M> {
 	 * @return
 	 */
 	CompletableFuture<M> synchronizeTasks(List<Tuple2<Integer, Integer>> taskList, M message);
+
+	CompletableFuture<M> synchronizeTasks(Map<Integer, List<Integer>> tasks, M message);
 
 	/**
 	 * Resume the paused tasks by synchronize.
@@ -78,7 +81,10 @@ public interface PrimitiveOperation<M> {
 	 * @param oldParallelism  the old parallelism to make a comparison
 	 * @return
 	 */
+
 	CompletableFuture<Void> updateTaskResources(int operatorID, int oldParallelism);
+
+	CompletableFuture<Void> updateTaskResources(Map<Integer, List<Integer>> tasks, int oldParallelism);
 
 	/**
 	 * Update key mappings between destOp and its parents
@@ -88,6 +94,8 @@ public interface PrimitiveOperation<M> {
 	 */
 	CompletableFuture<M> updateKeyMapping(int destOpID, M message);
 
+	CompletableFuture<M> updateKeyMapping(Map<Integer, List<Integer>> tasks, M message);
+
 	/**
 	 * update the key state in destination operator
 	 *
@@ -96,11 +104,15 @@ public interface PrimitiveOperation<M> {
 	 */
 	CompletableFuture<M> updateState(int operatorID, M message);
 
+	CompletableFuture<M> updateState(Map<Integer, List<Integer>> tasks, M message);
+
 	/**
 	 * @param vertexID the operator id of this operator
 	 * @return
 	 */
 	CompletableFuture<M> updateFunction(int vertexID, M message);
+
+	CompletableFuture<M> updateFunction(Map<Integer, List<Integer>> tasks, M message);
 
 	/**
 	 * Deprecated since we need a general primitive operation, use {@code PrimitiveOperation::updateFunction(int vertexID, int offset)},

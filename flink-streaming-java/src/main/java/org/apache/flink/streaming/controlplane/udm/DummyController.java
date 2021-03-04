@@ -2,8 +2,8 @@ package org.apache.flink.streaming.controlplane.udm;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.concurrent.FutureUtils;
+import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
-import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
 import org.apache.flink.streaming.api.windowing.triggers.CountTrigger;
 import org.apache.flink.streaming.api.windowing.triggers.PurgingTrigger;
 import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
@@ -46,7 +46,7 @@ public class DummyController extends AbstractControlPolicy {
 	}
 
 	private void showOperatorInfo() {
-		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
+		ExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
 		for (Iterator<OperatorDescriptor> it = streamJobState.getAllOperatorDescriptor(); it.hasNext(); ) {
 			OperatorDescriptor descriptor = it.next();
 			System.out.println(descriptor);
@@ -57,7 +57,7 @@ public class DummyController extends AbstractControlPolicy {
 	}
 
 	private void testRebalanceStateful(int testingOpID) throws InterruptedException {
-		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
+		ExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
 		Map<Integer, List<Integer>> curKeyStateAllocation = streamJobState.getKeyStateAllocation(testingOpID);
 		// we assume that each operator only have one input now
 
@@ -77,7 +77,7 @@ public class DummyController extends AbstractControlPolicy {
 	}
 
 	private void testRebalanceStateful2(int testingOpID) throws InterruptedException {
-		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
+		ExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
 		Map<Integer, List<Integer>> curKeyStateAllocation = streamJobState.getKeyStateAllocation(testingOpID);
 		// we assume that each operator only have one input now
 
@@ -97,7 +97,7 @@ public class DummyController extends AbstractControlPolicy {
 	}
 
 	private void testScaleOutStateful(int testingOpID) throws InterruptedException {
-		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
+		ExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
 
 		int oldParallelism = streamJobState.getParallelism(testingOpID);
 		System.out.println(oldParallelism);
@@ -127,7 +127,7 @@ public class DummyController extends AbstractControlPolicy {
 	}
 
 	private void testScaleOutStateful2(int testingOpID) throws InterruptedException {
-		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
+		ExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
 
 		int oldParallelism = streamJobState.getParallelism(testingOpID);
 		System.out.println(oldParallelism);
@@ -163,7 +163,7 @@ public class DummyController extends AbstractControlPolicy {
 	}
 
 	private void testScaleInStateful(int testingOpID) throws InterruptedException {
-		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
+		ExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
 
 		int oldParallelism = streamJobState.getParallelism(testingOpID);
 		System.out.println(oldParallelism);
@@ -190,7 +190,7 @@ public class DummyController extends AbstractControlPolicy {
 	}
 
 	private void testScaleInStateful2(int testingOpID) throws InterruptedException {
-		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
+		ExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
 
 		int oldParallelism = streamJobState.getParallelism(testingOpID);
 		System.out.println(oldParallelism);
@@ -219,7 +219,7 @@ public class DummyController extends AbstractControlPolicy {
 	}
 
 	private void testScaling(int testingOpID, int newParallelism) throws InterruptedException {
-		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
+		ExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
 
 		Map<Integer, List<Integer>> curKeyStateAllocation = streamJobState.getKeyStateAllocation(testingOpID);
 		int oldParallelism = streamJobState.getParallelism(testingOpID);
@@ -256,7 +256,7 @@ public class DummyController extends AbstractControlPolicy {
 
 	// WARNING: This only works without rebalance of the stateless operator
 	private void testScaleOut2(int testingOpID) throws InterruptedException {
-		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
+		ExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
 
 		int oldParallelism = streamJobState.getParallelism(testingOpID);
 		System.out.println(oldParallelism);
@@ -292,7 +292,7 @@ public class DummyController extends AbstractControlPolicy {
 
 	@Deprecated
 	private void testRebalanceStateless(int testingOpID) throws InterruptedException {
-		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
+		ExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
 		Set<OperatorDescriptor> parents = streamJobState.getOperatorDescriptorByID(testingOpID).getParents();
 		// we assume that each operator only have one input now
 		for (OperatorDescriptor parent : parents) {
@@ -392,7 +392,7 @@ public class DummyController extends AbstractControlPolicy {
 
 	private void testScaleOutWindowJoin() throws InterruptedException {
 
-		StreamJobExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
+		ExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
 		int testingOpID = findOperatorByName("join1");
 
 		int oldParallelism = streamJobState.getParallelism(testingOpID);
@@ -434,7 +434,7 @@ public class DummyController extends AbstractControlPolicy {
 		@Override
 		public void run() {
 			// the testing jobGraph (workload) is in TestingWorkload.java, see that file to know how to use it.
-			int statefulOpID = findOperatorByName("join");
+			int statefulOpID = findOperatorByName("Splitter FlatMap");
 
 			try {
 				showOperatorInfo();
@@ -443,26 +443,26 @@ public class DummyController extends AbstractControlPolicy {
 
 //				for (int i=0; i<100; i++) {
 
-				int i = 0;
-				while(true) {
-					testScaling(statefulOpID, (i%2 + 1));
-					sleep(100);
-					i++;
-				}
+//				int i = 0;
+//				while(true) {
+//					testScaling(statefulOpID, (i%2 + 1));
+//					sleep(100);
+//					i++;
+//				}
 
-//				testScaling(statefulOpID, 5);
-//				sleep(100);
-//				testScaling(statefulOpID, 3);
-//				sleep(100);
-//				testScaling(statefulOpID, 6);
-//				sleep(100);
-//				testScaling(statefulOpID, 2);
-//				sleep(100);
-//
-//				testScaling(statefulOpID, 8);
-//				sleep(100);
-//
-//				testScaling(statefulOpID, 4);
+				testScaling(statefulOpID, 5);
+				sleep(100);
+				testScaling(statefulOpID, 3);
+				sleep(100);
+				testScaling(statefulOpID, 6);
+				sleep(100);
+				testScaling(statefulOpID, 2);
+				sleep(100);
+
+				testScaling(statefulOpID, 8);
+				sleep(100);
+
+				testScaling(statefulOpID, 4);
 
 
 			} catch (InterruptedException e) {

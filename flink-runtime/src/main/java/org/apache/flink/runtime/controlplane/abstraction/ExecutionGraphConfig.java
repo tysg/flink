@@ -13,48 +13,55 @@ public interface ExecutionGraphConfig {
 	 *
 	 * @return
 	 */
-	Host[] getHosts();
+	Node[] getResourceDistribution();
 
 	/**
 	 * Get one of the parallel task of one operator.
 	 *
 	 * @param operatorID the operator id of this operator
-	 * @param offset     represent which parallel instance of this operator
+	 * @param taskId     represent which task instance of this operator
 	 * @return
 	 */
-	OperatorTask getTask(Integer operatorID, int offset);
+	Task getTask(Integer operatorID, int taskId);
 
-	class OperatorTask {
+	class Task {
 		// task own threads
-		int ownThreads;
-		Host location;
+		int allocatedSlot;
+		Node location;
 
-		public OperatorTask(int ownThreads, Host location) {
-			this.ownThreads = ownThreads;
+		public Task(int allocatedSlot, Node location) {
+			this.allocatedSlot = allocatedSlot;
 			this.location = location;
 			location.addContainedTask(this);
 		}
 	}
 
-	class Host {
-		// host network address
-		InetAddress address;
-		// host number of cpus
-		int numCpus;
-		/* host memory in bytes */
-		int memory;
+	class Node {
+//		// host network address
+//		InetAddress address;
+//		// host number of cpus
+//		int numCpus;
+//		/* host memory in bytes */
+//		int memory;
 
-		List<OperatorTask> containedTasks;
+		// address id
+		InetAddress nodeAddress;
+		// number of slots
+		int numOfSlots;
 
-		public Host(InetAddress address, int numCpus, int memory) {
-			this.address = address;
-			this.numCpus = numCpus;
-			this.memory = memory;
-			containedTasks = new ArrayList<>();
+		List<Task> deployedTasks;
+
+		public Node(InetAddress nodeAddress, int numOfSlots) {
+//			this.address = address;
+//			this.numCpus = numCpus;
+//			this.memory = memory;
+			this.nodeAddress = nodeAddress;
+			this.numOfSlots = numOfSlots;
+			deployedTasks = new ArrayList<>();
 		}
 
-		void addContainedTask(OperatorTask operatorTask){
-			containedTasks.add(operatorTask);
+		void addContainedTask(Task task){
+			deployedTasks.add(task);
 		}
 	}
 }

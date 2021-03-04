@@ -39,7 +39,7 @@ public class OperatorDescriptorVisitor {
 		operatorDescriptor.setAttributeField(object, fieldList);
 	}
 
-	public OperatorDescriptor.ApplicationLogic getApplicationLogic() {
+	public OperatorDescriptor.ExecutionLogic getApplicationLogic() {
 		return operatorDescriptor.getApplicationLogic();
 	}
 }

@@ -19,14 +19,14 @@
 package org.apache.flink.streaming.controlplane.streammanager.insts;
 
 import org.apache.flink.api.common.functions.Function;
+import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
-import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class StreamJobExecutionPlanWithUpdatingFlagImpl implements StreamJobExecutionPlanWithUpdatingFlag {
+public class ExecutionPlanWithUpdatingFlagImpl implements ExecutionPlanWithUpdatingFlag {
 
 	private final static int COMMITTED = 1;
 	private final static int STAGED = 0;
@@ -34,10 +34,10 @@ public class StreamJobExecutionPlanWithUpdatingFlagImpl implements StreamJobExec
 	private final AtomicInteger stateOfUpdate = new AtomicInteger(COMMITTED);
 	private ControlPolicy currentWaitingController;
 
-	private final StreamJobExecutionPlan streamJobExecutionPlanDelegate;
+	private final ExecutionPlan executionPlan;
 
-	public StreamJobExecutionPlanWithUpdatingFlagImpl(StreamJobExecutionPlan streamJobExecutionPlanDelegate) {
-		this.streamJobExecutionPlanDelegate = streamJobExecutionPlanDelegate;
+	public ExecutionPlanWithUpdatingFlagImpl(ExecutionPlan executionPlan) {
+		this.executionPlan = executionPlan;
 	}
 
 	@Override
@@ -63,42 +63,42 @@ public class StreamJobExecutionPlanWithUpdatingFlagImpl implements StreamJobExec
 
 	// delegate methods
 	@Override
-	public Host[] getHosts() {
-		return streamJobExecutionPlanDelegate.getHosts();
+	public Node[] getResourceDistribution() {
+		return executionPlan.getResourceDistribution();
 	}
 
 	@Override
-	public OperatorTask getTask(Integer operatorID, int offset) {
-		return streamJobExecutionPlanDelegate.getTask(operatorID, offset);
+	public Task getTask(Integer operatorID, int taskId) {
+		return executionPlan.getTask(operatorID, taskId);
 	}
 
 	@Override
 	public Function getUserFunction(Integer operatorID) {
-		return streamJobExecutionPlanDelegate.getUserFunction(operatorID);
+		return executionPlan.getUserFunction(operatorID);
 	}
 
 	@Override
 	public Map<Integer, List<Integer>> getKeyStateAllocation(Integer operatorID){
-		return streamJobExecutionPlanDelegate.getKeyStateAllocation(operatorID);
+		return executionPlan.getKeyStateAllocation(operatorID);
 	}
 
 	@Override
 	public Map<Integer, Map<Integer, List<Integer>>> getKeyMapping(Integer operatorID) {
-		return streamJobExecutionPlanDelegate.getKeyMapping(operatorID);
+		return executionPlan.getKeyMapping(operatorID);
 	}
 
 	@Override
 	public int getParallelism(Integer operatorID) {
-		return streamJobExecutionPlanDelegate.getParallelism(operatorID);
+		return executionPlan.getParallelism(operatorID);
 	}
 
 	@Override
 	public Iterator<OperatorDescriptor> getAllOperatorDescriptor() {
-		return streamJobExecutionPlanDelegate.getAllOperatorDescriptor();
+		return executionPlan.getAllOperatorDescriptor();
 	}
 
 	@Override
 	public OperatorDescriptor getOperatorDescriptorByID(Integer operatorID) {
-		return streamJobExecutionPlanDelegate.getOperatorDescriptorByID(operatorID);
+		return executionPlan.getOperatorDescriptorByID(operatorID);
 	}
 }

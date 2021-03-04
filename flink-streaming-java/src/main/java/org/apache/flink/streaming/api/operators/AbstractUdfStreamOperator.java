@@ -57,7 +57,7 @@ public abstract class AbstractUdfStreamOperator<OUT, F extends Function>
 
 
 	/** The user function. */
-	@ControlAttribute(name = OperatorDescriptor.ApplicationLogic.UDF)
+	@ControlAttribute(name = OperatorDescriptor.ExecutionLogic.UDF)
 	protected final F userFunction;
 
 	/** Flag to prevent duplicate function.close() calls in close() and dispose(). */

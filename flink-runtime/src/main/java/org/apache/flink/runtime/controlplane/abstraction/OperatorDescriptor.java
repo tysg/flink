@@ -1,7 +1,6 @@
 package org.apache.flink.runtime.controlplane.abstraction;
 
 import org.apache.flink.annotation.Internal;
-import org.apache.flink.annotation.Public;
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.functions.Function;
@@ -10,32 +9,35 @@ import org.apache.flink.util.Preconditions;
 
 import java.lang.reflect.Field;
 import java.util.*;
-import java.util.function.Supplier;
-import java.util.stream.Collector;
-import java.util.stream.Collectors;
+
+import static org.apache.flink.runtime.controlplane.abstraction.ExecutionGraphConfig.*;
 
 /**
  * this class make sure all field is not modifiable for external class
  */
 public class OperatorDescriptor {
 
-	private final Integer operatorID;
+	private final int operatorID;
 	private final String name;
 
 	private final Set<OperatorDescriptor> parents = new HashSet<>();
 	private final Set<OperatorDescriptor> children = new HashSet<>();
 
-	private final OperatorPayload payload;
+	private final TaskConfigurations taskConfigurations;
 	private boolean stateful = false;
 
-	public OperatorDescriptor(Integer operatorID, String name, int parallelism) {
+	public OperatorDescriptor(int operatorID, String name, int parallelism, Map<Integer, Task> tasks) {
 		this.operatorID = operatorID;
 		this.name = name;
-		this.payload = new OperatorPayload(parallelism);
+		this.taskConfigurations = new TaskConfigurations(parallelism, tasks);
 	}
 
-	public Integer getOperatorID() {
+	public int getOperatorID() {
 		return operatorID;
+	}
+
+	public List<Integer> getTaskIds() {
+		return new ArrayList<>(this.taskConfigurations.tasks.keySet());
 	}
 
 	public String getName() {
@@ -51,57 +53,48 @@ public class OperatorDescriptor {
 	}
 
 	public int getParallelism() {
-		return payload.parallelism;
+		return taskConfigurations.parallelism;
 	}
 
 	public Function getUdf() {
-		Object functionObject = payload.applicationLogic.attributeMap.get(ApplicationLogic.UDF);
+		Object functionObject = taskConfigurations.executionLogic.attributeMap.get(ExecutionLogic.UDF);
 		return (Function) Preconditions.checkNotNull(functionObject);
 	}
 
-//	public List<List<Integer>> getKeyStateAllocation() {
-//		return Collections.unmodifiableList(payload.keyStateAllocation);
-//	}
 
 	public Map<Integer, List<Integer>> getKeyStateAllocation() {
-		return payload.keyStateAllocation;
+		return taskConfigurations.keyStateAllocation;
 	}
 
 	public Map<Integer, Map<Integer, List<Integer>>> getKeyMapping() {
-		return Collections.unmodifiableMap(payload.keyMapping);
+		return Collections.unmodifiableMap(taskConfigurations.keyMapping);
 	}
 
 	public void setParallelism(int parallelism) {
-		payload.parallelism = parallelism;
+		taskConfigurations.parallelism = parallelism;
 	}
 
 	public void setUdf(Function udf) {
-		payload.applicationLogic.udf = udf;
+		taskConfigurations.executionLogic.udf = udf;
 	}
 
 	public final void setControlAttribute(String name, Object obj) throws Exception {
-		payload.applicationLogic.updateField(name, obj);
+		taskConfigurations.executionLogic.updateField(name, obj);
 	}
 
 	public Map<String, Object> getControlAttributeMap() {
-		return Collections.unmodifiableMap(payload.applicationLogic.attributeMap);
+		return Collections.unmodifiableMap(taskConfigurations.executionLogic.attributeMap);
 	}
 
 	@Internal
 //	void setKeyStateAllocation(List<List<Integer>> keyStateAllocation) {
 	void setKeyStateAllocation(Map<Integer, List<Integer>> keyStateAllocation) {
-//		List<List<Integer>> unmodifiableKeys = Collections.unmodifiableList(
-//			keyStateAllocation.stream()
-//				.map(Collections::unmodifiableList)
-//				.collect(Collectors.toList())
-//		);
-//		payload.keyStateAllocation.addAll(unmodifiableKeys);
 		addAll(keyStateAllocation);
 		for (OperatorDescriptor parent : parents) {
-			parent.payload.keyMapping.put(operatorID, keyStateAllocation);
+			parent.taskConfigurations.keyMapping.put(operatorID, keyStateAllocation);
 		}
 		// stateless operator should not be allocated  key set
-		stateful = !payload.keyStateAllocation.isEmpty();
+		stateful = !taskConfigurations.keyStateAllocation.isEmpty();
 	}
 
 	private void addAll(Map<Integer, List<Integer>> keyStateAllocation) {
@@ -110,36 +103,29 @@ public class OperatorDescriptor {
 		for (int taskId : keyStateAllocation.keySet()) {
 			unmodifiable.put(taskId, Collections.unmodifiableList(keyStateAllocation.get(taskId)));
 		}
-		payload.keyStateAllocation = Collections.unmodifiableMap(unmodifiable);
+		taskConfigurations.keyStateAllocation = Collections.unmodifiableMap(unmodifiable);
 	}
 
 	@Internal
 	void setKeyMapping(Map<Integer, Map<Integer, List<Integer>>> keyMapping) {
 		Map<Integer, Map<Integer, List<Integer>>> unmodifiable = convertKeyMappingToUnmodifiable(keyMapping);
-		payload.keyMapping.putAll(unmodifiable);
+		taskConfigurations.keyMapping.putAll(unmodifiable);
 		for (OperatorDescriptor child : children) {
 			if (child.stateful) {
 				// todo two inputs?
-//				child.payload.keyStateAllocation.addAll(keyMapping.get(child.operatorID));
 				child.addAll(keyMapping.get(child.operatorID));
 			}
 		}
 	}
 
 	@Internal
-	ApplicationLogic getApplicationLogic(){
-		return payload.applicationLogic;
+	ExecutionLogic getApplicationLogic(){
+		return taskConfigurations.executionLogic;
 	}
 
 	private Map<Integer, Map<Integer, List<Integer>>> convertKeyMappingToUnmodifiable(Map<Integer, Map<Integer, List<Integer>>> keyMappings) {
 		Map<Integer, Map<Integer, List<Integer>>> unmodifiable = new HashMap<>();
 		for (Integer inOpID : keyMappings.keySet()) {
-//			List<List<Integer>> unmodifiableKeys = Collections.unmodifiableList(
-////				keyStateAllocation.get(inOpID)
-////					.stream()
-////					.map(Collections::unmodifiableList)
-////					.collect(Collectors.toList())
-//			);
 			Map<Integer, List<Integer>> keyStateAllocation = convertKeyStateToUnmodifiable(keyMappings.get(inOpID));
 
 			Map<Integer, List<Integer>> unmodifiableKeys = Collections.unmodifiableMap(keyStateAllocation);
@@ -168,15 +154,10 @@ public class OperatorDescriptor {
 			return;
 		}
 		try {
-//			List<List<Integer>> unmodifiableKeys = Collections.unmodifiableList(
-//				keyStateAllocation.stream()
-//					.map(Collections::unmodifiableList)
-//					.collect(Collectors.toList())
-//			);
 			addAll(keyStateAllocation);
 			// sync with parent's key mapping
 			for(OperatorDescriptor parent: parents) {
-				parent.payload.keyMapping.put(operatorID, keyStateAllocation);
+				parent.taskConfigurations.keyMapping.put(operatorID, keyStateAllocation);
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -192,16 +173,10 @@ public class OperatorDescriptor {
 	 * @param keyMapping
 	 */
 	@PublicEvolving
-	public void setKeyMappingTo(int targetOperatorID, Map<Integer, List<Integer>> keyMapping) {
+	public void setOutputKeyMapping(int targetOperatorID, Map<Integer, List<Integer>> keyMapping) {
 		try {
 			OperatorDescriptor child = checkOperatorIDExistInSet(targetOperatorID, children);
-
-//			List<List<Integer>> unmodifiableKeys = Collections.unmodifiableList(
-//				keyMapping.stream()
-//					.map(Collections::unmodifiableList)
-//					.collect(Collectors.toList())
-//			);
-			payload.keyMapping.put(targetOperatorID, keyMapping);
+			taskConfigurations.keyMapping.put(targetOperatorID, keyMapping);
 			if (child.stateful) {
 				child.addAll(keyMapping);
 			}
@@ -252,43 +227,49 @@ public class OperatorDescriptor {
 
 	@Override
 	public String toString() {
-		return "OperatorDescriptor{name='" + name + "'', parallelism=" + payload.parallelism +
+		return "OperatorDescriptor{name='" + name + "'', parallelism=" + taskConfigurations.parallelism +
 			", parents:" + parents.size() + ", children:" + children.size() + '}';
 	}
 
-	private static class OperatorPayload {
+	/**
+	 * The object to store all task configurations under the operator
+	 * The configurations are stored per operator for the convenience of finding siblings of each task.
+	 */
+	private static class TaskConfigurations {
 		int parallelism;
-		final ApplicationLogic applicationLogic;
+		final ExecutionLogic executionLogic;
 		/* for stateful one input stream task, the key state allocation item is always one */
-//		final List<List<Integer>> keyStateAllocation;
-//		final Map<Integer, List<List<Integer>>> keyMapping;
 
+		// taskId -> keyset
 		public Map<Integer, List<Integer>> keyStateAllocation;
+		// task id -> key mapping
 		public Map<Integer, Map<Integer, List<Integer>>> keyMapping;
+		// task id -> task(slots, location)
+		public Map<Integer, Task> tasks;
 
-		OperatorPayload(int parallelism) {
+		TaskConfigurations(int parallelism, Map<Integer, Task> tasks) {
 			this.parallelism = parallelism;
-//			keyStateAllocation = new ArrayList<>(parallelism);
 			keyStateAllocation = new HashMap<>();
 			keyMapping = new HashMap<>();
-			applicationLogic = new ApplicationLogic();
+			executionLogic = new ExecutionLogic();
+			this.tasks = tasks;
 		}
 	}
 
 	void setAttributeField(Object object, List<Field> fieldList) throws IllegalAccessException {
-		payload.applicationLogic.operator = object;
+		taskConfigurations.executionLogic.operator = object;
 		for(Field field: fieldList) {
 			ControlAttribute attribute = field.getAnnotation(ControlAttribute.class);
 			boolean accessible = field.isAccessible();
 			// temporary set true
 			field.setAccessible(true);
-			payload.applicationLogic.fields.put(attribute.name(), field);
-			payload.applicationLogic.attributeMap.put(attribute.name(), field.get(object));
+			taskConfigurations.executionLogic.fields.put(attribute.name(), field);
+			taskConfigurations.executionLogic.attributeMap.put(attribute.name(), field.get(object));
 			field.setAccessible(accessible);
 		}
 	}
 
-	public static class ApplicationLogic{
+	public static class ExecutionLogic {
 
 		public static final String UDF = "UDF";
 		public static final String OPERATOR_TYPE = "OPERATOR_TYPE";
@@ -304,7 +285,7 @@ public class OperatorDescriptor {
 		public boolean equals(Object o) {
 			if (this == o) return true;
 			if (o == null || getClass() != o.getClass()) return false;
-			ApplicationLogic that = (ApplicationLogic) o;
+			ExecutionLogic that = (ExecutionLogic) o;
 			return attributeMap.equals(that.attributeMap);
 		}
 
@@ -313,7 +294,7 @@ public class OperatorDescriptor {
 			return Objects.hash(attributeMap);
 		}
 
-		public ApplicationLogic copyTo(ApplicationLogic that){
+		public ExecutionLogic copyTo(ExecutionLogic that){
 			that.attributeMap.clear();
 			that.attributeMap.putAll(attributeMap);
 			return that;

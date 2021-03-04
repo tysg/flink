@@ -3,9 +3,9 @@ package org.apache.flink.runtime.rescale.reconfigure;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.controlplane.PrimitiveOperation;
 import org.apache.flink.runtime.controlplane.StreamRelatedInstanceFactory;
+import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptorVisitor;
-import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
 import org.apache.flink.runtime.executiongraph.ExecutionGraph;
 import org.apache.flink.runtime.executiongraph.ExecutionJobVertex;
 import org.apache.flink.runtime.executiongraph.ExecutionVertex;
@@ -35,7 +35,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 
 	private JobGraphUpdater jobGraphUpdater;
 	protected WorkloadsAssignmentHandler workloadsAssignmentHandler;
-	protected StreamJobExecutionPlan heldExecutionPlan;
+	protected ExecutionPlan heldExecutionPlan;
 	protected Map<Integer, OperatorID> operatorIDMap;
 
 	// fields for deploy cancel tasks, OperatorID -> created/removed candidates
@@ -62,15 +62,15 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 		this.streamRelatedInstanceFactory = streamRelatedInstanceFactory;
 	}
 
-	public StreamJobExecutionPlan getHeldExecutionPlanCopy() {
-		StreamJobExecutionPlan executionPlan = streamRelatedInstanceFactory.createExecutionPlan(jobGraph, executionGraph, userCodeClassLoader);
+	public ExecutionPlan getHeldExecutionPlanCopy() {
+		ExecutionPlan executionPlan = streamRelatedInstanceFactory.createExecutionPlan(jobGraph, executionGraph, userCodeClassLoader);
 		for (Iterator<OperatorDescriptor> it = executionPlan.getAllOperatorDescriptor(); it.hasNext(); ) {
 			OperatorDescriptor descriptor = it.next();
 			OperatorDescriptor heldDescriptor = heldExecutionPlan.getOperatorDescriptorByID(descriptor.getOperatorID());
 			// make sure udf and other control attributes share the same reference so we could identity the change if any
-			OperatorDescriptor.ApplicationLogic heldAppLogic =
+			OperatorDescriptor.ExecutionLogic heldAppLogic =
 				OperatorDescriptorVisitor.attachOperator(heldDescriptor).getApplicationLogic();
-			OperatorDescriptor.ApplicationLogic appLogicCopy =
+			OperatorDescriptor.ExecutionLogic appLogicCopy =
 				OperatorDescriptorVisitor.attachOperator(descriptor).getApplicationLogic();
 			heldAppLogic.copyTo(appLogicCopy);
 		}
@@ -91,7 +91,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 	}
 
 	@Override
-	public final CompletableFuture<Map<Integer, Map<Integer, Diff>>> prepareExecutionPlan(StreamJobExecutionPlan jobExecutionPlan) {
+	public final CompletableFuture<Map<Integer, Map<Integer, Diff>>> prepareExecutionPlan(ExecutionPlan jobExecutionPlan) {
 		rescaleID = RescaleID.generateNextID();
 		Map<Integer, Map<Integer, Diff>> differenceMap = new HashMap<>();
 		for (Iterator<OperatorDescriptor> it = jobExecutionPlan.getAllOperatorDescriptor(); it.hasNext();) {
@@ -107,13 +107,13 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 				try {
 					switch (changedPosition) {
 						case UDF:
-							OperatorDescriptor.ApplicationLogic heldAppLogic =
+							OperatorDescriptor.ExecutionLogic heldAppLogic =
 								OperatorDescriptorVisitor.attachOperator(heldDescriptor).getApplicationLogic();
-							OperatorDescriptor.ApplicationLogic modifiedAppLogic =
+							OperatorDescriptor.ExecutionLogic modifiedAppLogic =
 								OperatorDescriptorVisitor.attachOperator(descriptor).getApplicationLogic();
 							modifiedAppLogic.copyTo(heldAppLogic);
 							jobGraphUpdater.updateOperator(operatorID, heldAppLogic);
-							difference.put(UDF, ExecutionLogic.UDF);
+							difference.put(UDF, AbstractCoordinator.ExecutionLogic.UDF);
 							break;
 						case PARALLELISM:
 							heldDescriptor.setParallelism(descriptor.getParallelism());
@@ -143,7 +143,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 							break;
 						case KEY_MAPPING:
 							// update key set will indirectly update key mapping, so we ignore this type of detected change here
-							difference.put(KEY_MAPPING, ExecutionLogic.KEY_MAPPING);
+							difference.put(KEY_MAPPING, AbstractCoordinator.ExecutionLogic.KEY_MAPPING);
 							break;
 						case NO_CHANGE:
 					}
@@ -155,7 +155,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 
 		}
 		// TODO: suspend checking StreamJobExecution for scale out
-//		final StreamJobExecutionPlan executionPlan = getHeldExecutionPlanCopy();
+//		final ExecutionPlan executionPlan = getHeldExecutionPlanCopy();
 //		for (Iterator<OperatorDescriptor> it = executionPlan.getAllOperatorDescriptor(); it.hasNext(); ) {
 //			OperatorDescriptor descriptor = it.next();
 //			OperatorDescriptor held = heldExecutionPlan.getOperatorDescriptorByID(descriptor.getOperatorID());
@@ -240,9 +240,9 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 
 	private List<Integer> analyzeOperatorDifference(OperatorDescriptor self, OperatorDescriptor modified) {
 		List<Integer> results = new LinkedList<>();
-		OperatorDescriptor.ApplicationLogic heldAppLogic =
+		OperatorDescriptor.ExecutionLogic heldAppLogic =
 			OperatorDescriptorVisitor.attachOperator(self).getApplicationLogic();
-		OperatorDescriptor.ApplicationLogic modifiedAppLogic =
+		OperatorDescriptor.ExecutionLogic modifiedAppLogic =
 			OperatorDescriptorVisitor.attachOperator(modified).getApplicationLogic();
 		if (!heldAppLogic.equals(modifiedAppLogic)) {
 			results.add(UDF);

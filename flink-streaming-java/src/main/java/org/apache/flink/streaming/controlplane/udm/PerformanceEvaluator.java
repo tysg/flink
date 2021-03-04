@@ -1,7 +1,7 @@
 package org.apache.flink.streaming.controlplane.udm;
 
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.runtime.controlplane.abstraction.StreamJobExecutionPlan;
+import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -88,7 +88,7 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 	}
 
 	private void measureRebalance(int testOpID, int numAffectedTasks, int reconfigInterval) throws InterruptedException {
-		StreamJobExecutionPlan executionPlan = getInstructionSet().getJobExecutionPlan();
+		ExecutionPlan executionPlan = getInstructionSet().getJobExecutionPlan();
 		if (reconfigInterval > 0) {
 //			int timeInterval = 1000 / reconfigInterval;
 			int timeInterval = reconfigInterval;
@@ -119,7 +119,7 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 	}
 
 	private void measureFunctionUpdate(int testOpID, int reconfigInterval) throws InterruptedException {
-		StreamJobExecutionPlan executionPlan = getInstructionSet().getJobExecutionPlan();
+		ExecutionPlan executionPlan = getInstructionSet().getJobExecutionPlan();
 		try {
 			ClassLoader userClassLoader = executionPlan.getUserFunction(testOpID).getClass().getClassLoader();
 			Class IncreaseCommunicationOverheadMapClass = userClassLoader.loadClass("flinkapp.StatefulDemoLongRun$IncreaseCommunicationOverheadMap");
@@ -157,7 +157,7 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 	}
 
 	private void measureRescale(int testOpID, int numAffectedTasks, int maxParallelism, int reconfigInterval) throws InterruptedException {
-		StreamJobExecutionPlan executionPlan = getInstructionSet().getJobExecutionPlan();
+		ExecutionPlan executionPlan = getInstructionSet().getJobExecutionPlan();
 		if (reconfigInterval > 0) {
 //			int timeInterval = 1000 / reconfigInterval;
 			int timeInterval = reconfigInterval;
@@ -205,7 +205,7 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 	}
 
 	private void measureNoOP(int testOpID, int reconfigInterval) throws InterruptedException {
-		StreamJobExecutionPlan executionPlan = getInstructionSet().getJobExecutionPlan();
+		ExecutionPlan executionPlan = getInstructionSet().getJobExecutionPlan();
 		if (reconfigInterval > 0) {
 //			int timeInterval = 1000 / reconfigInterval;
 			int timeInterval = reconfigInterval;
@@ -362,7 +362,7 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 		public void run() {
 			// the testing jobGraph (workload) is in TestingWorkload.java, see that file to know how to use it.
 			try {
-				Thread.sleep(10000);
+				Thread.sleep(30000);
 				generateTest();
 				Thread.sleep(3000);
 //				File latencyFile = new File("/home/hya/prog/latency.out");
