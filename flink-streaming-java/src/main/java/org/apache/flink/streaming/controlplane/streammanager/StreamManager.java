@@ -331,85 +331,6 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		runAsync(() -> jobMasterGateway.triggerJobRescale(wrapper, jobGraph, upDownStream.f0, upDownStream.f1));
 	}
 
-//	public void rescale(int operatorID, int newParallelism, Map<Integer, List<Integer>> keyStateAllocation, ControlPolicy waitingController) {
-//		try {
-//			reconfigurationProfiler.onReconfigurationStart();
-//			// scale in is not support now
-//			checkState(keyStateAllocation.size() == newParallelism,
-//				"new parallelism not match key state allocation");
-//			this.jobExecutionPlan.setStateUpdatingFlag(waitingController);
-//
-//			OperatorDescriptor targetDescriptor = jobExecutionPlan.getOperatorDescriptorByID(operatorID);
-//			List<Tuple2<Integer, Integer>> affectedTasks = new LinkedList<>();
-//			affectedTasks.add(Tuple2.of(operatorID, -1));
-//			targetDescriptor.getParents()
-//				.forEach(c -> affectedTasks.add(Tuple2.of(c.getOperatorID(), -1)));
-//			targetDescriptor.getChildren()
-//				.forEach(c -> affectedTasks.add(Tuple2.of(c.getOperatorID(), -1)));
-//
-//			int oldParallelism = targetDescriptor.getParallelism();
-//			// update the parallelism
-//			targetDescriptor.setParallelism(newParallelism);
-//
-//			// update the key set
-//			for (OperatorDescriptor parent : targetDescriptor.getParents()) {
-//				parent.setOutputKeyMapping(operatorID, keyStateAllocation);
-//			}
-//
-//			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
-//			final String PREPARE = "prepare timer";
-//			final String SYN = "synchronize timer";
-//			final String UPDATE_MAPPING = "updateKeyMapping timer";
-//			final String UPDATE_STATE = "updateState timer";
-//			log.info("++++++ start update");
-//			runAsync(() -> jobMasterGateway.callOperations(
-//				enforcement -> FutureUtils.completedVoidFuture()
-//					.thenCompose(o -> {
-//						reconfigurationProfiler.onOtherStart(PREPARE);
-//						return enforcement.prepareExecutionPlan(jobExecutionPlan);
-//					})
-//					.thenCompose(o -> {
-//						reconfigurationProfiler.onOtherEnd(PREPARE);
-//						reconfigurationProfiler.onOtherStart(SYN);
-//						return enforcement.synchronizeTasks(affectedTasks, o);
-//					})
-//					.thenCompose(o -> {
-//						reconfigurationProfiler.onOtherEnd(SYN);
-//						reconfigurationProfiler.onOtherStart(UPDATE_MAPPING);
-//						return enforcement.updateKeyMapping(operatorID, o);
-//					})
-//					.thenCompose(o -> {
-//						reconfigurationProfiler.onOtherEnd(UPDATE_MAPPING);
-//						reconfigurationProfiler.onOtherStart(UPDATE_STATE);
-//						return enforcement.updateState(operatorID, o);
-//					})
-//					.thenCompose(o -> {
-//						return enforcement.updateTaskResources(operatorID, oldParallelism);
-//					})
-//					.thenCompose(o -> enforcement.resumeTasks())
-//					.whenComplete((o, failure) -> {
-//						if (failure != null) {
-//							LOG.error("Reconfiguration failed: ", failure);
-//							failure.printStackTrace();
-//						}
-//						try {
-//							System.out.println("++++++ finished update");
-//							log.info("++++++ finished update");
-//							// TODO: extract the deployment overhead
-//							reconfigurationProfiler.onOtherEnd(UPDATE_STATE);
-//							this.jobExecutionPlan.notifyUpdateFinished(failure);
-//							reconfigurationProfiler.onReconfigurationEnd();
-//						} catch (Exception e) {
-//							e.printStackTrace();
-//						}
-//					})
-//			));
-//		} catch (Exception e) {
-//			LOG.error("Reconfiguration failed: ", e);
-//			e.printStackTrace();
-//		}
-//	}
-
 	public void rescale(int operatorID, int newParallelism, Map<Integer, List<Integer>> keyStateAllocation, ControlPolicy waitingController) {
 		try {
 			reconfigurationProfiler.onReconfigurationStart();
@@ -536,21 +457,17 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 			// put tasks in target vertex
 			tasks.put(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
+			updateStateTasks.put(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
+			// although we put the update key mapping in the target operator, it will find the upstream tasks and update.
+			updateKeyMappingTasks.put(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
+
 			// put tasks in upstream vertex
 			targetDescriptor.getParents()
 				.forEach(c -> {
 					int operatorId = c.getOperatorID();
 					List<Integer> curOpTasks = c.getTaskIds();
 					tasks.put(operatorId, curOpTasks);
-					updateStateTasks.put(operatorId, curOpTasks);
 				});
-//			// put tasks in downstream vertex
-//			targetDescriptor.getChildren()
-//				.forEach(c -> {
-//					List<Integer> curOpTasks = c.getTaskIds();
-//					tasks.put(c.getOperatorID(), curOpTasks);
-//					updateKeyMappingTasks.put(c.getOperatorID(), curOpTasks);
-//				});
 
 			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
 			final String PREPARE = "prepare timer";

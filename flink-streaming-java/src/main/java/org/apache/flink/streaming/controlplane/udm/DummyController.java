@@ -450,19 +450,19 @@ public class DummyController extends AbstractControlPolicy {
 //					i++;
 //				}
 
-				testScaling(statefulOpID, 5);
-				sleep(100);
-				testScaling(statefulOpID, 3);
-				sleep(100);
-				testScaling(statefulOpID, 6);
-				sleep(100);
-				testScaling(statefulOpID, 2);
-				sleep(100);
-
 				testScaling(statefulOpID, 8);
-				sleep(100);
-
-				testScaling(statefulOpID, 4);
+//				sleep(100);
+//				testScaling(statefulOpID, 3);
+//				sleep(100);
+//				testScaling(statefulOpID, 6);
+//				sleep(100);
+//				testScaling(statefulOpID, 2);
+//				sleep(100);
+//
+//				testScaling(statefulOpID, 8);
+//				sleep(100);
+//
+//				testScaling(statefulOpID, 4);
 
 
 			} catch (InterruptedException e) {
