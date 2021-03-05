@@ -1090,7 +1090,7 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 
 		try {
 			if (LOG.isInfoEnabled()) {
-				LOG.info(String.format("SechduleRescaling %s rescale option: %s", vertex.getTaskNameWithSubtaskIndex(), rescaleOptions));
+				LOG.info(String.format("ScheduleRescaling %s rescale option: %s", vertex.getTaskNameWithSubtaskIndex(), rescaleOptions));
 			}
 
 			if (rescaleOptions.isRepartition()) {

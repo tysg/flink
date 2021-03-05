@@ -995,7 +995,6 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 		@Override
 		public void onReceiveRescalepointAcknowledge(ExecutionAttemptID attemptID, PendingCheckpoint checkpoint) {
 			if (checkpointId == checkpoint.getCheckpointId()) {
-
 				CompletableFuture.runAsync(() -> {
 					LOG.info("++++++ Received Rescalepoint Acknowledgement:" + attemptID);
 					try {
@@ -1008,14 +1007,12 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 
 							if (notYetAcknowledgedTasks.isEmpty()) {
 								LOG.info("++++++ handle operator states");
-
 								CheckpointCoordinator checkpointCoordinator = executionGraph.getCheckpointCoordinator();
 								checkNotNull(checkpointCoordinator);
 								if (checkpointCoordinator.isPeriodicCheckpointingConfigured()) {
 									LOG.info("++++++ resume checkpoint coordinator");
 									checkpointCoordinator.startCheckpointScheduler();
 								}
-
 								LOG.info("++++++ received operator states" + checkpoint.getOperatorStates() + " : " + finishedFuture);
 								finishedFuture.complete(new HashMap<>(checkpoint.getOperatorStates()));
 							}
