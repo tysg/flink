@@ -74,7 +74,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 				System.out.println("synchronizeTasks successful");
 				LOG.debug("synchronizeTasks successful");
 				// if update state is needed, try to re-assign state among those tasks
-				checkNotNull(diff, "error while getting different between old and new executionplan");
+				checkNotNull(diff, "error while getting difference between old and new executionplan");
 				for (Integer operatorID : diff.keySet()) {
 					if (diff.get(operatorID).containsKey(KEY_STATE_ALLOCATION)) {
 						checkNotNull(syncOp, "no state collected currently, have you synchronized first?");
@@ -121,7 +121,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 				System.out.println("synchronizeTasks successful");
 				LOG.debug("synchronizeTasks successful");
 				// if update state is needed, try to re-assign state among those tasks
-				checkNotNull(diff, "error while getting different between old and new executionplan");
+				checkNotNull(diff, "error while getting difference between old and new executionplan");
 				for (Integer operatorID : diff.keySet()) {
 					if (diff.get(operatorID).containsKey(KEY_STATE_ALLOCATION)) {
 						checkNotNull(syncOp, "no state collected currently, have you synchronized first?");

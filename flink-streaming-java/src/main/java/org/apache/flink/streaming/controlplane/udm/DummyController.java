@@ -443,14 +443,14 @@ public class DummyController extends AbstractControlPolicy {
 
 //				for (int i=0; i<100; i++) {
 
-//				int i = 0;
-//				while(true) {
-//					testScaling(statefulOpID, (i%2 + 1));
-//					sleep(100);
-//					i++;
-//				}
+				int i = 0;
+				while(true) {
+					testScaling(statefulOpID, (i%10 + 1));
+					sleep(100);
+					i++;
+				}
 
-				testScaling(statefulOpID, 8);
+//				testScaling(statefulOpID, 2);
 //				sleep(100);
 //				testScaling(statefulOpID, 3);
 //				sleep(100);

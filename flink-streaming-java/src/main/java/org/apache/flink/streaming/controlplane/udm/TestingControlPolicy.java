@@ -497,7 +497,7 @@ public class TestingControlPolicy extends AbstractControlPolicy {
 //				testScaling(statefulOpID, 7);
 //				testScaling(statefulOpID, 3);
 //				testScaling(statefulOpID, 9);
-				testScaling(statefulOpID, 10);
+				testScaling(statefulOpID, 2);
 
 
 

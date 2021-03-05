@@ -1,5 +1,6 @@
 package org.apache.flink.runtime.rescale.reconfigure;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.flink.runtime.state.KeyGroupRange;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -122,7 +123,8 @@ public class OperatorWorkloadsAssignment implements AbstractCoordinator.Diff {
 //		int createdExecutorId = createdIdList.get(0);
 
 		List<Integer> modifiedIdList = oldExecutorMapping.keySet().stream()
-			.filter(id -> oldExecutorMapping.get(id).size() != executorMapping.get(id).size())
+//			.filter(id -> oldExecutorMapping.get(id).size() != executorMapping.get(id).size())
+			.filter(id -> CollectionUtils.isEqualCollection(executorMapping.get(id), executorMapping.get(id)))
 			.collect(Collectors.toList());
 //		checkState(modifiedIdList.size() == 1, "more than one modified in scale out");
 
@@ -165,7 +167,8 @@ public class OperatorWorkloadsAssignment implements AbstractCoordinator.Diff {
 		}
 
 		List<Integer> modifiedIdList = executorMapping.keySet().stream()
-			.filter(id -> executorMapping.get(id).size() != oldExecutorMapping.get(id).size())
+//			.filter(id -> executorMapping.get(id).size() != oldExecutorMapping.get(id).size())
+			.filter(id -> CollectionUtils.isEqualCollection(executorMapping.get(id), executorMapping.get(id)))
 			.collect(Collectors.toList());
 //		checkState(modifiedIdList.size() == 1, "more than one modified in scale in");
 
@@ -188,8 +191,14 @@ public class OperatorWorkloadsAssignment implements AbstractCoordinator.Diff {
 		Map<Integer, List<Integer>> executorMapping,
 		Map<Integer, List<Integer>> oldExecutorMapping) {
 
+		// the state can be shuffled among all tasks, so the size of keys in each task can be the same.
 		List<Integer> modifiedIdList = executorMapping.keySet().stream()
-			.filter(id -> executorMapping.get(id).size() != oldExecutorMapping.get(id).size())
+			.filter(id -> {
+				// size are different
+//				return executorMapping.get(id).size() != oldExecutorMapping.get(id).size()
+//					|| !executorMapping.get(id).containsAll(oldExecutorMapping.get(id));
+				return CollectionUtils.isEqualCollection(executorMapping.get(id), executorMapping.get(id));
+			})
 			.collect(Collectors.toList());
 //		checkState(modifiedIdList.size() == 2, "not exactly two are modified in repartition");
 
