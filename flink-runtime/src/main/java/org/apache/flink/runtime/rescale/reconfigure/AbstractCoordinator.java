@@ -101,7 +101,10 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 			int oldParallelism = heldDescriptor.getParallelism();
 			// loop until all change in this operator has been detected and sync
 			List<Integer> changes = analyzeOperatorDifference(heldDescriptor, descriptor);
+			// TODO: this part is still operator-centric rather than task-centric
+			// diff_id -> diff[udf, key state, key mapping, etc]
 			Map<Integer, Diff> difference = new HashMap<>();
+			// operator -> {diff_id -> diff}
 			differenceMap.put(operatorID, difference);
 			for (int changedPosition : changes) {
 				try {

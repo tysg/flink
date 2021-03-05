@@ -73,6 +73,28 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 			{
 				System.out.println("synchronizeTasks successful");
 				LOG.debug("synchronizeTasks successful");
+				// if update state is needed, try to re-assign state among those tasks
+				checkNotNull(diff, "error while getting different between old and new executionplan");
+				for (Integer operatorID : diff.keySet()) {
+					if (diff.get(operatorID).containsKey(KEY_STATE_ALLOCATION)) {
+						checkNotNull(syncOp, "no state collected currently, have you synchronized first?");
+						JobVertexID jobVertexID = rawVertexIDToJobVertexID(operatorID);
+						ExecutionJobVertex executionJobVertex = executionGraph.getJobVertex(jobVertexID);
+						Preconditions.checkNotNull(executionJobVertex, "Execution job vertex not found: " + jobVertexID);
+						OperatorWorkloadsAssignment remappingAssignment =
+							(OperatorWorkloadsAssignment) diff.get(operatorID).get(AbstractCoordinator.KEY_STATE_ALLOCATION);
+						StateAssignmentOperation stateAssignmentOperation =
+							new StateAssignmentOperation(syncOp.checkpointId, Collections.singleton(executionJobVertex), state, true);
+						stateAssignmentOperation.setForceRescale(true);
+						stateAssignmentOperation.setRedistributeStrategy(remappingAssignment);
+						LOG.info("++++++ start to assign states " + state);
+						stateAssignmentOperation.assignStates();
+						// can safely sync some old parameters because all modifications in JobMaster is completed.
+						executionJobVertex.syncOldConfigInfo();
+						LOG.info("++++++ assign states completed " + state);
+
+					}
+				}
 				return diff;
 			});
 		} catch (Exception e) {
@@ -98,6 +120,27 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 			{
 				System.out.println("synchronizeTasks successful");
 				LOG.debug("synchronizeTasks successful");
+				// if update state is needed, try to re-assign state among those tasks
+				checkNotNull(diff, "error while getting different between old and new executionplan");
+				for (Integer operatorID : diff.keySet()) {
+					if (diff.get(operatorID).containsKey(KEY_STATE_ALLOCATION)) {
+						checkNotNull(syncOp, "no state collected currently, have you synchronized first?");
+						JobVertexID jobVertexID = rawVertexIDToJobVertexID(operatorID);
+						ExecutionJobVertex executionJobVertex = executionGraph.getJobVertex(jobVertexID);
+						Preconditions.checkNotNull(executionJobVertex, "Execution job vertex not found: " + jobVertexID);
+						OperatorWorkloadsAssignment remappingAssignment =
+							(OperatorWorkloadsAssignment) diff.get(operatorID).get(AbstractCoordinator.KEY_STATE_ALLOCATION);
+						StateAssignmentOperation stateAssignmentOperation =
+							new StateAssignmentOperation(syncOp.checkpointId, Collections.singleton(executionJobVertex), state, true);
+						stateAssignmentOperation.setForceRescale(true);
+						stateAssignmentOperation.setRedistributeStrategy(remappingAssignment);
+						LOG.info("++++++ start to assign states " + state);
+						stateAssignmentOperation.assignStates();
+						// can safely sync some old parameters because all modifications in JobMaster is completed.
+						executionJobVertex.syncOldConfigInfo();
+						LOG.info("++++++ assign states completed " + state);
+					}
+				}
 				return diff;
 			});
 		} catch (Exception e) {
@@ -279,7 +322,6 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 //		int targetOperatorID,
 		Map<Integer, List<Integer>> tasks,
 		@Nonnull Map<Integer, Map<Integer, Diff>> diff) {
-
 		System.out.println("update mapping...");
 		LOG.info("++++++ update Key Mapping");
 
@@ -297,9 +339,6 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 			JobVertexID targetJobVertexID = rawVertexIDToJobVertexID(targetOperatorID);
 			ExecutionJobVertex targetJobVertex = executionGraph.getJobVertex(targetJobVertexID);
 			checkNotNull(targetJobVertex, "Execution job vertex not found: " + targetJobVertexID);
-//			RemappingAssignment remappingAssignment = new RemappingAssignment(
-//				heldExecutionPlan.getKeyStateAllocation(destOpID)
-//			);
 
 			OperatorWorkloadsAssignment remappingAssignment = workloadsAssignmentHandler.getHeldOperatorWorkloadsAssignment(targetOperatorID);
 			for (int subtaskIndex = 0; subtaskIndex < targetJobVertex.getParallelism(); subtaskIndex++) {
@@ -499,21 +538,22 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 			}
 		}
 
-		checkNotNull(syncOp, "no state collected currently, have you synchronized first?");
-		CompletableFuture<Void> assignStateFuture = syncOp.finishedFuture.thenAccept(
-			state -> {
-				StateAssignmentOperation stateAssignmentOperation =
-					new StateAssignmentOperation(syncOp.checkpointId, Collections.singleton(executionJobVertex), state, true);
-				stateAssignmentOperation.setForceRescale(true);
-				// think about latter
-				stateAssignmentOperation.setRedistributeStrategy(remappingAssignment);
-
-				LOG.info("++++++ start to assign states " + state);
-				stateAssignmentOperation.assignStates();
-				// can safely sync the some old parameters because all modifications in JobMaster is completed.
-				executionJobVertex.syncOldConfigInfo();
-			}
-		);
+//		checkNotNull(syncOp, "no state collected currently, have you synchronized first?");
+//		CompletableFuture<Void> assignStateFuture = syncOp.finishedFuture.thenAccept(
+//			state -> {
+//				StateAssignmentOperation stateAssignmentOperation =
+//					new StateAssignmentOperation(syncOp.checkpointId, Collections.singleton(executionJobVertex), state, true);
+//				stateAssignmentOperation.setForceRescale(true);
+//				// think about latter
+//				stateAssignmentOperation.setRedistributeStrategy(remappingAssignment);
+//
+//				LOG.info("++++++ start to assign states " + state);
+//				stateAssignmentOperation.assignStates();
+//				// can safely sync the some old parameters because all modifications in JobMaster is completed.
+//				executionJobVertex.syncOldConfigInfo();
+//			}
+//		);
+		CompletableFuture<Void> assignStateFuture = CompletableFuture.completedFuture(null);
 		final CompletableFuture<Void> finalUpdateTargetPartitionFuture = updateTargetPartitionFuture;
 		return assignStateFuture.thenCompose(o -> {
 				final List<CompletableFuture<?>> rescaleCandidatesFutures = new ArrayList<>();
@@ -549,10 +589,10 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 							rescaleCandidatesFutures.add(stateUpdateFuture);
 							if (diffMap.isEmpty()) {
 								checkNotNull(syncOp, "have you call sync before?");
-								final int taskOffset = subtaskIndex;
+								final int taskId = subtaskIndex;
 								stateUpdateFuture.runAfterBoth(
 									finalUpdateTargetPartitionFuture,
-									() -> syncOp.resumeTasks(Collections.singletonList(Tuple2.of(operatorID, taskOffset)))
+									() -> syncOp.resumeTasks(Collections.singletonList(Tuple2.of(operatorID, taskId)))
 								);
 							}
 						} catch (ExecutionGraphException e) {

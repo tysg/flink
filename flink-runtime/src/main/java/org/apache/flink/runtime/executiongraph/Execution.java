@@ -1106,7 +1106,10 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 					producedPartitions.values());
 
 			// null taskRestore to let it be GC'ed
-			taskRestore = null;
+			// only after repartition should the state being GC'ed
+			if (rescaleOptions.isRepartition()) {
+				taskRestore = null;
+			}
 
 			final TaskManagerGateway taskManagerGateway = slot.getTaskManagerGateway();
 

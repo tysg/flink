@@ -429,6 +429,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			tasks.put(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
 			updateStateTasks.put(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
 			deployingTasks.put(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
+			// although we put the update key mapping in the target operator, it will find the upstream tasks and update.
 			updateKeyMappingTasks.put(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
 			// put tasks in upstream vertex
 			targetDescriptor.getParents()
