@@ -1097,14 +1097,15 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 				Preconditions.checkNotNull(taskRestore, "task restore should not be null");
 			}
 
+			// if it is not a repartition, do not need to apply taskRestore.
+			JobManagerTaskRestore sendTaskRestore = rescaleOptions.isRepartition() ? taskRestore : null;
 			final TaskDeploymentDescriptor deployment = TaskDeploymentDescriptorFactory
 				.fromExecutionVertex(vertex, attemptNumber)
 				.createDeploymentDescriptor(
 					slot.getAllocationId(),
 					slot.getPhysicalSlotNumber(),
-					taskRestore,
+					sendTaskRestore,
 					producedPartitions.values());
-
 			// null taskRestore to let it be GC'ed
 			// only after repartition should the state being GC'ed
 			if (rescaleOptions.isRepartition()) {

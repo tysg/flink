@@ -355,19 +355,25 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 			}
 			final SynchronizeOperation syncOp = this.currentSyncOp;
 			CompletableFuture<Void> finishFuture = FutureUtils.completeAll(rescaleCandidatesFutures);
-			finishFuture.thenAccept(
+//			finishFuture.thenAccept(
+			return finishFuture.thenApply(
 				o -> {
-					for (OperatorDescriptor targetOperator : heldExecutionPlan.getOperatorDescriptorByID(targetOperatorID).getParents()) {
+					for (OperatorDescriptor upstreamOperator : heldExecutionPlan.getOperatorDescriptorByID(targetOperatorID).getParents()) {
 						// check should we resume those tasks
-						Map<Integer, Diff> diffMap = diff.get(targetOperator.getOperatorID());
+						Map<Integer, Diff> diffMap = diff.get(upstreamOperator.getOperatorID());
 						diffMap.remove(AbstractCoordinator.KEY_MAPPING);
 						if (diffMap.isEmpty() && syncOp != null) {
-							syncOp.resumeTasks(Collections.singletonList(Tuple2.of(targetOperator.getOperatorID(), -1)));
+							syncOp.resumeTasks(Collections.singletonList(Tuple2.of(upstreamOperator.getOperatorID(), -1)));
 						}
 					}
+					return diff;
 				}
 			);
-			return finishFuture.thenApply(o -> diff);
+			// the tasks can be resumed asynchrouously
+//			return finishFuture.thenApply(o -> {
+//				LOG.info("++++++ completed key mapping");
+//				return diff;
+//			});
 		} catch (ExecutionGraphException e) {
 			return FutureUtils.completedExceptionally(e);
 		}
