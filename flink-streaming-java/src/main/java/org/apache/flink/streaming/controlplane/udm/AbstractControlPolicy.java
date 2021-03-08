@@ -7,7 +7,7 @@ import org.apache.flink.streaming.controlplane.streammanager.insts.Reconfigurati
 import javax.annotation.Nonnull;
 import java.util.Iterator;
 
-public abstract class AbstractControlPolicy implements ControlPolicy{
+public abstract class AbstractControlPolicy implements ControlPolicy {
 
 	private final ReconfigurationAPI reconfigurationAPI;
 
@@ -15,7 +15,7 @@ public abstract class AbstractControlPolicy implements ControlPolicy{
 		this.reconfigurationAPI = reconfigurationAPI;
 	}
 
-	public ReconfigurationAPI getInstructionSet() {
+	public ReconfigurationAPI getReconfigurationExecutor() {
 		return reconfigurationAPI;
 	}
 

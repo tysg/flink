@@ -40,7 +40,7 @@ public abstract class ControlFunctionManager extends AbstractControlPolicy imple
 			function);
 		try {
 			// since job graph is shared in stream manager and among its services, we don't need to pass it
-			getInstructionSet().reconfigureUserFunction(operatorID, function, this);
+			getReconfigurationExecutor().reconfigureUserFunction(operatorID, function, this);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

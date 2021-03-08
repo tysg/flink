@@ -172,30 +172,28 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 		if (tgtJobVertex.getParallelism() < oldParallelism) {
 			return cancelTasks(operatorID, 0);
 		} else if (tgtJobVertex.getParallelism() > oldParallelism) {
-			return deployTasks(operatorID, oldParallelism);
+			return deployTasks(operatorID);
 		} else {
 			throw new IllegalStateException("none of new tasks has been created");
 		}
 	}
 
 	@Override
-	public CompletableFuture<Void> updateTaskResources(Map<Integer, List<Integer>> tasks, int oldParallelism) {
+	public CompletableFuture<Void> updateTaskResources(Map<Integer, List<Integer>> tasks, boolean isScaleIn) {
 		// TODO: By far we only support horizontal scaling, vertival scaling is not included.
 //		System.out.println("++++++ re-allocate resources for tasks" + operatorID);
 		int operatorID = tasks.keySet().iterator().next();
 		JobVertexID tgtJobVertexID = rawVertexIDToJobVertexID(operatorID);
 		ExecutionJobVertex tgtJobVertex = executionGraph.getJobVertex(tgtJobVertexID);
 		assert tgtJobVertex != null;
-		if (tgtJobVertex.getParallelism() < oldParallelism) {
+		if (isScaleIn) {
 			return cancelTasks(operatorID, 0);
-		} else if (tgtJobVertex.getParallelism() > oldParallelism) {
-			return deployTasks(operatorID, oldParallelism);
 		} else {
-			throw new IllegalStateException("none of new tasks has been created");
+			return deployTasks(operatorID);
 		}
 	}
 
-	public CompletableFuture<Void> deployTasks(int operatorID, int oldParallelism) {
+	public CompletableFuture<Void> deployTasks(int operatorID) {
 		// TODO: add the task to the checkpointCoordinator
 		System.out.println("deploying... tasks of " + operatorID);
 		LOG.info("++++++ deploying tasks" + operatorID);
@@ -206,7 +204,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 		jobVertex.cleanBeforeRescale();
 
 		Collection<CompletableFuture<Execution>> allocateSlotFutures =
-			new ArrayList<>(jobVertex.getParallelism() - oldParallelism);
+			new ArrayList<>(jobVertex.getParallelism());
 
 //		ExecutionVertex[] taskVertices = tgtJobVertex.getTaskVertices();
 //		List<ExecutionVertex> createdVertex = new ArrayList<>();
@@ -234,7 +232,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 				}
 			).thenCompose(executions -> {
 					Collection<CompletableFuture<Void>> deployFutures =
-						new ArrayList<>(jobVertex.getParallelism() - oldParallelism);
+						new ArrayList<>(jobVertex.getParallelism());
 					for (Execution execution : executions) {
 						try {
 							deployFutures.add(execution.deploy(

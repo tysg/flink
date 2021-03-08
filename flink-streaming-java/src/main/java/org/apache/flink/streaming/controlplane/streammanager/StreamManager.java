@@ -167,8 +167,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 //		this.controlPolicyList.add(new FlinkStreamSwitchAdaptor(this, jobGraph));
 //		this.controlPolicyList.add(new TestingCFManager(this));
 //		this.controlPolicyList.add(new TestingControlPolicy(this));
-		this.controlPolicyList.add(new DummyController(this));
-//		this.controlPolicyList.add(new PerformanceEvaluator(this, streamManagerConfiguration.getConfiguration()));
+//		this.controlPolicyList.add(new DummyController(this));
+		this.controlPolicyList.add(new PerformanceEvaluator(this, streamManagerConfiguration.getConfiguration()));
 
 		reconfigurationProfiler = new ReconfigurationProfiler(streamManagerConfiguration.getConfiguration());
 	}
@@ -370,6 +370,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			int oldParallelism = targetDescriptor.getParallelism();
 			// update the parallelism
 			targetDescriptor.setParallelism(newParallelism);
+			boolean isScaleIn = oldParallelism > newParallelism;
 
 			// update the key set
 			for (OperatorDescriptor parent : targetDescriptor.getParents()) {
@@ -405,7 +406,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						return enforcement.updateState(updateStateTasks, o);
 					})
 					.thenCompose(o -> {
-						return enforcement.updateTaskResources(deployingTasks, oldParallelism);
+						return enforcement.updateTaskResources(deployingTasks, isScaleIn);
 					})
 					.thenCompose(o -> enforcement.resumeTasks())
 					.whenComplete((o, failure) -> {
@@ -444,11 +445,6 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			for (OperatorDescriptor parent : targetDescriptor.getParents()) {
 				parent.setOutputKeyMapping(operatorID, keyStateAllocation);
 			}
-			List<Tuple2<Integer, Integer>> affectedTasks = targetDescriptor.getParents()
-				.stream()
-				.map(d -> Tuple2.of(d.getOperatorID(), -1))
-				.collect(Collectors.toList());
-			affectedTasks.add(Tuple2.of(operatorID, -1));
 
 			// operatorId to TaskIdList mapping, representing affected tasks.
 			Map<Integer, List<Integer>> tasks = new HashMap<>();

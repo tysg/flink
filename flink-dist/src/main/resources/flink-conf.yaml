@@ -274,5 +274,6 @@ web.backpressure.delay-between-samples: 100000000
 taskmanager.network.memory.buffers-per-channel: 10000000
 taskmanager.network.memory.floating-buffers-per-gate: 10000000
 taskmanager.network.memory.max: 10gb
+akka.framesize: 1048576000b
 
 taskmanager.network.credit-model: false

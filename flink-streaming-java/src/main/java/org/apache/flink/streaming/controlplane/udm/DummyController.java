@@ -46,7 +46,7 @@ public class DummyController extends AbstractControlPolicy {
 	}
 
 	private void showOperatorInfo() {
-		ExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
+		ExecutionPlan streamJobState = getReconfigurationExecutor().getJobExecutionPlan();
 		for (Iterator<OperatorDescriptor> it = streamJobState.getAllOperatorDescriptor(); it.hasNext(); ) {
 			OperatorDescriptor descriptor = it.next();
 			System.out.println(descriptor);
@@ -57,7 +57,7 @@ public class DummyController extends AbstractControlPolicy {
 	}
 
 	private void testRebalanceStateful(int testingOpID) throws InterruptedException {
-		ExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
+		ExecutionPlan streamJobState = getReconfigurationExecutor().getJobExecutionPlan();
 		Map<Integer, List<Integer>> curKeyStateAllocation = streamJobState.getKeyStateAllocation(testingOpID);
 		// we assume that each operator only have one input now
 
@@ -69,7 +69,7 @@ public class DummyController extends AbstractControlPolicy {
 		List<Integer> oddKeys = newKeyStateAllocation.get(0).stream().filter(i -> i % 2 == 0).collect(Collectors.toList());
 		newKeyStateAllocation.get(0).removeAll(oddKeys);
 		newKeyStateAllocation.get(1).addAll(oddKeys);
-		getInstructionSet().rebalance(testingOpID, newKeyStateAllocation, true, this);
+		getReconfigurationExecutor().rebalance(testingOpID, newKeyStateAllocation, true, this);
 		// wait for operation completed
 		synchronized (object) {
 			object.wait();
@@ -77,7 +77,7 @@ public class DummyController extends AbstractControlPolicy {
 	}
 
 	private void testRebalanceStateful2(int testingOpID) throws InterruptedException {
-		ExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
+		ExecutionPlan streamJobState = getReconfigurationExecutor().getJobExecutionPlan();
 		Map<Integer, List<Integer>> curKeyStateAllocation = streamJobState.getKeyStateAllocation(testingOpID);
 		// we assume that each operator only have one input now
 
@@ -89,7 +89,7 @@ public class DummyController extends AbstractControlPolicy {
 		List<Integer> oddKeys = newKeyStateAllocation.get(1).stream().filter(i -> i % 2 == 0).collect(Collectors.toList());
 		newKeyStateAllocation.get(1).removeAll(oddKeys);
 		newKeyStateAllocation.get(0).addAll(oddKeys);
-		getInstructionSet().rebalance(testingOpID, newKeyStateAllocation, true, this);
+		getReconfigurationExecutor().rebalance(testingOpID, newKeyStateAllocation, true, this);
 		// wait for operation completed
 		synchronized (object) {
 			object.wait();
@@ -97,7 +97,7 @@ public class DummyController extends AbstractControlPolicy {
 	}
 
 	private void testScaleOutStateful(int testingOpID) throws InterruptedException {
-		ExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
+		ExecutionPlan streamJobState = getReconfigurationExecutor().getJobExecutionPlan();
 
 		int oldParallelism = streamJobState.getParallelism(testingOpID);
 		System.out.println(oldParallelism);
@@ -119,7 +119,7 @@ public class DummyController extends AbstractControlPolicy {
 
 		System.out.println(newKeyStateAllocation);
 
-		getInstructionSet().rescale(testingOpID, oldParallelism+1, newKeyStateAllocation, this);
+		getReconfigurationExecutor().rescale(testingOpID, oldParallelism+1, newKeyStateAllocation, this);
 
 		synchronized (object) {
 			object.wait();
@@ -127,7 +127,7 @@ public class DummyController extends AbstractControlPolicy {
 	}
 
 	private void testScaleOutStateful2(int testingOpID) throws InterruptedException {
-		ExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
+		ExecutionPlan streamJobState = getReconfigurationExecutor().getJobExecutionPlan();
 
 		int oldParallelism = streamJobState.getParallelism(testingOpID);
 		System.out.println(oldParallelism);
@@ -155,7 +155,7 @@ public class DummyController extends AbstractControlPolicy {
 
 		System.out.println(newKeyStateAllocation);
 
-		getInstructionSet().rescale(testingOpID, oldParallelism+1, newKeyStateAllocation, this);
+		getReconfigurationExecutor().rescale(testingOpID, oldParallelism+1, newKeyStateAllocation, this);
 
 		synchronized (object) {
 			object.wait();
@@ -163,7 +163,7 @@ public class DummyController extends AbstractControlPolicy {
 	}
 
 	private void testScaleInStateful(int testingOpID) throws InterruptedException {
-		ExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
+		ExecutionPlan streamJobState = getReconfigurationExecutor().getJobExecutionPlan();
 
 		int oldParallelism = streamJobState.getParallelism(testingOpID);
 		System.out.println(oldParallelism);
@@ -182,7 +182,7 @@ public class DummyController extends AbstractControlPolicy {
 
 		System.out.println(newKeyStateAllocation);
 
-		getInstructionSet().rescale(testingOpID, oldParallelism-1, newKeyStateAllocation, this);
+		getReconfigurationExecutor().rescale(testingOpID, oldParallelism-1, newKeyStateAllocation, this);
 
 		synchronized (object) {
 			object.wait();
@@ -190,7 +190,7 @@ public class DummyController extends AbstractControlPolicy {
 	}
 
 	private void testScaleInStateful2(int testingOpID) throws InterruptedException {
-		ExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
+		ExecutionPlan streamJobState = getReconfigurationExecutor().getJobExecutionPlan();
 
 		int oldParallelism = streamJobState.getParallelism(testingOpID);
 		System.out.println(oldParallelism);
@@ -211,7 +211,7 @@ public class DummyController extends AbstractControlPolicy {
 
 		System.out.println(newKeyStateAllocation);
 
-		getInstructionSet().rescale(testingOpID, oldParallelism-2, newKeyStateAllocation, this);
+		getReconfigurationExecutor().rescale(testingOpID, oldParallelism-2, newKeyStateAllocation, this);
 
 		synchronized (object) {
 			object.wait();
@@ -219,7 +219,7 @@ public class DummyController extends AbstractControlPolicy {
 	}
 
 	private void testScaling(int testingOpID, int newParallelism) throws InterruptedException {
-		ExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
+		ExecutionPlan streamJobState = getReconfigurationExecutor().getJobExecutionPlan();
 
 		Map<Integer, List<Integer>> curKeyStateAllocation = streamJobState.getKeyStateAllocation(testingOpID);
 		int oldParallelism = streamJobState.getParallelism(testingOpID);
@@ -236,9 +236,9 @@ public class DummyController extends AbstractControlPolicy {
 		System.out.println(newKeyStateAllocation);
 
 		if (oldParallelism == newParallelism) {
-			getInstructionSet().rebalance(testingOpID, newKeyStateAllocation, true, this);
+			getReconfigurationExecutor().rebalance(testingOpID, newKeyStateAllocation, true, this);
 		} else {
-			getInstructionSet().rescale(testingOpID, newParallelism, newKeyStateAllocation, this);
+			getReconfigurationExecutor().rescale(testingOpID, newParallelism, newKeyStateAllocation, this);
 		}
 
 		synchronized (object) {
@@ -256,7 +256,7 @@ public class DummyController extends AbstractControlPolicy {
 
 	// WARNING: This only works without rebalance of the stateless operator
 	private void testScaleOut2(int testingOpID) throws InterruptedException {
-		ExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
+		ExecutionPlan streamJobState = getReconfigurationExecutor().getJobExecutionPlan();
 
 		int oldParallelism = streamJobState.getParallelism(testingOpID);
 		System.out.println(oldParallelism);
@@ -283,7 +283,7 @@ public class DummyController extends AbstractControlPolicy {
 
 		System.out.println(newKeyStateAllocation);
 
-		getInstructionSet().rescale(testingOpID, oldParallelism+2, newKeyStateAllocation, this);
+		getReconfigurationExecutor().rescale(testingOpID, oldParallelism+2, newKeyStateAllocation, this);
 
 		synchronized (object) {
 			object.wait();
@@ -292,7 +292,7 @@ public class DummyController extends AbstractControlPolicy {
 
 	@Deprecated
 	private void testRebalanceStateless(int testingOpID) throws InterruptedException {
-		ExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
+		ExecutionPlan streamJobState = getReconfigurationExecutor().getJobExecutionPlan();
 		Set<OperatorDescriptor> parents = streamJobState.getOperatorDescriptorByID(testingOpID).getParents();
 		// we assume that each operator only have one input now
 		for (OperatorDescriptor parent : parents) {
@@ -309,7 +309,7 @@ public class DummyController extends AbstractControlPolicy {
 			List<Integer> oddKeys = newKeyStateAllocation.get(0).stream().filter(i -> i % 2 == 0).collect(Collectors.toList());
 			newKeyStateAllocation.get(0).removeAll(oddKeys);
 			newKeyStateAllocation.get(1).addAll(oddKeys);
-			getInstructionSet().rebalance(testingOpID, newKeyStateAllocation, false, this);
+			getReconfigurationExecutor().rebalance(testingOpID, newKeyStateAllocation, false, this);
 			// wait for operation completed
 			synchronized (object) {
 				object.wait();
@@ -320,7 +320,7 @@ public class DummyController extends AbstractControlPolicy {
 
 	@Deprecated
 	private void testPauseSource(int sourceID) throws InterruptedException {
-		getInstructionSet().callCustomizeOperations(
+		getReconfigurationExecutor().callCustomizeOperations(
 			enforcement -> FutureUtils.completedVoidFuture()
 				.thenCompose(o -> enforcement.synchronizeTasks(Collections.singletonList(Tuple2.of(sourceID, -1)), null))
 				.thenCompose(o -> {
@@ -351,7 +351,7 @@ public class DummyController extends AbstractControlPolicy {
 		//	 an example shows how to defined customize operations
 		int windowOpID = findOperatorByName("counting window reduce");
 		if (windowOpID != -1) {
-			OperatorDescriptor descriptor = getInstructionSet().getJobExecutionPlan().getOperatorDescriptorByID(windowOpID);
+			OperatorDescriptor descriptor = getReconfigurationExecutor().getJobExecutionPlan().getOperatorDescriptorByID(windowOpID);
 			Map<String, Object> attributeMap = descriptor.getControlAttributeMap();
 			PurgingTrigger<?, ?> trigger = (PurgingTrigger<?, ?>) attributeMap.get("trigger");
 			long oldWindowSize = ((CountTrigger<?>) trigger.getNestedTrigger()).getMaxCount();
@@ -368,11 +368,11 @@ public class DummyController extends AbstractControlPolicy {
 	private void updateCountingWindowSize(int rawVertexID, long newWindowSize) throws Exception {
 		// update abstraction in stream manager execution plan
 		CountTrigger<?> trigger = CountTrigger.of(newWindowSize);
-		OperatorDescriptor descriptor = getInstructionSet().getJobExecutionPlan().getOperatorDescriptorByID(rawVertexID);
+		OperatorDescriptor descriptor = getReconfigurationExecutor().getJobExecutionPlan().getOperatorDescriptorByID(rawVertexID);
 		descriptor.setControlAttribute("trigger", PurgingTrigger.of(trigger));
-		getInstructionSet().callCustomizeOperations(
+		getReconfigurationExecutor().callCustomizeOperations(
 			enforcement -> FutureUtils.completedVoidFuture()
-				.thenCompose(o -> enforcement.prepareExecutionPlan(getInstructionSet().getJobExecutionPlan()))
+				.thenCompose(o -> enforcement.prepareExecutionPlan(getReconfigurationExecutor().getJobExecutionPlan()))
 				.thenCompose(o -> enforcement.synchronizeTasks(Collections.singletonList(Tuple2.of(rawVertexID, -1)), o))
 				.thenCompose(o -> enforcement.updateFunction(rawVertexID, o))
 				.whenComplete((o, failure) -> {
@@ -392,7 +392,7 @@ public class DummyController extends AbstractControlPolicy {
 
 	private void testScaleOutWindowJoin() throws InterruptedException {
 
-		ExecutionPlan streamJobState = getInstructionSet().getJobExecutionPlan();
+		ExecutionPlan streamJobState = getReconfigurationExecutor().getJobExecutionPlan();
 		int testingOpID = findOperatorByName("join1");
 
 		int oldParallelism = streamJobState.getParallelism(testingOpID);
@@ -413,7 +413,7 @@ public class DummyController extends AbstractControlPolicy {
 
 		System.out.println(newKeyStateAllocation);
 
-		getInstructionSet().rescale(testingOpID, oldParallelism+1, newKeyStateAllocation, this);
+		getReconfigurationExecutor().rescale(testingOpID, oldParallelism+1, newKeyStateAllocation, this);
 
 		synchronized (object) {
 			object.wait();
@@ -422,7 +422,7 @@ public class DummyController extends AbstractControlPolicy {
 
 	private void testNoOp(int operatorID) throws InterruptedException {
 
-		getInstructionSet().noOp(operatorID, this);
+		getReconfigurationExecutor().noOp(operatorID, this);
 
 		synchronized (object) {
 			object.wait();

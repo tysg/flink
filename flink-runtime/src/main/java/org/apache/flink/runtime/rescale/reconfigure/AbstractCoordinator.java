@@ -109,7 +109,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 			for (int changedPosition : changes) {
 				try {
 					switch (changedPosition) {
-						case UDF:
+						case UDF: // change of logic for target tasks
 							OperatorDescriptor.ExecutionLogic heldAppLogic =
 								OperatorDescriptorVisitor.attachOperator(heldDescriptor).getApplicationLogic();
 							OperatorDescriptor.ExecutionLogic modifiedAppLogic =
@@ -118,15 +118,15 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 							jobGraphUpdater.updateOperator(operatorID, heldAppLogic);
 							difference.put(UDF, AbstractCoordinator.ExecutionLogic.UDF);
 							break;
-						case PARALLELISM:
-							heldDescriptor.setParallelism(descriptor.getParallelism());
-							// next update job graph
-							JobVertexID jobVertexID = rawVertexIDToJobVertexID(heldDescriptor.getOperatorID());
-							JobVertex vertex = jobGraph.findVertexByID(jobVertexID);
-							vertex.setParallelism(heldDescriptor.getParallelism());
-//							difference.add(PARALLELISM);
-							break;
-						case KEY_STATE_ALLOCATION:
+//						case PARALLELISM: // new tasks to be deployed
+//							heldDescriptor.setParallelism(descriptor.getParallelism());
+//							// next update job graph
+//							JobVertexID jobVertexID = rawVertexIDToJobVertexID(heldDescriptor.getOperatorID());
+//							JobVertex vertex = jobGraph.findVertexByID(jobVertexID);
+//							vertex.setParallelism(heldDescriptor.getParallelism());
+////							difference.add(PARALLELISM);
+//							break;
+						case KEY_STATE_ALLOCATION: // rebalance
 							// convert the logical key mapping to Flink version partition assignment
 							OperatorWorkloadsAssignment operatorWorkloadsAssignment =
 								workloadsAssignmentHandler.handleWorkloadsReallocate(operatorID, descriptor.getKeyStateAllocation());
@@ -135,16 +135,21 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 								operatorWorkloadsAssignment
 							);
 							boolean isRescale = false;
+							// if new tasks are deployed under current operator
 							if (heldDescriptor.getKeyStateAllocation().size() != descriptor.getKeyStateAllocation().size()) {
-								// TODO: do what case PARALLELISM do.
 								isRescale = true;
+								heldDescriptor.setParallelism(descriptor.getParallelism());
+								// next update job graph
+								JobVertexID jobVertexID = rawVertexIDToJobVertexID(heldDescriptor.getOperatorID());
+								JobVertex vertex = jobGraph.findVertexByID(jobVertexID);
+								vertex.setParallelism(heldDescriptor.getParallelism());
 								rescaleExecutionGraph(heldDescriptor.getOperatorID(), oldParallelism, operatorWorkloadsAssignment);
 							}
 							heldDescriptor.setKeySet(descriptor.getKeyStateAllocation());
 							// update the partition assignment of Flink JobGrpah
 							updatePartitionAssignment(heldDescriptor, operatorWorkloadsAssignment, isRescale);
 							break;
-						case KEY_MAPPING:
+						case KEY_MAPPING: //
 							// update key set will indirectly update key mapping, so we ignore this type of detected change here
 							difference.put(KEY_MAPPING, AbstractCoordinator.ExecutionLogic.KEY_MAPPING);
 							break;
