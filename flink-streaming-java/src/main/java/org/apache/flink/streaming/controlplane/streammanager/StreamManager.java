@@ -167,8 +167,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 //		this.controlPolicyList.add(new FlinkStreamSwitchAdaptor(this, jobGraph));
 //		this.controlPolicyList.add(new TestingCFManager(this));
 //		this.controlPolicyList.add(new TestingControlPolicy(this));
-//		this.controlPolicyList.add(new DummyController(this));
-		this.controlPolicyList.add(new PerformanceEvaluator(this, streamManagerConfiguration.getConfiguration()));
+		this.controlPolicyList.add(new DummyController(this));
+//		this.controlPolicyList.add(new PerformanceEvaluator(this, streamManagerConfiguration.getConfiguration()));
 
 		reconfigurationProfiler = new ReconfigurationProfiler(streamManagerConfiguration.getConfiguration());
 	}
@@ -385,46 +385,94 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			final String UPDATE_STATE = "updateState timer";
 			log.info("++++++ start update");
 			runAsync(() -> jobMasterGateway.callOperations(
-				enforcement -> FutureUtils.completedVoidFuture()
-					.thenCompose(o -> {
-						reconfigurationProfiler.onOtherStart(PREPARE);
-						return enforcement.prepareExecutionPlan(jobExecutionPlan);
-					})
-					.thenCompose(o -> {
-						reconfigurationProfiler.onOtherEnd(PREPARE);
-						reconfigurationProfiler.onOtherStart(SYN);
-						return enforcement.synchronizeTasks(tasks, o);
-					})
-					.thenCompose(o -> {
+				enforcement -> {
+					// prepare andsynchronize among affected tasks
+					CompletableFuture<?> syncFuture = FutureUtils.completedVoidFuture()
+						.thenCompose(o -> {
+							reconfigurationProfiler.onOtherStart(PREPARE);
+							return enforcement.prepareExecutionPlan(jobExecutionPlan);
+						})
+						.thenCompose(o -> {
+							reconfigurationProfiler.onOtherEnd(PREPARE);
+							reconfigurationProfiler.onOtherStart(SYN);
+							return enforcement.synchronizeTasks(tasks, o);
+						});
+					// run update asynchronously.
+					List<CompletableFuture<?>> updateFutureList = new ArrayList<>();
+					updateFutureList.add(syncFuture.thenCompose(o -> {
 						reconfigurationProfiler.onOtherEnd(SYN);
 						reconfigurationProfiler.onOtherStart(UPDATE_MAPPING);
 						return enforcement.updateKeyMapping(updateKeyMappingTasks, o);
-					})
-					.thenCompose(o -> {
+					}));
+					updateFutureList.add(syncFuture.thenCompose(o -> {
 						reconfigurationProfiler.onOtherEnd(UPDATE_MAPPING);
 						reconfigurationProfiler.onOtherStart(UPDATE_STATE);
 						return enforcement.updateState(updateStateTasks, o);
-					})
-					.thenCompose(o -> {
+					}));
+					updateFutureList.add(syncFuture.thenCompose(o -> {
 						return enforcement.updateTaskResources(deployingTasks, isScaleIn);
-					})
-					.thenCompose(o -> enforcement.resumeTasks())
-					.whenComplete((o, failure) -> {
-						if (failure != null) {
-							LOG.error("Reconfiguration failed: ", failure);
-							failure.printStackTrace();
-						}
-						try {
-							System.out.println("++++++ finished update");
-							log.info("++++++ finished update");
-							// TODO: extract the deployment overhead
-							reconfigurationProfiler.onOtherEnd(UPDATE_STATE);
-							this.jobExecutionPlan.notifyUpdateFinished(failure);
-							reconfigurationProfiler.onReconfigurationEnd();
-						} catch (Exception e) {
-							e.printStackTrace();
-						}
-					})
+					}));
+
+					// finish the reconfiguration after all asynchronous update completed
+					return FutureUtils.completeAll(updateFutureList)
+						.thenCompose(o -> enforcement.resumeTasks())
+						.whenComplete((o, failure) -> {
+							if (failure != null) {
+								LOG.error("Reconfiguration failed: ", failure);
+								failure.printStackTrace();
+							}
+							try {
+								System.out.println("++++++ finished update");
+								log.info("++++++ finished update");
+								// TODO: extract the deployment overhead
+								reconfigurationProfiler.onOtherEnd(UPDATE_STATE);
+								this.jobExecutionPlan.notifyUpdateFinished(failure);
+								reconfigurationProfiler.onReconfigurationEnd();
+							} catch (Exception e) {
+								e.printStackTrace();
+							}
+						});
+//					FutureUtils.completedVoidFuture()
+//					.thenCompose(o -> {
+//						reconfigurationProfiler.onOtherStart(PREPARE);
+//						return enforcement.prepareExecutionPlan(jobExecutionPlan);
+//					})
+//					.thenCompose(o -> {
+//						reconfigurationProfiler.onOtherEnd(PREPARE);
+//						reconfigurationProfiler.onOtherStart(SYN);
+//						return enforcement.synchronizeTasks(tasks, o);
+//					})
+//					.thenCompose(o -> {
+//						reconfigurationProfiler.onOtherEnd(SYN);
+//						reconfigurationProfiler.onOtherStart(UPDATE_MAPPING);
+//						return enforcement.updateKeyMapping(updateKeyMappingTasks, o);
+//					})
+//					.thenCompose(o -> {
+//						reconfigurationProfiler.onOtherEnd(UPDATE_MAPPING);
+//						reconfigurationProfiler.onOtherStart(UPDATE_STATE);
+//						return enforcement.updateState(updateStateTasks, o);
+//					})
+//					.thenCompose(o -> {
+//						return enforcement.updateTaskResources(deployingTasks, isScaleIn);
+//					})
+//					.thenCompose(o -> enforcement.resumeTasks())
+//					.whenComplete((o, failure) -> {
+//						if (failure != null) {
+//							LOG.error("Reconfiguration failed: ", failure);
+//							failure.printStackTrace();
+//						}
+//						try {
+//							System.out.println("++++++ finished update");
+//							log.info("++++++ finished update");
+//							// TODO: extract the deployment overhead
+//							reconfigurationProfiler.onOtherEnd(UPDATE_STATE);
+//							this.jobExecutionPlan.notifyUpdateFinished(failure);
+//							reconfigurationProfiler.onReconfigurationEnd();
+//						} catch (Exception e) {
+//							e.printStackTrace();
+//						}
+//					})
+				}
 			));
 		} catch (Exception e) {
 			LOG.error("Reconfiguration failed: ", e);
@@ -472,7 +520,9 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			final String UPDATE_STATE = "updateState timer";
 			if (stateful) {
 				runAsync(() -> jobMasterGateway.callOperations(
-					enforcement -> FutureUtils.completedVoidFuture()
+				enforcement -> {
+					// prepare and synchronize among affected tasks
+					CompletableFuture<?> syncFuture = FutureUtils.completedVoidFuture()
 						.thenCompose(o -> {
 							reconfigurationProfiler.onOtherStart(PREPARE);
 							return enforcement.prepareExecutionPlan(jobExecutionPlan);
@@ -481,31 +531,36 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 							reconfigurationProfiler.onOtherEnd(PREPARE);
 							reconfigurationProfiler.onOtherStart(SYN);
 							return enforcement.synchronizeTasks(tasks, o);
-						})
-						.thenCompose(o -> {
-							reconfigurationProfiler.onOtherEnd(SYN);
-							reconfigurationProfiler.onOtherStart(UPDATE_MAPPING);
-							return enforcement.updateKeyMapping(updateKeyMappingTasks, o);
-						})
-						.thenCompose(o -> {
-							reconfigurationProfiler.onOtherEnd(UPDATE_MAPPING);
-							reconfigurationProfiler.onOtherStart(UPDATE_STATE);
-							return enforcement.updateState(updateStateTasks, o);
-						})
+						});
+					// run update asynchronously.
+					List<CompletableFuture<?>> updateFutureList = new ArrayList<>();
+					updateFutureList.add(syncFuture.thenCompose(o -> {
+						reconfigurationProfiler.onOtherEnd(SYN);
+						reconfigurationProfiler.onOtherStart(UPDATE_MAPPING);
+						return enforcement.updateKeyMapping(updateKeyMappingTasks, o);
+					}));
+					updateFutureList.add(syncFuture.thenCompose(o -> {
+						reconfigurationProfiler.onOtherEnd(UPDATE_MAPPING);
+						reconfigurationProfiler.onOtherStart(UPDATE_STATE);
+						return enforcement.updateState(updateStateTasks, o);
+					}));
+					// finish the reconfiguration after all asynchronous update completed
+					return FutureUtils.completeAll(updateFutureList)
+//						.thenCompose(o -> enforcement.resumeTasks()) // resume all tasks who has both state and mapping to update (to be appeared in the future).
 						.whenComplete((o, failure) -> {
-							if (failure != null) {
-								failure.printStackTrace();
-							}
-							try {
-								System.out.println("++++++ finished update");
-								reconfigurationProfiler.onOtherEnd(UPDATE_STATE);
-								reconfigurationProfiler.onReconfigurationEnd();
-								this.jobExecutionPlan.notifyUpdateFinished(failure);
-							} catch (Exception e) {
-								e.printStackTrace();
-							}
-						})
-				));
+						if (failure != null) {
+							failure.printStackTrace();
+						}
+						try {
+							System.out.println("++++++ finished update");
+							reconfigurationProfiler.onOtherEnd(UPDATE_STATE);
+							reconfigurationProfiler.onReconfigurationEnd();
+							this.jobExecutionPlan.notifyUpdateFinished(failure);
+						} catch (Exception e) {
+							e.printStackTrace();
+						}
+					});
+				}));
 			} else {
 				runAsync(() -> jobMasterGateway.callOperations(
 					enforcement -> FutureUtils.completedVoidFuture()

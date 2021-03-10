@@ -130,10 +130,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 							// convert the logical key mapping to Flink version partition assignment
 							OperatorWorkloadsAssignment operatorWorkloadsAssignment =
 								workloadsAssignmentHandler.handleWorkloadsReallocate(operatorID, descriptor.getKeyStateAllocation());
-							difference.put(
-								KEY_STATE_ALLOCATION,
-								operatorWorkloadsAssignment
-							);
+							difference.put(KEY_STATE_ALLOCATION, operatorWorkloadsAssignment);
 							boolean isRescale = false;
 							// if new tasks are deployed under current operator
 							if (heldDescriptor.getKeyStateAllocation().size() != descriptor.getKeyStateAllocation().size()) {
@@ -149,10 +146,11 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 							// update the partition assignment of Flink JobGrpah
 							updatePartitionAssignment(heldDescriptor, operatorWorkloadsAssignment, isRescale);
 							break;
-						case KEY_MAPPING: //
+						case KEY_MAPPING: // update the key mapping of the tasks
 							// update key set will indirectly update key mapping, so we ignore this type of detected change here
 							difference.put(KEY_MAPPING, AbstractCoordinator.ExecutionLogic.KEY_MAPPING);
 							break;
+						// TODO: case resources
 						case NO_CHANGE:
 					}
 				} catch (Exception e) {

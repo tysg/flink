@@ -676,16 +676,13 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 						tdd.getKeyGroupRange(),
 						tdd.getIdInModel(),
 						tdd.getTaskRestore());
-				}else
-
-				if (rescaleOptions.isUpdateKeyGroupRange()) {
+				} else if (rescaleOptions.isUpdateKeyGroupRange()) {
 					log.info("++++++ update task keyGroupRange for subtask: " + tdd.getSubtaskIndex() + "  " + tdd.getExecutionAttemptId());
 					task.updateKeyGroupRange(tdd.getKeyGroupRange());
 				} else {
 					// author: @hya
 					return task.finalizeRescaleAsync().thenApply(o -> Acknowledge.get());
 				}
-
 
 				return CompletableFuture.completedFuture(Acknowledge.get());
 			} catch (Exception e) {

@@ -14,8 +14,8 @@ import static org.apache.flink.util.Preconditions.checkState;
 public class PerformanceEvaluator extends AbstractControlPolicy {
 	private static final Logger LOG = LoggerFactory.getLogger(PerformanceEvaluator.class);
 
-	private final Object object = new Object();
-	private final TestingThread testingThread;
+	private final Object lock = new Object();
+	private final Profiler profiler;
 	private final Map<String, String> experimentConfig;
 
 	public final static String AFFECTED_TASK = "trisk.reconfig.affected_tasks";
@@ -35,32 +35,32 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 
 	public PerformanceEvaluator(ReconfigurationAPI reconfigurationAPI, Configuration configuration) {
 		super(reconfigurationAPI);
-		testingThread = new TestingThread();
+		profiler = new Profiler();
 		experimentConfig = configuration.toMap();
 	}
 
 	@Override
 	public synchronized void startControllers() {
 		System.out.println("PerformanceMeasure is starting...");
-		testingThread.setName("reconfiguration performance measure");
-		testingThread.start();
+		profiler.setName("reconfiguration performance measure");
+		profiler.start();
 	}
 
 	@Override
 	public void stopControllers() {
 		System.out.println("PerformanceMeasure is stopping...");
 		finished = true;
-		testingThread.interrupt();
+		profiler.interrupt();
 	}
 
 	@Override
 	public synchronized void onChangeCompleted(Throwable throwable) {
 		if (throwable != null) {
-			testingThread.interrupt();
+			profiler.interrupt();
 			return;
 		}
-		synchronized (object) {
-			object.notify();
+		synchronized (lock) {
+			lock.notify();
 		}
 	}
 
@@ -109,8 +109,8 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 
 				getReconfigurationExecutor().rebalance(testOpID, newKeySet, true, this);
 				// wait for operation completed
-				synchronized (object) {
-					object.wait();
+				synchronized (lock) {
+					lock.wait();
 				}
 				while ((System.currentTimeMillis() - start) < reconfigInterval) {}
 				i++;
@@ -143,8 +143,8 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 					System.out.println("new function:" + func);
 					getReconfigurationExecutor().reconfigureUserFunction(testOpID, func, this);
 					// wait for operation completed
-					synchronized (object) {
-						object.wait();
+					synchronized (lock) {
+						lock.wait();
 					}
 					while ((System.currentTimeMillis() - start) < timeInterval) {
 					}
@@ -198,8 +198,8 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 			getReconfigurationExecutor().rescale(testingOpID, newParallelism, newKeyStateAllocation, this);
 		}
 
-		synchronized (object) {
-			object.wait();
+		synchronized (lock) {
+			lock.wait();
 		}
 	}
 
@@ -247,8 +247,8 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 
 				getReconfigurationExecutor().rescale(testOpID, newParallelism, newKeySet, this);
 				// wait for operation completed
-				synchronized (object) {
-					object.wait();
+				synchronized (lock) {
+					lock.wait();
 				}
 				while ((System.currentTimeMillis() - start) < reconfigInterval) {
 					// busy waiting
@@ -270,8 +270,8 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 				System.out.println("\nnumber of noop test: " + i);
 				getReconfigurationExecutor().noOp(testOpID, this);
 				// wait for operation completed
-				synchronized (object) {
-					object.wait();
+				synchronized (lock) {
+					lock.wait();
 				}
 				if (System.currentTimeMillis() - start > reconfigInterval) {
 					System.out.println("overloaded frequency");
@@ -404,12 +404,12 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 
 		getReconfigurationExecutor().noOp(operatorID, this);
 
-		synchronized (object) {
-			object.wait();
+		synchronized (lock) {
+			lock.wait();
 		}
 	}
 
-	private class TestingThread extends Thread {
+	private class Profiler extends Thread {
 
 		@Override
 		public void run() {

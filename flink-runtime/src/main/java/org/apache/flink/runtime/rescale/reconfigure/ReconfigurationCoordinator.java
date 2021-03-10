@@ -206,18 +206,6 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 		Collection<CompletableFuture<Execution>> allocateSlotFutures =
 			new ArrayList<>(jobVertex.getParallelism());
 
-//		ExecutionVertex[] taskVertices = tgtJobVertex.getTaskVertices();
-//		List<ExecutionVertex> createdVertex = new ArrayList<>();
-//		for (int i = oldParallelism; i < srcJobVertex.getParallelism(); i++) {
-//			createdVertex.add(taskVertices[i]);
-//			Execution executionAttempt = taskVertices[i].getCurrentExecutionAttempt();
-//			// todo a better way is to only update those partition id changed partition, now will loss some data
-//			allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(RescaleID.DEFAULT));
-//		for (int i = oldParallelism; i < tgtJobVertex.getParallelism(); i++) {
-//			createCandidates.add(taskVertices[i]);
-//			Execution executionAttempt = taskVertices[i].getCurrentExecutionAttempt();
-//			allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(rescaleID));
-//		}
 		for (ExecutionVertex vertex : createdCandidates.get(operatorID)) {
 			Execution executionAttempt = vertex.getCurrentExecutionAttempt();
 			allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(rescaleID));
@@ -258,27 +246,6 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 	}
 
 	public CompletableFuture<Void> cancelTasks(int operatorID, int offset) {
-		// TODO: add them to the future list
-//		Collection<CompletableFuture<?>> removeFutures =
-//			new ArrayList<>(removedCandidates.size());
-//
-//		for (ExecutionVertex vertex : removedCandidates.get(operatorID)) {
-//			CompletableFuture<?> removedTask = vertex.cancel();
-//			removeFutures.add(removedTask);
-//		}
-//
-//		CheckpointCoordinator checkpointCoordinator = executionGraph.getCheckpointCoordinator();
-//		assert checkpointCoordinator != null;
-//		checkpointCoordinator.stopCheckpointScheduler();
-//		checkNotNull(checkpointCoordinator);
-//		checkpointCoordinator.dropVertices(removedCandidates.get(operatorID).toArray(new ExecutionVertex[0]), false);
-//
-//		if (checkpointCoordinator.isPeriodicCheckpointingConfigured()) {
-//			checkpointCoordinator.startCheckpointScheduler();
-//		}
-//		return FutureUtils.completeAll(removeFutures)
-//			.thenCompose(o -> updateDownstreamGates(operatorID));
-
 		LOG.info("++++++ canceling tasks" + operatorID);
 
 		updateDownstreamGates(operatorID)
@@ -317,7 +284,6 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 	 */
 	@Override
 	public CompletableFuture<Map<Integer, Map<Integer, Diff>>> updateKeyMapping(
-//		int targetOperatorID,
 		Map<Integer, List<Integer>> tasks,
 		@Nonnull Map<Integer, Map<Integer, Diff>> diff) {
 		System.out.println("update mapping...");
@@ -337,8 +303,10 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 			JobVertexID targetJobVertexID = rawVertexIDToJobVertexID(targetOperatorID);
 			ExecutionJobVertex targetJobVertex = executionGraph.getJobVertex(targetJobVertexID);
 			checkNotNull(targetJobVertex, "Execution job vertex not found: " + targetJobVertexID);
+			final SynchronizeOperation syncOp = this.currentSyncOp;
 
 			OperatorWorkloadsAssignment remappingAssignment = workloadsAssignmentHandler.getHeldOperatorWorkloadsAssignment(targetOperatorID);
+			List<Tuple2<Integer, Integer>> notModifiedList = new ArrayList<>();
 			for (int subtaskIndex = 0; subtaskIndex < targetJobVertex.getParallelism(); subtaskIndex++) {
 				ExecutionVertex vertex = targetJobVertex.getTaskVertices()[subtaskIndex];
 				Execution execution = vertex.getCurrentExecutionAttempt();
@@ -347,14 +315,29 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 						rescaleID,
 						RescaleOptions.RESCALE_KEYGROUP_RANGE_ONLY,
 						remappingAssignment.getAlignedKeyGroupRange(subtaskIndex)));
+					// if is not a modified task and do not need to update partitions, then resume.
+					if (!remappingAssignment.isTaskModified(subtaskIndex)) {
+						notModifiedList.add(Tuple2.of(targetOperatorID, subtaskIndex));
+					}
 				} else {
 					vertex.assignKeyGroupRange(remappingAssignment.getAlignedKeyGroupRange(subtaskIndex));
 				}
 			}
-			final SynchronizeOperation syncOp = this.currentSyncOp;
+			// TODO: before resume those tasks, should check whether the update on the task has been completed, using diffmap
+			// TODO: but diffmap is operator-centric, and is unable to check whether the task should be resumed.
+			if (remappingAssignment.isScaling()) {
+				try { // update partition and downstream gates if there are tasks to be scaled out/in
+					updatePartitions(targetOperatorID, rescaleID).thenAccept(o -> syncOp.resumeTasks(notModifiedList));
+				} catch (ExecutionGraphException e) {
+					e.printStackTrace();
+				}
+			} else {
+				syncOp.resumeTasks(notModifiedList);
+			}
+
 			CompletableFuture<Void> finishFuture = FutureUtils.completeAll(rescaleCandidatesFutures);
-//			finishFuture.thenAccept(
-			return finishFuture.thenApply(
+			finishFuture.thenAccept(
+//			return finishFuture.thenApply(
 				o -> {
 					for (OperatorDescriptor upstreamOperator : heldExecutionPlan.getOperatorDescriptorByID(targetOperatorID).getParents()) {
 						// check should we resume those tasks
@@ -364,14 +347,14 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 							syncOp.resumeTasks(Collections.singletonList(Tuple2.of(upstreamOperator.getOperatorID(), -1)));
 						}
 					}
-					return diff;
+//					return diff;
 				}
 			);
 			// the tasks can be resumed asynchrouously
-//			return finishFuture.thenApply(o -> {
-//				LOG.info("++++++ completed key mapping");
-//				return diff;
-//			});
+			return finishFuture.thenApply(o -> {
+				LOG.info("++++++ completed key mapping");
+				return diff;
+			});
 		} catch (ExecutionGraphException e) {
 			return FutureUtils.completedExceptionally(e);
 		}
@@ -495,7 +478,6 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 	 */
 	@Override
 	public CompletableFuture<Map<Integer, Map<Integer, AbstractCoordinator.Diff>>> updateState(
-//		int operatorID,
 		Map<Integer, List<Integer>> tasks,
 		Map<Integer, Map<Integer, AbstractCoordinator.Diff>> diff) {
 		System.out.println("update state...");
@@ -510,53 +492,35 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 		ExecutionJobVertex executionJobVertex = executionGraph.getJobVertex(jobVertexID);
 		Preconditions.checkNotNull(executionJobVertex, "Execution job vertex not found: " + jobVertexID);
 
-//		RemappingAssignment remappingAssignment = new RemappingAssignment(
-//			heldExecutionPlan.getKeyStateAllocation(operatorID)
-//		);
 		Map<Integer, Diff> diffMap = diff.get(operatorID);
 		OperatorWorkloadsAssignment remappingAssignment = (OperatorWorkloadsAssignment) diffMap.remove(AbstractCoordinator.KEY_STATE_ALLOCATION);
 
 		CompletableFuture<Void> updateTargetPartitionFuture = CompletableFuture.completedFuture(null);
-		if (diffMap.isEmpty()) {
-			// means the state set allocation do not have change, update state should finish
-			if (remappingAssignment == null) {
-				syncOp.resumeTasks(Collections.singletonList(Tuple2.of(operatorID, -1)));
-				return CompletableFuture.completedFuture(diff);
-			} else {
-				List<Tuple2<Integer, Integer>> notModifiedList =
-					Arrays.stream(executionJobVertex.getTaskVertices())
-						.map(ExecutionVertex::getParallelSubtaskIndex)
-						.filter(i -> !remappingAssignment.isTaskModified(i))
-						.map(i -> Tuple2.of(operatorID, i))
-						.collect(Collectors.toList());
-				if (remappingAssignment.isScaling()) {
-					try {
-						updateTargetPartitionFuture = updatePartitions(operatorID, rescaleID);
-						updateTargetPartitionFuture.thenAccept(o -> syncOp.resumeTasks(notModifiedList));
-					} catch (ExecutionGraphException e) {
-						e.printStackTrace();
-					}
-				} else {
-					syncOp.resumeTasks(notModifiedList);
-				}
-			}
-		}
-
-//		checkNotNull(syncOp, "no state collected currently, have you synchronized first?");
-//		CompletableFuture<Void> assignStateFuture = syncOp.finishedFuture.thenAccept(
-//			state -> {
-//				StateAssignmentOperation stateAssignmentOperation =
-//					new StateAssignmentOperation(syncOp.checkpointId, Collections.singleton(executionJobVertex), state, true);
-//				stateAssignmentOperation.setForceRescale(true);
-//				// think about latter
-//				stateAssignmentOperation.setRedistributeStrategy(remappingAssignment);
-//
-//				LOG.info("++++++ start to assign states " + state);
-//				stateAssignmentOperation.assignStates();
-//				// can safely sync the some old parameters because all modifications in JobMaster is completed.
-//				executionJobVertex.syncOldConfigInfo();
+//		if (diffMap.isEmpty()) {
+//			// means the state set allocation do not have change, update state should finish
+//			if (remappingAssignment == null) {
+//				syncOp.resumeTasks(Collections.singletonList(Tuple2.of(operatorID, -1)));
+//				return CompletableFuture.completedFuture(diff);
+//			} else {
+//				List<Tuple2<Integer, Integer>> notModifiedList =
+//					Arrays.stream(executionJobVertex.getTaskVertices())
+//						.map(ExecutionVertex::getParallelSubtaskIndex)
+//						.filter(i -> !remappingAssignment.isTaskModified(i))
+//						.map(i -> Tuple2.of(operatorID, i))
+//					.collect(Collectors.toList());
+//				if (remappingAssignment.isScaling()) {
+//					try { // update partition and downstream gates if there are tasks to be scaled out/in
+//						updateTargetPartitionFuture = updatePartitions(operatorID, rescaleID);
+//						updateTargetPartitionFuture.thenAccept(o -> syncOp.resumeTasks(notModifiedList));
+//					} catch (ExecutionGraphException e) {
+//						e.printStackTrace();
+//					}
+//				}  else {
+//					syncOp.resumeTasks(notModifiedList);
+//				}
 //			}
-//		);
+//		}
+
 		CompletableFuture<Void> assignStateFuture = CompletableFuture.completedFuture(null);
 		final CompletableFuture<Void> finalUpdateTargetPartitionFuture = updateTargetPartitionFuture;
 		return assignStateFuture.thenCompose(o -> {
@@ -565,20 +529,6 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 					Execution execution = executionJobVertex.getTaskVertices()[subtaskIndex].getCurrentExecutionAttempt();
 					// for those unmodified tasks, update keygroup range, for those modified tasks, update state.
 					if (!remappingAssignment.isTaskModified(subtaskIndex)) {
-//						try {
-//							System.out.println(operatorID + " update keygroup range at: " + subtaskIndex);
-//							CompletableFuture<Void> stateUpdateFuture = execution.scheduleRescale(rescaleID,
-//								RescaleOptions.RESCALE_KEYGROUP_RANGE_ONLY,
-//								remappingAssignment.getAlignedKeyGroupRange(subtaskIndex));
-//							if (diffMap.isEmpty()) {
-//								checkNotNull(syncOp, "have you call sync before");
-//								final int taskOffset = subtaskIndex;
-//								stateUpdateFuture.thenAccept(
-//									v -> syncOp.resumeTasks(Collections.singletonList(Tuple2.of(operatorID, taskOffset))));
-//							}
-//						} catch (ExecutionGraphException e) {
-//							e.printStackTrace();
-//						}
 						continue;
 					}
 					if (execution != null && execution.getState() == ExecutionState.RUNNING) {
@@ -633,7 +583,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 		OperatorWorkloadsAssignment remappingAssignment = (OperatorWorkloadsAssignment) diffMap.remove(AbstractCoordinator.KEY_STATE_ALLOCATION);
 
 		CompletableFuture<Void> updateTargetPartitionFuture = CompletableFuture.completedFuture(null);
-		if (diffMap.isEmpty()) {
+		if (diffMap.isEmpty()) { // TODO: this is weird, why need to add a diffMap is empty?
 			// means the state set allocation do not have change, update state should finish
 			if (remappingAssignment == null) {
 				syncOp.resumeTasks(Collections.singletonList(Tuple2.of(operatorID, -1)));

@@ -291,7 +291,5 @@ public interface JobMasterGateway extends
 	 */
 	void triggerOperatorUpdate(JobGraph jobGraph, JobVertexID targetVertexID, OperatorID operatorID);
 
-	default <M>void callOperations(Function<PrimitiveOperation<M>, CompletableFuture<?>> operationCaller){
-
-	}
+	default <M>void callOperations(Function<PrimitiveOperation<M>, CompletableFuture<?>> operationCaller) {}
 }
