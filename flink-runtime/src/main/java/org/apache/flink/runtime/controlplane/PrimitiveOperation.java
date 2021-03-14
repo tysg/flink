@@ -19,6 +19,7 @@
 package org.apache.flink.runtime.controlplane;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 import javax.annotation.Nullable;
@@ -30,11 +31,6 @@ import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.messages.Acknowledge;
-
-import javax.annotation.Nullable;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 /**
  * The low level primitive operations.
  * <p>

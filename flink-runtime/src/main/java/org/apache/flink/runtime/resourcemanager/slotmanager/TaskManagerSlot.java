@@ -169,9 +169,4 @@ public class TaskManagerSlot implements TaskManagerSlotInformation {
 		PENDING,
 		ALLOCATED
 	}
-
-	@Override
-	public String toString() {
-		return String.format("slot id: %s\nstate: %s\nallocation id: %s\nresource profile: %s\n", slotId.toString(), state, allocationId, resourceProfile.toString());
-	}
 }

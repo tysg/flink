@@ -992,6 +992,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 				streamManagerGateway.jobStatusChanged(
 					jobGraph.getJobID(), newJobStatus, timestamp, error, jobAbstraction
 				);
+				slotPool.getAllSlots().thenAccept(slots -> streamManagerGateway.slotStatusChanged(slots));
 			}
 		);
 	}

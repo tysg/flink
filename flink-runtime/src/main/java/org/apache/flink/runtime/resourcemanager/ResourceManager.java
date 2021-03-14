@@ -461,7 +461,11 @@ public abstract class ResourceManager<WorkerType extends ResourceIDRetrievable>
 					slotRequest.getJobId(),
 					slotRequest.getAllocationId());
 
-				slotManager.allocateSlot(slotRequest, slotID);
+				try {
+					slotManager.allocateSlot(slotRequest, slotID);
+				} catch (ResourceManagerException e) {
+					return FutureUtils.completedExceptionally(e);
+				}
 
 				return CompletableFuture.completedFuture(Acknowledge.get());
 			} else {

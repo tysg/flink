@@ -18,6 +18,7 @@
 
 package org.apache.flink.runtime.controlplane.streammanager;
 
+import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
 
 import org.apache.flink.api.common.JobID;
@@ -30,6 +31,7 @@ import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobmaster.JobMaster;
 import org.apache.flink.runtime.jobmaster.JobMasterId;
 import org.apache.flink.runtime.registration.RegistrationResponse;
+import org.apache.flink.runtime.resourcemanager.slotmanager.TaskManagerSlot;
 import org.apache.flink.runtime.rpc.FencedRpcGateway;
 import org.apache.flink.runtime.rpc.RpcTimeout;
 
@@ -82,6 +84,8 @@ public interface StreamManagerGateway extends FencedRpcGateway<StreamManagerId> 
 	 *                      exception that caused the failure.
 	 */
 	void jobStatusChanged(JobID jobId, JobStatus newJobStatus, long timestamp, Throwable error, ExecutionPlan jobAbstraction);
+
+	void slotStatusChanged(Collection<TaskManagerSlot> taskManagerSlots);
 
 	StreamRelatedInstanceFactory getStreamRelatedInstanceFactory();
 

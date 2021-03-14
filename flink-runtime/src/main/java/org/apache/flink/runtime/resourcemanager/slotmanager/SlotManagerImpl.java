@@ -326,23 +326,31 @@ public class SlotManagerImpl implements SlotManager {
 		}
 	}
 
-	public void allocateSlot(SlotRequest slotRequest, SlotID slotId) {
+	public void allocateSlot(SlotRequest slotRequest, SlotID slotId) throws ResourceManagerException {
 		checkInit();
+
+		if (checkDuplicateRequest(slotRequest.getAllocationId())) {
+			LOG.debug("Ignoring a duplicate slot request with allocation id {}.", slotRequest.getAllocationId());
+			return;
+		}
+
+		PendingSlotRequest pendingSlotRequest = new PendingSlotRequest(slotRequest);
+		pendingSlotRequests.put(slotRequest.getAllocationId(), pendingSlotRequest);
 
 		TaskManagerSlot taskManagerSlot = freeSlots.get(slotId);
 
-		Preconditions.checkNotNull(taskManagerSlot);
-		// sanity check
-		Preconditions.checkState(
-			taskManagerSlot.getState() == TaskManagerSlot.State.FREE,
-			"TaskManagerSlot %s is not in state FREE but %s.",
-			taskManagerSlot.getSlotId(), taskManagerSlot.getState());
-
-		PendingSlotRequest pendingSlotRequest = new PendingSlotRequest(slotRequest);
-		freeSlots.remove(taskManagerSlot.getSlotId());
-
-		pendingSlotRequests.put(slotRequest.getAllocationId(), pendingSlotRequest);
-		allocateSlot(taskManagerSlot, pendingSlotRequest);
+		if (taskManagerSlot != null && taskManagerSlot.getState() == TaskManagerSlot.State.FREE) {
+			freeSlots.remove(taskManagerSlot.getSlotId());
+			allocateSlot(taskManagerSlot, pendingSlotRequest);
+		} else {
+			try {
+				internalRequestSlot(pendingSlotRequest);
+			} catch (ResourceManagerException e) {
+				// requesting the slot failed --> remove pending slot request
+				pendingSlotRequests.remove(slotRequest.getAllocationId());
+				throw new ResourceManagerException("Could not fulfill slot request " + slotRequest.getAllocationId() + '.', e);
+			}
+		}
 	}
 
 	/**

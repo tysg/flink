@@ -18,9 +18,11 @@
 
 package org.apache.flink.streaming.controlplane.streammanager;
 
+import static org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor.ExecutionLogic.UDF;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.apache.flink.util.Preconditions.checkState;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -37,7 +39,6 @@ import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
-import org.apache.flink.runtime.clusterframework.types.ResourceProfile;
 import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.controlplane.PrimitiveOperation;
@@ -73,24 +74,16 @@ import org.apache.flink.streaming.controlplane.jobgraph.NormalInstantiateFactory
 import org.apache.flink.streaming.controlplane.rescale.StreamJobGraphRescaler;
 import org.apache.flink.streaming.controlplane.streammanager.exceptions.StreamManagerException;
 import org.apache.flink.streaming.controlplane.streammanager.insts.ExecutionPlanWithUpdatingFlag;
-import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
 import org.apache.flink.streaming.controlplane.streammanager.insts.ExecutionPlanWithUpdatingFlagImpl;
+import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
+import org.apache.flink.streaming.controlplane.streammanager.resource.AbstractSlot;
+import org.apache.flink.streaming.controlplane.streammanager.resource.FlinkSlot;
+import org.apache.flink.streaming.controlplane.streammanager.resource.Resource;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 import org.apache.flink.streaming.controlplane.udm.TestingControlPolicy;
-import org.apache.flink.streaming.controlplane.udm.DummyController;
-import org.apache.flink.streaming.controlplane.udm.PerformanceEvaluator;
 import org.apache.flink.util.OptionalConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
-import static org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor.ExecutionLogic.UDF;
-import static org.apache.flink.util.Preconditions.checkNotNull;
-import static org.apache.flink.util.Preconditions.checkState;
 /**
  * @author trx
  * StreamManager implementation.
@@ -151,7 +144,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 //	private ResourceManagerGateway resourceManagerGateway = null;
 
-	private Map<String, List<TaskManagerSlot>> slotMap = null;
+	private Map<String, List<AbstractSlot>> slotMap = null;
 
 	// ------------------------------------------------------------------------
 
@@ -354,23 +347,6 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	}
 
 	public void printSlots() {
-//		assert(resourceManagerGateway != null);
-////		resourceManagerGateway.getNumberOfRegisteredTaskManagers().thenAccept(num -> System.out.println("------ num registered task managers: " + num));
-//		resourceManagerGateway.requestTaskManagerInfo(Time.days(1)).thenAccept(taskManagerInfos -> {
-//			System.out.println("++++++ TaskManagerInfos:");
-//			taskManagerInfos.forEach(taskManagerInfo -> {
-//				System.out.println(taskManagerInfo);
-//			});
-//			System.out.println();
-//		});
-//
-//		resourceManagerGateway.getAllSlots().thenAccept(taskManagerSlots -> {
-//			System.out.println("++++++ TaskManagerSlots:");
-//			taskManagerSlots.forEach(taskManagerSlot -> {
-//				System.out.println(taskManagerSlot);
-//			});
-//			System.out.println();
-//		});
 		System.out.println("++++++ Printing Slots");
 		slotMap.forEach((taskManagerId, taskManagerSlots) -> {
 			System.out.println("++++++ TaskManagerId: " + taskManagerId);
@@ -380,40 +356,41 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		});
 	}
 
-	private void acquireSlots() {
-		jobManagerRegistration.getJobManagerGateway().getAllSlots().thenAccept(taskManagerSlots -> {
-			if (taskManagerSlots == null) {
-				// TODO: retry for slots
-				return;
-			}
-			taskManagerSlots.forEach(taskManagerSlot -> {
-				String taskManagerId = taskManagerSlot.getSlotId().getResourceID().getResourceIdString();
+//	private void acquireSlots() {
+//		slotMap.clear();
+//		jobManagerRegistration.getJobManagerGateway().getAllSlots().thenAccept(taskManagerSlots -> {
+//			if (taskManagerSlots == null) {
+//				// TODO: retry for slots
+//				return;
+//			}
+//			taskManagerSlots.forEach(taskManagerSlot -> {
+//				AbstractSlot slot = FlinkSlot.fromTaskManagerSlot(taskManagerSlot);
+//
+//				List<AbstractSlot> slots = slotMap.get(slot.getLocation());
+//				if (slots == null) {
+//					slots = new LinkedList<>();
+//					slotMap.put(slot.getLocation(), slots);
+//				}
+//				slots.add(slot);
+//			});
+//			printSlots();
+//		});
+//	}
 
-				List<TaskManagerSlot> slots = slotMap.get(taskManagerId);
-				if (slots == null) {
-					slots = new LinkedList<>();
-					slotMap.put(taskManagerId, slots);
-				}
-				slots.add(taskManagerSlot);
-			});
-			printSlots();
-		});
-	}
-
-	public SlotID findBestSlot(double cpuCores, int taskMemory, int taskOffHeapMemory, int managedMemory, int networkMemory) {
-		ResourceProfile requirements = ResourceProfile.newBuilder()
+	public SlotID findBestSlot(double cpuCores, long taskMemory, long taskOffHeapMemory, long managedMemory, long networkMemory) {
+		Resource requirements = Resource.newBuilder()
 			.setCpuCores(cpuCores)
-			.setTaskHeapMemoryMB(taskMemory)
-			.setTaskOffHeapMemoryMB(taskOffHeapMemory)
-			.setManagedMemoryMB(managedMemory)
-			.setNetworkMemoryMB(networkMemory)
+			.setTaskHeapMemory(taskMemory)
+			.setTaskOffHeapMemory(taskOffHeapMemory)
+			.setManagedMemory(managedMemory)
+			.setNetworkMemory(networkMemory)
 			.build();
-		for (List<TaskManagerSlot> slots: slotMap.values()) {
-			for (TaskManagerSlot slot: slots) {
-				if (slot.getState() == TaskManagerSlot.State.FREE && slot.isMatchingRequirement(requirements)) {
+		for (List<AbstractSlot> slots: slotMap.values()) {
+			for (AbstractSlot slot: slots) {
+				if (slot.getState() == AbstractSlot.State.FREE && slot.isMatchingRequirement(requirements)) {
 					System.out.println("++++++ choosing slot: " + slot);
 					slots.remove(slot);
-					return slot.getSlotId();
+					return FlinkSlot.toSlotId(slot.getId());
 				}
 			}
 		}
@@ -500,7 +477,6 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 //	}
 
 	public void rescale(int operatorID, int newParallelism, Map<Integer, List<Integer>> keyStateAllocation, ControlPolicy waitingController) {
-		acquireSlots();
 		try {
 			reconfigurationProfiler.onReconfigurationStart();
 			// scale in is not support now
@@ -814,6 +790,22 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	}
 
 	@Override
+	public void slotStatusChanged(Collection<TaskManagerSlot> taskManagerSlots) {
+		System.out.println("++++++ slotStatusChanged");
+		taskManagerSlots.forEach(taskManagerSlot -> {
+			AbstractSlot slot = FlinkSlot.fromTaskManagerSlot(taskManagerSlot);
+
+			List<AbstractSlot> slots = slotMap.get(slot.getLocation());
+			if (slots == null) {
+				slots = new LinkedList<>();
+				slotMap.put(slot.getLocation(), slots);
+			}
+			slots.add(slot);
+		});
+		printSlots();
+	}
+
+	@Override
 	public void jobStatusChanged(JobID jobId, JobStatus newJobStatus, long timestamp, Throwable error, ExecutionPlan jobAbstraction) {
 		runAsync(
 			() -> {
@@ -879,25 +871,6 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		log.info("Registered job manager {}@{} for job {}.", jobMasterGateway.getFencingToken(), jobManagerAddress, jobId);
 
 		// TODO: HeartBeatService
-
-//		TODO: Task manager not registered/Resource manager not registered when job master is registered.
-//		jobMasterGateway.getAllSlots().thenAccept(taskManagerSlots -> {
-//			if (taskManagerSlots == null) {
-//				// TODO: retry for slots
-//				return;
-//			}
-//			taskManagerSlots.forEach(taskManagerSlot -> {
-//				String taskManagerId = taskManagerSlot.getSlotId().getResourceID().getResourceIdString();
-//
-//				List<TaskManagerSlot> slots = slotMap.get(taskManagerId);
-//				if (slots == null) {
-//					slots = new LinkedList<>();
-//					slotMap.put(taskManagerId, slots);
-//				}
-//				slots.add(taskManagerSlot);
-//			});
-//			printSlots();
-//		});
 
 		return new JobMasterRegistrationSuccess<StreamManagerId>(
 			getFencingToken(),

@@ -81,7 +81,7 @@ public interface SlotManager extends AutoCloseable {
 	 */
 	boolean registerSlotRequest(SlotRequest slotRequest) throws ResourceManagerException;
 
-	void allocateSlot(SlotRequest slotRequest, SlotID slotID);
+	void allocateSlot(SlotRequest slotRequest, SlotID slotID) throws ResourceManagerException;
 
 	/**
 	 * Cancels and removes a pending slot request with the given allocation id. If there is no such
