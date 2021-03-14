@@ -290,20 +290,37 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 		LOG.info("++++++ update Key Mapping");
 
 		int targetOperatorID = tasks.keySet().iterator().next();
+		// update key group range in target stream
+		JobVertexID targetJobVertexID = rawVertexIDToJobVertexID(targetOperatorID);
+		ExecutionJobVertex targetJobVertex = executionGraph.getJobVertex(targetJobVertexID);
+		checkNotNull(targetJobVertex, "Execution job vertex not found: " + targetJobVertexID);
+		final SynchronizeOperation syncOp = this.currentSyncOp;
 
 		final List<CompletableFuture<Void>> rescaleCandidatesFutures = new ArrayList<>();
 		try {
 			for (OperatorDescriptor upstreamOperator : heldExecutionPlan.getOperatorDescriptorByID(targetOperatorID).getParents()) {
 				// todo some partitions may not need modified, for example, broad cast partitioner
 				rescaleCandidatesFutures
-					.add(updatePartitions(upstreamOperator.getOperatorID(), rescaleID).thenCompose(o -> updateDownstreamGates(upstreamOperator.getOperatorID()))
+					.add(
+						updatePartitions(upstreamOperator.getOperatorID(), rescaleID)
+							.thenCompose(o -> updateDownstreamGates(upstreamOperator.getOperatorID()))
+//							.thenCompose(o -> {
+//								// check should we resume those tasks
+//								Map<Integer, Diff> diffMap = diff.get(upstreamOperator.getOperatorID());
+//								diffMap.remove(AbstractCoordinator.KEY_MAPPING);
+//								if (diffMap.isEmpty() && syncOp != null) {
+//									return syncOp.resumeTasks(Collections.singletonList(Tuple2.of(upstreamOperator.getOperatorID(), -1)));
+//								}
+//								return CompletableFuture.completedFuture(null);
+//							})
 				);
+				// check should we resume those tasks
+				Map<Integer, Diff> diffMap = diff.get(upstreamOperator.getOperatorID());
+				diffMap.remove(AbstractCoordinator.KEY_MAPPING);
+				if (diffMap.isEmpty() && syncOp != null) {
+					syncOp.resumeTasks(Collections.singletonList(Tuple2.of(upstreamOperator.getOperatorID(), -1)));
+				}
 			}
-			// update key group range in target stream
-			JobVertexID targetJobVertexID = rawVertexIDToJobVertexID(targetOperatorID);
-			ExecutionJobVertex targetJobVertex = executionGraph.getJobVertex(targetJobVertexID);
-			checkNotNull(targetJobVertex, "Execution job vertex not found: " + targetJobVertexID);
-			final SynchronizeOperation syncOp = this.currentSyncOp;
 
 			OperatorWorkloadsAssignment remappingAssignment = workloadsAssignmentHandler.getHeldOperatorWorkloadsAssignment(targetOperatorID);
 			List<Tuple2<Integer, Integer>> notModifiedList = new ArrayList<>();
@@ -336,20 +353,20 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 			}
 
 			CompletableFuture<Void> finishFuture = FutureUtils.completeAll(rescaleCandidatesFutures);
-			finishFuture.thenAccept(
-//			return finishFuture.thenApply(
-				o -> {
-					for (OperatorDescriptor upstreamOperator : heldExecutionPlan.getOperatorDescriptorByID(targetOperatorID).getParents()) {
-						// check should we resume those tasks
-						Map<Integer, Diff> diffMap = diff.get(upstreamOperator.getOperatorID());
-						diffMap.remove(AbstractCoordinator.KEY_MAPPING);
-						if (diffMap.isEmpty() && syncOp != null) {
-							syncOp.resumeTasks(Collections.singletonList(Tuple2.of(upstreamOperator.getOperatorID(), -1)));
-						}
-					}
-//					return diff;
-				}
-			);
+//			finishFuture.thenAccept(
+////			return finishFuture.thenApply(
+//				o -> {
+//					for (OperatorDescriptor upstreamOperator : heldExecutionPlan.getOperatorDescriptorByID(targetOperatorID).getParents()) {
+//						// check should we resume those tasks
+//						Map<Integer, Diff> diffMap = diff.get(upstreamOperator.getOperatorID());
+//						diffMap.remove(AbstractCoordinator.KEY_MAPPING);
+//						if (diffMap.isEmpty() && syncOp != null) {
+//							syncOp.resumeTasks(Collections.singletonList(Tuple2.of(upstreamOperator.getOperatorID(), -1)));
+//						}
+//					}
+////					return diff;
+//				}
+//			);
 			// the tasks can be resumed asynchrouously
 			return finishFuture.thenApply(o -> {
 				LOG.info("++++++ completed key mapping");
@@ -495,34 +512,10 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 		Map<Integer, Diff> diffMap = diff.get(operatorID);
 		OperatorWorkloadsAssignment remappingAssignment = (OperatorWorkloadsAssignment) diffMap.remove(AbstractCoordinator.KEY_STATE_ALLOCATION);
 
-		CompletableFuture<Void> updateTargetPartitionFuture = CompletableFuture.completedFuture(null);
-//		if (diffMap.isEmpty()) {
-//			// means the state set allocation do not have change, update state should finish
-//			if (remappingAssignment == null) {
-//				syncOp.resumeTasks(Collections.singletonList(Tuple2.of(operatorID, -1)));
-//				return CompletableFuture.completedFuture(diff);
-//			} else {
-//				List<Tuple2<Integer, Integer>> notModifiedList =
-//					Arrays.stream(executionJobVertex.getTaskVertices())
-//						.map(ExecutionVertex::getParallelSubtaskIndex)
-//						.filter(i -> !remappingAssignment.isTaskModified(i))
-//						.map(i -> Tuple2.of(operatorID, i))
-//					.collect(Collectors.toList());
-//				if (remappingAssignment.isScaling()) {
-//					try { // update partition and downstream gates if there are tasks to be scaled out/in
-//						updateTargetPartitionFuture = updatePartitions(operatorID, rescaleID);
-//						updateTargetPartitionFuture.thenAccept(o -> syncOp.resumeTasks(notModifiedList));
-//					} catch (ExecutionGraphException e) {
-//						e.printStackTrace();
-//					}
-//				}  else {
-//					syncOp.resumeTasks(notModifiedList);
-//				}
-//			}
-//		}
+//		CompletableFuture<Void> updateTargetPartitionFuture = CompletableFuture.completedFuture(null);
 
 		CompletableFuture<Void> assignStateFuture = CompletableFuture.completedFuture(null);
-		final CompletableFuture<Void> finalUpdateTargetPartitionFuture = updateTargetPartitionFuture;
+//		final CompletableFuture<Void> finalUpdateTargetPartitionFuture = updateTargetPartitionFuture;
 		return assignStateFuture.thenCompose(o -> {
 				final List<CompletableFuture<?>> rescaleCandidatesFutures = new ArrayList<>();
 				for (int subtaskIndex = 0; subtaskIndex < executionJobVertex.getParallelism(); subtaskIndex++) {
@@ -540,15 +533,14 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 								remappingAssignment.getAlignedKeyGroupRange(subtaskIndex),
 								remappingAssignment.getIdInModel(subtaskIndex)
 							);
-							rescaleCandidatesFutures.add(stateUpdateFuture);
 							if (diffMap.isEmpty()) {
 								checkNotNull(syncOp, "have you call sync before?");
 								final int taskId = subtaskIndex;
-								stateUpdateFuture.runAfterBoth(
-									finalUpdateTargetPartitionFuture,
+								stateUpdateFuture.thenRun(
 									() -> syncOp.resumeTasks(Collections.singletonList(Tuple2.of(operatorID, taskId)))
 								);
 							}
+							rescaleCandidatesFutures.add(stateUpdateFuture);
 						} catch (ExecutionGraphException e) {
 							e.printStackTrace();
 						}
@@ -556,7 +548,10 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 				}
 				return FutureUtils.completeAll(rescaleCandidatesFutures);
 			}
-		).thenApply(o -> diff);
+		).thenApply(o -> {
+			LOG.info("++++++ update state completed");
+			return diff;
+		});
 	}
 
 	/**
@@ -919,6 +914,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 			System.out.println("resuming..." + taskList);
 			taskList = convertToNoneNegativeOffsetList(taskList);
 			List<CompletableFuture<Void>> affectedExecutionPrepareSyncFutures = new LinkedList<>();
+			boolean isSourceResumed = false;
 			for (Tuple2<Integer, Integer> taskID : taskList) {
 				synchronized (pausedTasks) {
 					if (!this.pausedTasks.remove(taskID)) {
@@ -936,7 +932,10 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 					//
 					// Since we could ensure that we will only update those partition id changed
 					// gates, thus in this case, it is ok cause resumeSourceStreamTask will do nothing
-					affectedExecutionPrepareSyncFutures.add(updateDownstreamGates(taskID.f0));
+					if (!isSourceResumed) { // only need to update once for downstream tasks
+						affectedExecutionPrepareSyncFutures.add(updateDownstreamGates(taskID.f0));
+					}
+					isSourceResumed = true;
 				} else {
 					Execution execution = operatedVertex.getCurrentExecutionAttempt();
 					affectedExecutionPrepareSyncFutures.add(execution.scheduleForInterTaskSync(TaskOperatorManager.NEED_RESUME_REQUEST));

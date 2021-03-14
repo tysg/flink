@@ -250,7 +250,6 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 
 	private static Map<Integer, List<Integer>> getKeyMessage(StreamEdge streamEdge, int parallelism) {
 		StreamPartitioner<?> partitioner = streamEdge.getPartitioner();
-		Map<String, List<String>> keyStateAllocation = new HashMap<>();
 		if (partitioner instanceof AssignedKeyGroupStreamPartitioner) {
 			return ((AssignedKeyGroupStreamPartitioner<?, ?>) partitioner).getKeyMappingInfo(parallelism);
 		} else if (partitioner instanceof KeyGroupStreamPartitioner) {

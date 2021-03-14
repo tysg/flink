@@ -258,7 +258,7 @@ jobmanager.execution.failover-strategy: region
 
 trisk.reconfig.operator.name: Splitter FlatMap
 trisk.reconfig.interval: 0
-trisk.reconfig.affected_task: 2
+trisk.reconfig.affected_tasks: 2
 trisk.reconfig.type: noop
 trisk.exp.dir: /data
 

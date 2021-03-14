@@ -167,8 +167,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 //		this.controlPolicyList.add(new FlinkStreamSwitchAdaptor(this, jobGraph));
 //		this.controlPolicyList.add(new TestingCFManager(this));
 //		this.controlPolicyList.add(new TestingControlPolicy(this));
-		this.controlPolicyList.add(new DummyController(this));
-//		this.controlPolicyList.add(new PerformanceEvaluator(this, streamManagerConfiguration.getConfiguration()));
+//		this.controlPolicyList.add(new DummyController(this));
+		this.controlPolicyList.add(new PerformanceEvaluator(this, streamManagerConfiguration.getConfiguration()));
 
 		reconfigurationProfiler = new ReconfigurationProfiler(streamManagerConfiguration.getConfiguration());
 	}
@@ -538,11 +538,18 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						reconfigurationProfiler.onOtherEnd(SYN);
 						reconfigurationProfiler.onOtherStart(UPDATE_MAPPING);
 						return enforcement.updateKeyMapping(updateKeyMappingTasks, o);
-					}));
+					})
+//						.thenCompose(o -> {
+//						reconfigurationProfiler.onOtherEnd(UPDATE_MAPPING);
+//						return CompletableFuture.completedFuture(o); })
+					);
 					updateFutureList.add(syncFuture.thenCompose(o -> {
 						reconfigurationProfiler.onOtherEnd(UPDATE_MAPPING);
 						reconfigurationProfiler.onOtherStart(UPDATE_STATE);
 						return enforcement.updateState(updateStateTasks, o);
+					}).thenCompose(o -> {
+						reconfigurationProfiler.onOtherEnd(UPDATE_STATE);
+						return CompletableFuture.completedFuture(o);
 					}));
 					// finish the reconfiguration after all asynchronous update completed
 					return FutureUtils.completeAll(updateFutureList)
@@ -553,7 +560,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						}
 						try {
 							System.out.println("++++++ finished update");
-							reconfigurationProfiler.onOtherEnd(UPDATE_STATE);
+							LOG.info("++++++ finished update");
 							reconfigurationProfiler.onReconfigurationEnd();
 							this.jobExecutionPlan.notifyUpdateFinished(failure);
 						} catch (Exception e) {

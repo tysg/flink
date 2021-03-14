@@ -294,23 +294,27 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 			selectTaskID.add(allTaskID.get(offset));
 			allKeyGroup.addAll(newKeySet.remove(allTaskID.remove(offset)));
 		}
-		List<Integer> keyGroupList = new LinkedList<>(allKeyGroup);
-		int leftBound = 0;
-		for (int i = 0; i < numAffectedTasks - 1; i++) {
+		List<Integer> keyGroupList = new ArrayList<>(allKeyGroup);
+		Collections.shuffle(keyGroupList);
+//		int leftBound = 0;
+//		int subKeySetSize = keyGroupList.size()/numAffectedTasks; // uniformly assign keygroups to affected tasks.
+		int keyGroupSize = keyGroupList.size(); // uniformly assign keygroups to affected tasks.
+		for (int i = 0; i < numAffectedTasks; i++) {
 			// sub keyset size is in [1, left - num_of_to_keyset_that_are_to_be_decided]
 			// we should make sure each sub key set has at at least one element (key group)
-			int subKeySetSize = random.nextInt(keyGroupList.size() - leftBound - numAffectedTasks + i + 1) + 1;
+//			int subKeySetSize = random.nextInt(keyGroupList.size() - leftBound - numAffectedTasks + i + 1) + 1;
 //			subKeySetSize = subKeySetSize > 0 ? subKeySetSize : 1;
+//			int start = i*subKeySetSize;
+//			int end = i == numAffectedTasks-1 ? keyGroupList.size() : (i+1)*subKeySetSize;
+			int start = ((i * keyGroupSize + numAffectedTasks - 1) / numAffectedTasks);
+			int end = ((i + 1) * keyGroupSize - 1) / numAffectedTasks;
 			newKeySet.put(
 				selectTaskID.get(i),
-				new ArrayList<>(keyGroupList.subList(leftBound, leftBound + subKeySetSize))
+//				new ArrayList<>(keyGroupList.subList(leftBound, leftBound + subKeySetSize))
+				new ArrayList<>(keyGroupList.subList(start, end+1))
 			);
-			leftBound += subKeySetSize;
+//			leftBound += subKeySetSize;
 		}
-		newKeySet.put(
-			selectTaskID.get(numAffectedTasks - 1),
-			new ArrayList<>(keyGroupList.subList(leftBound, keyGroupList.size()))
-		);
 	}
 
 	private List<Integer> findNextSubTaskID(Collection<Integer> keySetID, int numOfNext) {
@@ -415,7 +419,7 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 		public void run() {
 			// the testing jobGraph (workload) is in TestingWorkload.java, see that file to know how to use it.
 			try {
-				Thread.sleep(30000);
+				Thread.sleep(10000);
 				generateTest();
 				Thread.sleep(3000);
 			} catch (InterruptedException e) {

@@ -5,10 +5,7 @@ import org.apache.flink.runtime.state.KeyGroupRange;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -124,7 +121,10 @@ public class OperatorWorkloadsAssignment implements AbstractCoordinator.Diff {
 
 		List<Integer> modifiedIdList = oldExecutorMapping.keySet().stream()
 //			.filter(id -> oldExecutorMapping.get(id).size() != executorMapping.get(id).size())
-			.filter(id -> CollectionUtils.isEqualCollection(executorMapping.get(id), executorMapping.get(id)))
+			.filter(id ->
+				// listEqualsIgnoreOrder(executorMapping.get(id), oldExecutorMapping.get(id))
+				!(executorMapping.get(id).size() == oldExecutorMapping.get(id).size()
+					&& executorMapping.get(id).containsAll(oldExecutorMapping.get(id))))
 			.collect(Collectors.toList());
 //		checkState(modifiedIdList.size() == 1, "more than one modified in scale out");
 
@@ -168,7 +168,10 @@ public class OperatorWorkloadsAssignment implements AbstractCoordinator.Diff {
 
 		List<Integer> modifiedIdList = executorMapping.keySet().stream()
 //			.filter(id -> executorMapping.get(id).size() != oldExecutorMapping.get(id).size())
-			.filter(id -> CollectionUtils.isEqualCollection(executorMapping.get(id), executorMapping.get(id)))
+			.filter(id ->
+				// listEqualsIgnoreOrder(executorMapping.get(id), oldExecutorMapping.get(id))
+				!(executorMapping.get(id).size() == oldExecutorMapping.get(id).size()
+					&& executorMapping.get(id).containsAll(oldExecutorMapping.get(id))))
 			.collect(Collectors.toList());
 //		checkState(modifiedIdList.size() == 1, "more than one modified in scale in");
 
@@ -195,10 +198,11 @@ public class OperatorWorkloadsAssignment implements AbstractCoordinator.Diff {
 		List<Integer> modifiedIdList = executorMapping.keySet().stream()
 			.filter(id -> {
 				// size are different
-//				return executorMapping.get(id).size() != oldExecutorMapping.get(id).size()
-//					|| !executorMapping.get(id).containsAll(oldExecutorMapping.get(id));
-				return CollectionUtils.isEqualCollection(executorMapping.get(id), executorMapping.get(id));
-			})
+//				listEqualsIgnoreOrder(executorMapping.get(id), oldExecutorMapping.get(id));
+				return !(executorMapping.get(id).size() == oldExecutorMapping.get(id).size()
+					&& executorMapping.get(id).containsAll(oldExecutorMapping.get(id)));
+//				return CollectionUtils.isEqualCollection(executorMapping.get(id), executorMapping.get(id));
+			 })
 			.collect(Collectors.toList());
 //		checkState(modifiedIdList.size() == 2, "not exactly two are modified in repartition");
 
@@ -395,5 +399,9 @@ public class OperatorWorkloadsAssignment implements AbstractCoordinator.Diff {
 
 	public boolean isScaling() {
 		return isScaling;
+	}
+
+	public static <T> boolean listEqualsIgnoreOrder(List<T> list1, List<T> list2) {
+		return new HashSet<>(list1).equals(new HashSet<>(list2));
 	}
 }
