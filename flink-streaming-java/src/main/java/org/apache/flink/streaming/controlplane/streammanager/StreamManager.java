@@ -128,6 +128,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 	private ReconfigurationProfiler reconfigurationProfiler;
 
+	private final boolean isPlacementOn = false;
+
     /*
 
     // --------- JobManager --------
@@ -378,19 +380,21 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 //	}
 
 	public SlotID findBestSlot(double cpuCores, long taskMemory, long taskOffHeapMemory, long managedMemory, long networkMemory) {
-		Resource requirements = Resource.newBuilder()
-			.setCpuCores(cpuCores)
-			.setTaskHeapMemory(taskMemory)
-			.setTaskOffHeapMemory(taskOffHeapMemory)
-			.setManagedMemory(managedMemory)
-			.setNetworkMemory(networkMemory)
-			.build();
-		for (List<AbstractSlot> slots: slotMap.values()) {
-			for (AbstractSlot slot: slots) {
-				if (slot.getState() == AbstractSlot.State.FREE && slot.isMatchingRequirement(requirements)) {
-					System.out.println("++++++ choosing slot: " + slot);
-					slots.remove(slot);
-					return FlinkSlot.toSlotId(slot.getId());
+		if (isPlacementOn) {
+			Resource requirements = Resource.newBuilder()
+				.setCpuCores(cpuCores)
+				.setTaskHeapMemory(taskMemory)
+				.setTaskOffHeapMemory(taskOffHeapMemory)
+				.setManagedMemory(managedMemory)
+				.setNetworkMemory(networkMemory)
+				.build();
+			for (List<AbstractSlot> slots : slotMap.values()) {
+				for (AbstractSlot slot : slots) {
+					if (slot.getState() == AbstractSlot.State.FREE && slot.isMatchingRequirement(requirements)) {
+						System.out.println("++++++ choosing slot: " + slot);
+						slots.remove(slot);
+						return FlinkSlot.toSlotId(slot.getId());
+					}
 				}
 			}
 		}
