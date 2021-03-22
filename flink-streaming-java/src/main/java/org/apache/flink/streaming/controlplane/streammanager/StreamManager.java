@@ -116,7 +116,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 	private CompletableFuture<Acknowledge> rescalePartitionFuture;
 
-	private ReconfigurationProfiler reconfigurationProfiler;
+	private final ReconfigurationProfiler reconfigurationProfiler;
 
     /*
 
@@ -339,13 +339,13 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 				"new parallelism not match key state allocation");
 			this.jobExecutionPlan.setStateUpdatingFlag(waitingController);
 
-			OperatorDescriptor targetDescriptor = jobExecutionPlan.getOperatorDescriptorByID(operatorID);
 			// operatorId to TaskIdList mapping, representing affected tasks.
 			Map<Integer, List<Integer>> tasks = new HashMap<>();
 			Map<Integer, List<Integer>> updateStateTasks = new HashMap<>();
 			Map<Integer, List<Integer>> updateKeyMappingTasks = new HashMap<>();
 			Map<Integer, List<Integer>> deployingTasks = new HashMap<>();
 
+			OperatorDescriptor targetDescriptor = jobExecutionPlan.getOperatorDescriptorByID(operatorID);
 			// put tasks in target vertex
 			tasks.put(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
 			updateStateTasks.put(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
@@ -432,46 +432,106 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 								e.printStackTrace();
 							}
 						});
-//					FutureUtils.completedVoidFuture()
-//					.thenCompose(o -> {
-//						reconfigurationProfiler.onOtherStart(PREPARE);
-//						return enforcement.prepareExecutionPlan(jobExecutionPlan);
-//					})
-//					.thenCompose(o -> {
-//						reconfigurationProfiler.onOtherEnd(PREPARE);
-//						reconfigurationProfiler.onOtherStart(SYN);
-//						return enforcement.synchronizeTasks(tasks, o);
-//					})
-//					.thenCompose(o -> {
-//						reconfigurationProfiler.onOtherEnd(SYN);
-//						reconfigurationProfiler.onOtherStart(UPDATE_MAPPING);
-//						return enforcement.updateKeyMapping(updateKeyMappingTasks, o);
-//					})
-//					.thenCompose(o -> {
-//						reconfigurationProfiler.onOtherEnd(UPDATE_MAPPING);
-//						reconfigurationProfiler.onOtherStart(UPDATE_STATE);
-//						return enforcement.updateState(updateStateTasks, o);
-//					})
-//					.thenCompose(o -> {
-//						return enforcement.updateTaskResources(deployingTasks, isScaleIn);
-//					})
-//					.thenCompose(o -> enforcement.resumeTasks())
-//					.whenComplete((o, failure) -> {
-//						if (failure != null) {
-//							LOG.error("Reconfiguration failed: ", failure);
-//							failure.printStackTrace();
-//						}
-//						try {
-//							System.out.println("++++++ finished update");
-//							log.info("++++++ finished update");
-//							// TODO: extract the deployment overhead
-//							reconfigurationProfiler.onOtherEnd(UPDATE_STATE);
-//							this.jobExecutionPlan.notifyUpdateFinished(failure);
-//							reconfigurationProfiler.onReconfigurationEnd();
-//						} catch (Exception e) {
-//							e.printStackTrace();
-//						}
-//					})
+				}
+			));
+		} catch (Exception e) {
+			LOG.error("Reconfiguration failed: ", e);
+			e.printStackTrace();
+		}
+	}
+
+	@Override
+	public void rescale(ExecutionPlan executionPlan, int operatorID, Boolean isScaleIn,  ControlPolicy waitingController) {
+		try {
+			reconfigurationProfiler.onReconfigurationStart();
+			// scale in is not support now
+//			checkState(keyStateAllocation.size() == newParallelism,
+//				"new parallelism not match key state allocation");
+			executionPlan.getParallelism(operatorID);
+			this.jobExecutionPlan.setStateUpdatingFlag(waitingController);
+
+			// operatorId to TaskIdList mapping, representing affected tasks.
+			Map<Integer, List<Integer>> tasks = new HashMap<>();
+			Map<Integer, List<Integer>> updateStateTasks = new HashMap<>();
+			Map<Integer, List<Integer>> updateKeyMappingTasks = new HashMap<>();
+			Map<Integer, List<Integer>> deployingTasks = new HashMap<>();
+
+			OperatorDescriptor targetDescriptor = jobExecutionPlan.getOperatorDescriptorByID(operatorID);
+			// put tasks in target vertex
+			tasks.put(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
+			updateStateTasks.put(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
+			deployingTasks.put(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
+			// although we put the update key mapping in the target operator, it will find the upstream tasks and update.
+			updateKeyMappingTasks.put(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
+			// put tasks in upstream vertex
+			targetDescriptor.getParents()
+				.forEach(c -> {
+					int operatorId = c.getOperatorID();
+					List<Integer> curOpTasks = c.getTaskIds();
+					tasks.put(operatorId, curOpTasks);
+//					updateKeyMappingTasks.put(c.getOperatorID(), curOpTasks);
+				});
+			// put tasks in downstream vertex
+			targetDescriptor.getChildren()
+				.forEach(c -> {
+					List<Integer> curOpTasks = c.getTaskIds();
+					tasks.put(c.getOperatorID(), curOpTasks);
+				});
+
+			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
+			final String PREPARE = "prepare timer";
+			final String SYN = "synchronize timer";
+			final String UPDATE_MAPPING = "updateKeyMapping timer";
+			final String UPDATE_STATE = "updateState timer";
+			log.info("++++++ start update");
+			runAsync(() -> jobMasterGateway.callOperations(
+				enforcement -> {
+					// prepare andsynchronize among affected tasks
+					CompletableFuture<?> syncFuture = FutureUtils.completedVoidFuture()
+						.thenCompose(o -> {
+							reconfigurationProfiler.onOtherStart(PREPARE);
+							return enforcement.prepareExecutionPlan(jobExecutionPlan);
+						})
+						.thenCompose(o -> {
+							reconfigurationProfiler.onOtherEnd(PREPARE);
+							reconfigurationProfiler.onOtherStart(SYN);
+							return enforcement.synchronizeTasks(tasks, o);
+						});
+					// run update asynchronously.
+					List<CompletableFuture<?>> updateFutureList = new ArrayList<>();
+					updateFutureList.add(syncFuture.thenCompose(o -> {
+						reconfigurationProfiler.onOtherEnd(SYN);
+						reconfigurationProfiler.onOtherStart(UPDATE_MAPPING);
+						return enforcement.updateKeyMapping(updateKeyMappingTasks, o);
+					}));
+					updateFutureList.add(syncFuture.thenCompose(o -> {
+						reconfigurationProfiler.onOtherEnd(UPDATE_MAPPING);
+						reconfigurationProfiler.onOtherStart(UPDATE_STATE);
+						return enforcement.updateState(updateStateTasks, o);
+					}));
+					updateFutureList.add(syncFuture.thenCompose(o -> {
+						return enforcement.updateTaskResources(deployingTasks, isScaleIn);
+					}));
+
+					// finish the reconfiguration after all asynchronous update completed
+					return FutureUtils.completeAll(updateFutureList)
+						.thenCompose(o -> enforcement.resumeTasks())
+						.whenComplete((o, failure) -> {
+							if (failure != null) {
+								LOG.error("Reconfiguration failed: ", failure);
+								failure.printStackTrace();
+							}
+							try {
+								System.out.println("++++++ finished update");
+								log.info("++++++ finished update");
+								// TODO: extract the deployment overhead
+								reconfigurationProfiler.onOtherEnd(UPDATE_STATE);
+								this.jobExecutionPlan.notifyUpdateFinished(failure);
+								reconfigurationProfiler.onReconfigurationEnd();
+							} catch (Exception e) {
+								e.printStackTrace();
+							}
+						});
 				}
 			));
 		} catch (Exception e) {
@@ -586,6 +646,99 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						})
 				));
 			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	@Override
+	public void rebalance(ExecutionPlan executionPlan, int operatorID, ControlPolicy waitingController) {
+		try {
+			reconfigurationProfiler.onReconfigurationStart();
+			// typically, the target operator should contain key state,
+			// todo if keyStateAllocation is null, means it is stateless operator, but not support now
+			this.jobExecutionPlan.setStateUpdatingFlag(waitingController);
+
+			OperatorDescriptor targetDescriptor = executionPlan.getOperatorDescriptorByID(operatorID);
+			Map<Integer, List<Integer>> keyStateAllocation = executionPlan.getKeyStateAllocation(operatorID);
+
+			for (OperatorDescriptor parent : targetDescriptor.getParents()) {
+				parent.setOutputKeyMapping(operatorID, keyStateAllocation);
+			}
+
+			// operatorId to TaskIdList mapping, representing affected tasks.
+			Map<Integer, List<Integer>> tasks = new HashMap<>();
+			Map<Integer, List<Integer>> updateStateTasks = new HashMap<>();
+			Map<Integer, List<Integer>> updateKeyMappingTasks = new HashMap<>();
+
+			// put tasks in target vertex
+			tasks.put(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
+			updateStateTasks.put(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
+			// although we put the update key mapping in the target operator, it will find the upstream tasks and update.
+			updateKeyMappingTasks.put(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
+
+			// put tasks in upstream vertex
+			targetDescriptor.getParents()
+				.forEach(c -> {
+					int operatorId = c.getOperatorID();
+					List<Integer> curOpTasks = c.getTaskIds();
+					tasks.put(operatorId, curOpTasks);
+				});
+
+			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
+			final String PREPARE = "prepare timer";
+			final String SYN = "synchronize timer";
+			final String UPDATE_MAPPING = "updateKeyMapping timer";
+			final String UPDATE_STATE = "updateState timer";
+			runAsync(() -> jobMasterGateway.callOperations(
+				enforcement -> {
+					// prepare and synchronize among affected tasks
+					CompletableFuture<?> syncFuture = FutureUtils.completedVoidFuture()
+						.thenCompose(o -> {
+							reconfigurationProfiler.onOtherStart(PREPARE);
+							return enforcement.prepareExecutionPlan(jobExecutionPlan);
+						})
+						.thenCompose(o -> {
+							reconfigurationProfiler.onOtherEnd(PREPARE);
+							reconfigurationProfiler.onOtherStart(SYN);
+							return enforcement.synchronizeTasks(tasks, o);
+						});
+					// run update asynchronously.
+					List<CompletableFuture<?>> updateFutureList = new ArrayList<>();
+					updateFutureList.add(syncFuture.thenCompose(o -> {
+							reconfigurationProfiler.onOtherEnd(SYN);
+							reconfigurationProfiler.onOtherStart(UPDATE_MAPPING);
+							return enforcement.updateKeyMapping(updateKeyMappingTasks, o);
+						})
+//						.thenCompose(o -> {
+//						reconfigurationProfiler.onOtherEnd(UPDATE_MAPPING);
+//						return CompletableFuture.completedFuture(o); })
+					);
+					updateFutureList.add(syncFuture.thenCompose(o -> {
+						reconfigurationProfiler.onOtherEnd(UPDATE_MAPPING);
+						reconfigurationProfiler.onOtherStart(UPDATE_STATE);
+						return enforcement.updateState(updateStateTasks, o);
+					}).thenCompose(o -> {
+						reconfigurationProfiler.onOtherEnd(UPDATE_STATE);
+						return CompletableFuture.completedFuture(o);
+					}));
+					// finish the reconfiguration after all asynchronous update completed
+					return FutureUtils.completeAll(updateFutureList)
+//						.thenCompose(o -> enforcement.resumeTasks()) // resume all tasks who has both state and mapping to update (to be appeared in the future).
+						.whenComplete((o, failure) -> {
+							if (failure != null) {
+								failure.printStackTrace();
+							}
+							try {
+								System.out.println("++++++ finished update");
+								LOG.info("++++++ finished update");
+								reconfigurationProfiler.onReconfigurationEnd();
+								this.jobExecutionPlan.notifyUpdateFinished(failure);
+							} catch (Exception e) {
+								e.printStackTrace();
+							}
+						});
+				}));
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

@@ -2,6 +2,7 @@ package org.apache.flink.streaming.controlplane.udm;
 
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
+import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
 import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -108,13 +109,17 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 				System.out.println("new key set:" + newKeySet);
 
 				getReconfigurationExecutor().rebalance(testOpID, newKeySet, true, this);
-				// wait for operation completed
-				synchronized (lock) {
-					lock.wait();
-				}
+				waitForCompletion();
 				while ((System.currentTimeMillis() - start) < reconfigInterval) {}
 				i++;
 			}
+		}
+	}
+
+	private void waitForCompletion() throws InterruptedException {
+		// wait for operation completed
+		synchronized (lock) {
+			lock.wait();
 		}
 	}
 
@@ -143,9 +148,7 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 					System.out.println("new function:" + func);
 					getReconfigurationExecutor().reconfigureUserFunction(testOpID, func, this);
 					// wait for operation completed
-					synchronized (lock) {
-						lock.wait();
-					}
+					waitForCompletion();
 					while ((System.currentTimeMillis() - start) < timeInterval) {
 					}
 					i++;
@@ -160,6 +163,8 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 		ExecutionPlan executionPlan = getReconfigurationExecutor().getJobExecutionPlan();
 		if (reconfigInterval > 0) {
 			long start;
+			// first scale in and then scale out to avoid exceed the parallelism set for the app,
+			// this is only for current app
 			boolean isScaleIn = false;
 			while (true) {
 				start = System.currentTimeMillis();
@@ -176,10 +181,12 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 	}
 
 	private void scaling(int testingOpID, int newParallelism) throws InterruptedException {
-		ExecutionPlan streamJobState = getReconfigurationExecutor().getJobExecutionPlan();
+		ExecutionPlan executionPlan = getReconfigurationExecutor().getJobExecutionPlan();
+		OperatorDescriptor targetDescriptor = executionPlan.getOperatorDescriptorByID(testingOpID);
 
-		Map<Integer, List<Integer>> curKeyStateAllocation = streamJobState.getKeyStateAllocation(testingOpID);
-		int oldParallelism = streamJobState.getParallelism(testingOpID);
+
+		Map<Integer, List<Integer>> curKeyStateAllocation = targetDescriptor.getKeyStateAllocation();
+		int oldParallelism = targetDescriptor.getParallelism();
 		assert oldParallelism == curKeyStateAllocation.size() : "old parallelism does not match the key set";
 
 		Map<Integer, List<Integer>> newKeyStateAllocation = preparePartitionAssignment(newParallelism);
@@ -190,17 +197,26 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 			newKeyStateAllocation.get(i%newParallelism).add(i);
 		}
 
+		// update the parallelism
+		targetDescriptor.setParallelism(newParallelism);
+		boolean isScaleIn = oldParallelism > newParallelism;
+
+		// update the key set
+		for (OperatorDescriptor parent : targetDescriptor.getParents()) {
+			parent.setOutputKeyMapping(testingOpID, newKeyStateAllocation);
+		}
+
 		System.out.println(newKeyStateAllocation);
 
 		if (oldParallelism == newParallelism) {
-			getReconfigurationExecutor().rebalance(testingOpID, newKeyStateAllocation, true, this);
+//			getReconfigurationExecutor().rebalance(testingOpID, newKeyStateAllocation, true, this);
+			getReconfigurationExecutor().rebalance(executionPlan, testingOpID, this);
 		} else {
-			getReconfigurationExecutor().rescale(testingOpID, newParallelism, newKeyStateAllocation, this);
+//			getReconfigurationExecutor().rescale(testingOpID, newParallelism, newKeyStateAllocation, this);
+			getReconfigurationExecutor().rescale(executionPlan, testingOpID, isScaleIn, this);
 		}
 
-		synchronized (lock) {
-			lock.wait();
-		}
+		waitForCompletion();
 	}
 
 	private Map<Integer, List<Integer>> preparePartitionAssignment(int parallleism) {
@@ -247,9 +263,7 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 
 				getReconfigurationExecutor().rescale(testOpID, newParallelism, newKeySet, this);
 				// wait for operation completed
-				synchronized (lock) {
-					lock.wait();
-				}
+				waitForCompletion();
 				while ((System.currentTimeMillis() - start) < reconfigInterval) {
 					// busy waiting
 				}
@@ -270,9 +284,7 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 				System.out.println("\nnumber of noop test: " + i);
 				getReconfigurationExecutor().noOp(testOpID, this);
 				// wait for operation completed
-				synchronized (lock) {
-					lock.wait();
-				}
+				waitForCompletion();
 				if (System.currentTimeMillis() - start > reconfigInterval) {
 					System.out.println("overloaded frequency");
 				}
@@ -408,9 +420,7 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 
 		getReconfigurationExecutor().noOp(operatorID, this);
 
-		synchronized (lock) {
-			lock.wait();
-		}
+		waitForCompletion();
 	}
 
 	private class Profiler extends Thread {

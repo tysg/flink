@@ -74,6 +74,7 @@ public class StreamTaskStateInitializerImpl implements StreamTaskStateInitialize
 	/** The logger for this class. */
 	private static final Logger LOG = LoggerFactory.getLogger(StreamTaskStateInitializerImpl.class);
 
+
 	/**
 	 * The environment of the task. This is required as parameter to construct state backends via their factory.
 	 */
