@@ -3,6 +3,8 @@ package org.apache.flink.streaming.controlplane.streammanager.resource;
 public interface AbstractSlot {
 	State getState();
 
+	void setPending();
+
 	Resource getResource();
 
 	String getLocation();
@@ -14,7 +16,7 @@ public interface AbstractSlot {
 	enum State {
 		FREE,
 		ALLOCATED,
-		INUSE,
+		PENDING
 	}
 }
 

@@ -30,6 +30,7 @@ import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobmaster.JobMaster;
 import org.apache.flink.runtime.jobmaster.JobMasterId;
+import org.apache.flink.runtime.jobmaster.slotpool.SlotInfoWithUtilization;
 import org.apache.flink.runtime.registration.RegistrationResponse;
 import org.apache.flink.runtime.resourcemanager.slotmanager.TaskManagerSlot;
 import org.apache.flink.runtime.rpc.FencedRpcGateway;
@@ -85,7 +86,7 @@ public interface StreamManagerGateway extends FencedRpcGateway<StreamManagerId> 
 	 */
 	void jobStatusChanged(JobID jobId, JobStatus newJobStatus, long timestamp, Throwable error, ExecutionPlan jobAbstraction);
 
-	void slotStatusChanged(Collection<TaskManagerSlot> taskManagerSlots);
+	void slotStatusChanged(Collection<TaskManagerSlot> taskManagerSlots, Collection<SlotInfoWithUtilization> availableSlots);
 
 	StreamRelatedInstanceFactory getStreamRelatedInstanceFactory();
 

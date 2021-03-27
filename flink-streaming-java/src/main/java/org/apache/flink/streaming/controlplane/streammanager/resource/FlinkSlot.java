@@ -1,8 +1,11 @@
 package org.apache.flink.streaming.controlplane.streammanager.resource;
 
+import java.util.Collection;
+
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.clusterframework.types.ResourceProfile;
 import org.apache.flink.runtime.clusterframework.types.SlotID;
+import org.apache.flink.runtime.jobmaster.slotpool.SlotInfoWithUtilization;
 import org.apache.flink.runtime.resourcemanager.slotmanager.TaskManagerSlot;
 
 public class FlinkSlot implements AbstractSlot {
@@ -26,10 +29,24 @@ public class FlinkSlot implements AbstractSlot {
 		return new FlinkSlot(slot.getSlotId(), fromSlotState(slot.getState()), fromResourceProfile(slot.getResourceProfile()),taskManagerId);
 	}
 
+	public static FlinkSlot fromTaskManagerSlot(TaskManagerSlot slot, Collection<SlotInfoWithUtilization> availableSlots) {
+		String taskManagerId = slot.getSlotId().getResourceID().getResourceIdString();
+		FlinkSlot newSlot = new FlinkSlot(slot.getSlotId(), fromSlotState(slot.getState()), fromResourceProfile(slot.getResourceProfile()),taskManagerId);
+
+		if (newSlot.getState() == AbstractSlot.State.ALLOCATED &&
+			availableSlots.stream()
+				.filter(slotInfoWithUtilization -> newSlot.isMatchingSlotInfo(slotInfoWithUtilization))
+				.findFirst().isPresent()) {
+			newSlot.state = State.FREE;
+		}
+
+		return newSlot;
+	}
+
 	public static State fromSlotState(TaskManagerSlot.State state) {
 		if (state == TaskManagerSlot.State.FREE) {
 			return State.FREE;
-		} else if (state == TaskManagerSlot.State.ALLOCATED) {
+		} else if (state == TaskManagerSlot.State.ALLOCATED || state == TaskManagerSlot.State.PENDING) {
 			return State.ALLOCATED;
 		}
 
@@ -54,6 +71,11 @@ public class FlinkSlot implements AbstractSlot {
 	@Override
 	public State getState() {
 		return state;
+	}
+
+	@Override
+	public void setPending() {
+		state = State.PENDING;
 	}
 
 	@Override
@@ -88,6 +110,11 @@ public class FlinkSlot implements AbstractSlot {
 		} catch (NumberFormatException e) {
 			return SlotID.generateDynamicSlotID(new ResourceID(parts[0]));
 		}
+	}
+
+	public boolean isMatchingSlotInfo(SlotInfoWithUtilization slotInfoWithUtilization) {
+		return slotInfoWithUtilization.getPhysicalSlotNumber() == slotId.getSlotNumber() &&
+			slotInfoWithUtilization.getTaskManagerLocation().getResourceID() == slotId.getResourceID();
 	}
 
 	@Override

@@ -54,6 +54,7 @@ import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobmaster.JobMasterGateway;
 import org.apache.flink.runtime.jobmaster.JobMasterId;
 import org.apache.flink.runtime.jobmaster.JobMasterRegistrationSuccess;
+import org.apache.flink.runtime.jobmaster.slotpool.SlotInfoWithUtilization;
 import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.registration.RegistrationResponse;
 import org.apache.flink.runtime.rescale.JobRescaleAction;
@@ -128,7 +129,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 	private ReconfigurationProfiler reconfigurationProfiler;
 
-	private final boolean isPlacementOn = false;
+	private final boolean isPlacementOn = true;
 
     /*
 
@@ -392,7 +393,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 				for (AbstractSlot slot : slots) {
 					if (slot.getState() == AbstractSlot.State.FREE && slot.isMatchingRequirement(requirements)) {
 						System.out.println("++++++ choosing slot: " + slot);
-						slots.remove(slot);
+						slot.setPending();
 						return FlinkSlot.toSlotId(slot.getId());
 					}
 				}
@@ -794,18 +795,20 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	}
 
 	@Override
-	public void slotStatusChanged(Collection<TaskManagerSlot> taskManagerSlots) {
+	public void slotStatusChanged(Collection<TaskManagerSlot> taskManagerSlots, Collection<SlotInfoWithUtilization> availableSlots) {
 		System.out.println("++++++ slotStatusChanged");
+		Map<String, List<AbstractSlot>> updatedSlotMap = new HashMap<>();
 		taskManagerSlots.forEach(taskManagerSlot -> {
-			AbstractSlot slot = FlinkSlot.fromTaskManagerSlot(taskManagerSlot);
+			AbstractSlot slot = FlinkSlot.fromTaskManagerSlot(taskManagerSlot, availableSlots);
 
-			List<AbstractSlot> slots = slotMap.get(slot.getLocation());
+			List<AbstractSlot> slots = updatedSlotMap.get(slot.getLocation());
 			if (slots == null) {
 				slots = new LinkedList<>();
-				slotMap.put(slot.getLocation(), slots);
+				updatedSlotMap.put(slot.getLocation(), slots);
 			}
 			slots.add(slot);
 		});
+		slotMap = updatedSlotMap;
 		printSlots();
 	}
 
