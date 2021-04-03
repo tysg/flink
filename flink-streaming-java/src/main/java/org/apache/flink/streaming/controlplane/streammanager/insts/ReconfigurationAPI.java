@@ -42,6 +42,8 @@ public interface ReconfigurationAPI {
 	 */
 	ExecutionPlan getExecutionPlan();
 
+	void execute();
+
 	@Deprecated
 	void rescaleStreamJob(JobRescaleAction.RescaleParamsWrapper wrapper);
 
@@ -65,6 +67,7 @@ public interface ReconfigurationAPI {
 	void reconfigureUserFunction(int operatorID, Object function, ControlPolicy waitingController);
 
 	void noOp(int operatorID, ControlPolicy waitingController);
+
 
 	default void callCustomizeOperations(
 		Function<PrimitiveOperation<Map<Integer, Map<Integer, AbstractCoordinator.Diff>>>, CompletableFuture<?>> operationCaller){

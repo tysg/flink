@@ -56,6 +56,9 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 	// node with resources
 	private final List<Node> resourceDistribution;
 
+	// transformation operations -> affected tasks.
+	private Map<String, Map<Integer, Integer>> transformations;
+
 	@Internal
 	public ExecutionPlanImpl(JobGraph jobGraph, ExecutionGraph executionGraph, ClassLoader userLoader) {
 		Map<OperatorID, Integer> operatorIdToVertexId = new HashMap<>();

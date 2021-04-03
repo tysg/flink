@@ -988,6 +988,11 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		return checkNotNull(executionPlan, "stream job abstraction (execution plan) have not been initialized");
 	}
 
+	@Override
+	public void execute() {
+
+	}
+
 	// ------------------------------------------------------------------------
 	//  Error Handling
 	// ------------------------------------------------------------------------
