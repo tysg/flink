@@ -42,7 +42,7 @@ import javax.annotation.Nullable;
  * H represents the hosts in the cluster, each host has a certain number of CPU and memory resources.
  * T is the set of tasks, the main information in T is: number of threads owned by each task and task location.
  */
-public interface ExecutionPlanWithUpdatingFlag extends ExecutionPlan {
+public interface ExecutionPlanWithLock extends ExecutionPlan {
 	/**
 	 * get job graph from stream manager (the state of stream manager)
 	 *

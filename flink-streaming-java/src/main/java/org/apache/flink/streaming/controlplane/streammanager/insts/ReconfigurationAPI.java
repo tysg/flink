@@ -40,7 +40,7 @@ public interface ReconfigurationAPI {
 	 *
 	 * @return the stream job state maintained in some place (e.g. {@link org.apache.flink.streaming.controlplane.streammanager.StreamManager})
 	 */
-	ExecutionPlan getJobExecutionPlan();
+	ExecutionPlan getExecutionPlan();
 
 	@Deprecated
 	void rescaleStreamJob(JobRescaleAction.RescaleParamsWrapper wrapper);

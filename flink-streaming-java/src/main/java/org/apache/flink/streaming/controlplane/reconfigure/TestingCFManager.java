@@ -16,7 +16,7 @@ public class TestingCFManager extends ControlFunctionManager implements ControlP
 	public void startControllerInternal() {
 		System.out.println("Testing Control Function Manager starting...");
 
-		ExecutionPlan jobState = getReconfigurationExecutor().getJobExecutionPlan();
+		ExecutionPlan jobState = getReconfigurationExecutor().getExecutionPlan();
 
 		int secondOperatorId = findOperatorByName("filte");
 
@@ -31,7 +31,7 @@ public class TestingCFManager extends ControlFunctionManager implements ControlP
 
 	private void getKeyStateMapping(int operatorID){
 		try {
-			this.getReconfigurationExecutor().getJobExecutionPlan().getKeyMapping(operatorID);
+			this.getReconfigurationExecutor().getExecutionPlan().getKeyMapping(operatorID);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -40,7 +40,7 @@ public class TestingCFManager extends ControlFunctionManager implements ControlP
 
 	private void getKeyStateAllocation(int operatorID){
 		try {
-			this.getReconfigurationExecutor().getJobExecutionPlan().getKeyStateAllocation(operatorID);
+			this.getReconfigurationExecutor().getExecutionPlan().getKeyStateAllocation(operatorID);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

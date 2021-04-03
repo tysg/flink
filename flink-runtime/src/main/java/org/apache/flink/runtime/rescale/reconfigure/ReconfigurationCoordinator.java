@@ -298,7 +298,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 
 		final List<CompletableFuture<Void>> rescaleCandidatesFutures = new ArrayList<>();
 		try {
-			for (OperatorDescriptor upstreamOperator : heldExecutionPlan.getOperatorDescriptorByID(targetOperatorID).getParents()) {
+			for (OperatorDescriptor upstreamOperator : heldExecutionPlan.getOperatorByID(targetOperatorID).getParents()) {
 				// todo some partitions may not need modified, for example, broad cast partitioner
 				rescaleCandidatesFutures
 					.add(
@@ -394,7 +394,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 
 		final List<CompletableFuture<Void>> rescaleCandidatesFutures = new ArrayList<>();
 		try {
-			for (OperatorDescriptor upstreamOperator : heldExecutionPlan.getOperatorDescriptorByID(targetOperatorID).getParents()) {
+			for (OperatorDescriptor upstreamOperator : heldExecutionPlan.getOperatorByID(targetOperatorID).getParents()) {
 				// todo some partitions may not need modified, for example, broad cast partitioner
 				rescaleCandidatesFutures
 					.add(updatePartitions(upstreamOperator.getOperatorID(), rescaleID).thenCompose(o -> updateDownstreamGates(upstreamOperator.getOperatorID()))
@@ -425,7 +425,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 			CompletableFuture<Void> finishFuture = FutureUtils.completeAll(rescaleCandidatesFutures);
 			finishFuture.thenAccept(
 				o -> {
-					for (OperatorDescriptor targetOperator : heldExecutionPlan.getOperatorDescriptorByID(targetOperatorID).getParents()) {
+					for (OperatorDescriptor targetOperator : heldExecutionPlan.getOperatorByID(targetOperatorID).getParents()) {
 						// check should we resume those tasks
 						Map<Integer, Diff> diffMap = diff.get(targetOperator.getOperatorID());
 						diffMap.remove(AbstractCoordinator.KEY_MAPPING);
@@ -464,7 +464,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 	private CompletableFuture<Void> updateDownstreamGates(int operatorID) {
 		List<CompletableFuture<Void>> updateGatesFuture = new ArrayList<>();
 		// update input gates in child stream of source op
-		for (OperatorDescriptor downstreamOperator : heldExecutionPlan.getOperatorDescriptorByID(operatorID).getChildren()) {
+		for (OperatorDescriptor downstreamOperator : heldExecutionPlan.getOperatorByID(operatorID).getChildren()) {
 			try {
 				updateGates(downstreamOperator.getOperatorID(), updateGatesFuture);
 			} catch (ExecutionGraphException e) {

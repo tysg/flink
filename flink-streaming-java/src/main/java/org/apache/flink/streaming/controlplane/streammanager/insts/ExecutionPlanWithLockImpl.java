@@ -26,7 +26,7 @@ import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class ExecutionPlanWithUpdatingFlagImpl implements ExecutionPlanWithUpdatingFlag {
+public class ExecutionPlanWithLockImpl implements ExecutionPlanWithLock {
 
 	private final static int COMMITTED = 1;
 	private final static int STAGED = 0;
@@ -36,7 +36,7 @@ public class ExecutionPlanWithUpdatingFlagImpl implements ExecutionPlanWithUpdat
 
 	private final ExecutionPlan executionPlan;
 
-	public ExecutionPlanWithUpdatingFlagImpl(ExecutionPlan executionPlan) {
+	public ExecutionPlanWithLockImpl(ExecutionPlan executionPlan) {
 		this.executionPlan = executionPlan;
 	}
 
@@ -68,7 +68,7 @@ public class ExecutionPlanWithUpdatingFlagImpl implements ExecutionPlanWithUpdat
 	}
 
 	@Override
-	public Task getTask(Integer operatorID, int taskId) {
+	public TaskDescriptor getTask(Integer operatorID, int taskId) {
 		return executionPlan.getTask(operatorID, taskId);
 	}
 
@@ -93,12 +93,27 @@ public class ExecutionPlanWithUpdatingFlagImpl implements ExecutionPlanWithUpdat
 	}
 
 	@Override
-	public Iterator<OperatorDescriptor> getAllOperatorDescriptor() {
-		return executionPlan.getAllOperatorDescriptor();
+	public Iterator<OperatorDescriptor> getAllOperator() {
+		return executionPlan.getAllOperator();
 	}
 
 	@Override
-	public OperatorDescriptor getOperatorDescriptorByID(Integer operatorID) {
-		return executionPlan.getOperatorDescriptorByID(operatorID);
+	public OperatorDescriptor getOperatorByID(Integer operatorID) {
+		return executionPlan.getOperatorByID(operatorID);
+	}
+
+	@Override
+	public ExecutionPlan redistribute(Integer operatorID, Map<Integer, List<Integer>> distribution) {
+		return null;
+	}
+
+	@Override
+	public ExecutionPlan updateExecutionLogic(Integer operatorID, Object function) {
+		return null;
+	}
+
+	@Override
+	public ExecutionPlan reDeploy(List<Integer> tasks, Map<Integer, Node> deployment) {
+		return null;
 	}
 }

@@ -1,6 +1,5 @@
 package org.apache.flink.streaming.controlplane.udm;
 
-import org.apache.flink.runtime.controlplane.abstraction.JobGraphConfig;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
 import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
 
@@ -20,7 +19,7 @@ public abstract class AbstractControlPolicy implements ControlPolicy {
 	}
 
 	protected int findOperatorByName(@Nonnull String name) {
-		for (Iterator<OperatorDescriptor> it = reconfigurationAPI.getJobExecutionPlan().getAllOperatorDescriptor(); it.hasNext(); ) {
+		for (Iterator<OperatorDescriptor> it = reconfigurationAPI.getExecutionPlan().getAllOperator(); it.hasNext(); ) {
 			OperatorDescriptor descriptor = it.next();
 			if(descriptor.getName().equals(name)){
 				return descriptor.getOperatorID();

@@ -21,7 +21,7 @@ public class WorkloadsAssignmentHandler {
 
 	public void setupWorkloadsAssignmentMapFromExecutionPlan(ExecutionPlan heldExecutionPlan) {
 //	public Map<Integer, OperatorWorkloadsAssignment> setupWorkloadsAssignmentMapFromExecutionPlan(ExecutionPlan heldExecutionPlan) {
-		for (Iterator<OperatorDescriptor> it = heldExecutionPlan.getAllOperatorDescriptor(); it.hasNext(); ) {
+		for (Iterator<OperatorDescriptor> it = heldExecutionPlan.getAllOperator(); it.hasNext(); ) {
 			OperatorDescriptor descriptor = it.next();
 			int operatorID = descriptor.getOperatorID();
 			int parallelism = descriptor.getParallelism();

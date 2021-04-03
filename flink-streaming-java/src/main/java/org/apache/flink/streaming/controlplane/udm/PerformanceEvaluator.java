@@ -71,7 +71,7 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 		int reconfigInterval = Integer.parseInt(experimentConfig.getOrDefault(RECONFIG_INTERVAL, "10000"));
 //		int reconfigFreq = Integer.parseInt(experimentConfig.getOrDefault(RECONFIG_FREQUENCY, "5"));
 		int testOpID = findOperatorByName(testOperatorName);
-		latestUnusedSubTaskIdx = getReconfigurationExecutor().getJobExecutionPlan().getParallelism(testOpID);
+		latestUnusedSubTaskIdx = getReconfigurationExecutor().getExecutionPlan().getParallelism(testOpID);
 		switch (experimentConfig.getOrDefault(TEST_TYPE, RESCALE)) {
 			case REMAP:
 				measureRebalance(testOpID, numAffectedTasks, reconfigInterval);
@@ -90,7 +90,7 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 	}
 
 	private void measureRebalance(int testOpID, int numAffectedTasks, int reconfigInterval) throws InterruptedException {
-		ExecutionPlan executionPlan = getReconfigurationExecutor().getJobExecutionPlan();
+		ExecutionPlan executionPlan = getReconfigurationExecutor().getExecutionPlan();
 		if (reconfigInterval > 0) {
 //			int timeInterval = 1000 / reconfigInterval;
 			int i = 0;
@@ -124,7 +124,7 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 	}
 
 	private void measureFunctionUpdate(int testOpID, int reconfigInterval) throws InterruptedException {
-		ExecutionPlan executionPlan = getReconfigurationExecutor().getJobExecutionPlan();
+		ExecutionPlan executionPlan = getReconfigurationExecutor().getExecutionPlan();
 		try {
 			ClassLoader userClassLoader = executionPlan.getUserFunction(testOpID).getClass().getClassLoader();
 			Class IncreaseCommunicationOverheadMapClass = userClassLoader.loadClass("flinkapp.StatefulDemoLongRun$IncreaseCommunicationOverheadMap");
@@ -160,7 +160,7 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 	}
 
 	private void measureRescale(int testOpID, int numAffectedTasks, int reconfigInterval) throws InterruptedException {
-		ExecutionPlan executionPlan = getReconfigurationExecutor().getJobExecutionPlan();
+		ExecutionPlan executionPlan = getReconfigurationExecutor().getExecutionPlan();
 		if (reconfigInterval > 0) {
 			long start;
 			// first scale in and then scale out to avoid exceed the parallelism set for the app,
@@ -181,8 +181,8 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 	}
 
 	private void scaling(int testingOpID, int newParallelism) throws InterruptedException {
-		ExecutionPlan executionPlan = getReconfigurationExecutor().getJobExecutionPlan();
-		OperatorDescriptor targetDescriptor = executionPlan.getOperatorDescriptorByID(testingOpID);
+		ExecutionPlan executionPlan = getReconfigurationExecutor().getExecutionPlan();
+		OperatorDescriptor targetDescriptor = executionPlan.getOperatorByID(testingOpID);
 
 
 		Map<Integer, List<Integer>> curKeyStateAllocation = targetDescriptor.getKeyStateAllocation();
@@ -228,7 +228,7 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 	}
 
 	private void measureRescale(int testOpID, int numAffectedTasks, int maxParallelism, int reconfigInterval) throws InterruptedException {
-		ExecutionPlan executionPlan = getReconfigurationExecutor().getJobExecutionPlan();
+		ExecutionPlan executionPlan = getReconfigurationExecutor().getExecutionPlan();
 		if (reconfigInterval > 0) {
 //			int timeInterval = 1000 / reconfigInterval;
 			int i = 0;
@@ -273,7 +273,7 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 	}
 
 	private void measureNoOP(int testOpID, int reconfigInterval) throws InterruptedException {
-		ExecutionPlan executionPlan = getReconfigurationExecutor().getJobExecutionPlan();
+		ExecutionPlan executionPlan = getReconfigurationExecutor().getExecutionPlan();
 		if (reconfigInterval > 0) {
 //			int timeInterval = 1000 / reconfigInterval;
 			int i = 0;

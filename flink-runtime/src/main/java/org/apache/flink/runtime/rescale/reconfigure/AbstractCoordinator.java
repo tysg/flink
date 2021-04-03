@@ -64,9 +64,9 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 
 	public ExecutionPlan getHeldExecutionPlanCopy() {
 		ExecutionPlan executionPlan = streamRelatedInstanceFactory.createExecutionPlan(jobGraph, executionGraph, userCodeClassLoader);
-		for (Iterator<OperatorDescriptor> it = executionPlan.getAllOperatorDescriptor(); it.hasNext(); ) {
+		for (Iterator<OperatorDescriptor> it = executionPlan.getAllOperator(); it.hasNext(); ) {
 			OperatorDescriptor descriptor = it.next();
-			OperatorDescriptor heldDescriptor = heldExecutionPlan.getOperatorDescriptorByID(descriptor.getOperatorID());
+			OperatorDescriptor heldDescriptor = heldExecutionPlan.getOperatorByID(descriptor.getOperatorID());
 			// make sure udf and other control attributes share the same reference so we could identity the change if any
 			OperatorDescriptor.ExecutionLogic heldAppLogic =
 				OperatorDescriptorVisitor.attachOperator(heldDescriptor).getApplicationLogic();
@@ -94,10 +94,10 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 	public final CompletableFuture<Map<Integer, Map<Integer, Diff>>> prepareExecutionPlan(ExecutionPlan jobExecutionPlan) {
 		rescaleID = RescaleID.generateNextID();
 		Map<Integer, Map<Integer, Diff>> differenceMap = new HashMap<>();
-		for (Iterator<OperatorDescriptor> it = jobExecutionPlan.getAllOperatorDescriptor(); it.hasNext();) {
+		for (Iterator<OperatorDescriptor> it = jobExecutionPlan.getAllOperator(); it.hasNext();) {
 			OperatorDescriptor descriptor = it.next();
 			int operatorID = descriptor.getOperatorID();
-			OperatorDescriptor heldDescriptor = heldExecutionPlan.getOperatorDescriptorByID(operatorID);
+			OperatorDescriptor heldDescriptor = heldExecutionPlan.getOperatorByID(operatorID);
 			int oldParallelism = heldDescriptor.getParallelism();
 			// loop until all change in this operator has been detected and sync
 			List<Integer> changes = analyzeOperatorDifference(heldDescriptor, descriptor);
@@ -180,12 +180,12 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 		JobVertex targetJobVertex = jobGraph.findVertexByID(rawVertexIDToJobVertexID(rawVertexID));
 		Preconditions.checkNotNull(targetVertex, "can not found target vertex");
 		// TODO: this should be found through updating the JobGraph
-		List<JobVertexID> updatedDownstream = heldExecutionPlan.getOperatorDescriptorByID(rawVertexID)
+		List<JobVertexID> updatedDownstream = heldExecutionPlan.getOperatorByID(rawVertexID)
 			.getChildren().stream()
 			.map(child -> rawVertexIDToJobVertexID(child.getOperatorID()))
 			.collect(Collectors.toList());
 
-		List<JobVertexID> updatedUpstream = heldExecutionPlan.getOperatorDescriptorByID(rawVertexID)
+		List<JobVertexID> updatedUpstream = heldExecutionPlan.getOperatorByID(rawVertexID)
 			.getParents().stream()
 			.map(child -> rawVertexIDToJobVertexID(child.getOperatorID()))
 			.collect(Collectors.toList());

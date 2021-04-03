@@ -52,7 +52,7 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 	private final OperatorDescriptor[] headOperators;
 
 	// operatorId -> task
-	private final Map<Integer, Map<Integer, Task>> operatorToTaskMap = new HashMap<>();
+	private final Map<Integer, Map<Integer, TaskDescriptor>> operatorToTaskMap = new HashMap<>();
 	// node with resources
 	private final List<Node> resourceDistribution;
 
@@ -148,13 +148,28 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 	}
 
 	@Override
-	public Iterator<OperatorDescriptor> getAllOperatorDescriptor() {
+	public Iterator<OperatorDescriptor> getAllOperator() {
 		return operatorsMap.values().iterator();
 	}
 
 	@Override
-	public OperatorDescriptor getOperatorDescriptorByID(Integer operatorID) {
+	public OperatorDescriptor getOperatorByID(Integer operatorID) {
 		return operatorsMap.get(operatorID);
+	}
+
+	@Override
+	public ExecutionPlan redistribute(Integer operatorID, Map<Integer, List<Integer>> distribution) {
+		return null;
+	}
+
+	@Override
+	public ExecutionPlan updateExecutionLogic(Integer operatorID, Object function) {
+		return null;
+	}
+
+	@Override
+	public ExecutionPlan reDeploy(List<Integer> tasks, Map<Integer, Node> deployment) {
+		return null;
 	}
 
 	public OperatorDescriptor[] getHeadOperators() {
@@ -168,7 +183,7 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 		for (ExecutionJobVertex jobVertex : executionGraph.getAllVertices().values()) {
 			// contains all tasks of the same parallel operator instances
 //			List<Task> taskList = new ArrayList<>(jobVertex.getParallelism());
-			Map<Integer, Task> taskMap = new HashMap<>();
+			Map<Integer, TaskDescriptor> taskMap = new HashMap<>();
 			for (ExecutionVertex vertex : jobVertex.getTaskVertices()) {
 				Execution execution;
 				do {
@@ -187,7 +202,7 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 					hosts.put(slot.getTaskManagerLocation().getResourceID(), node);
 				}
 				// todo how to get number of slots?
-				Task task = new Task(slot.getPhysicalSlotNumber(), node);
+				TaskDescriptor task = new TaskDescriptor(slot.getPhysicalSlotNumber(), node);
 				taskMap.put(vertex.getParallelSubtaskIndex(), task);
 			}
 			for (OperatorID operatorID : jobVertex.getOperatorIDs()) {
@@ -203,7 +218,7 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 	}
 
 	@Override
-	public Task getTask(Integer operatorID, int taskId) {
+	public TaskDescriptor getTask(Integer operatorID, int taskId) {
 		return operatorToTaskMap.get(operatorID).get(taskId);
 	}
 

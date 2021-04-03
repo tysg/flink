@@ -10,7 +10,7 @@ import org.apache.flink.util.Preconditions;
 import java.lang.reflect.Field;
 import java.util.*;
 
-import static org.apache.flink.runtime.controlplane.abstraction.ExecutionGraphConfig.*;
+import static org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan.*;
 
 /**
  * this class make sure all field is not modifiable for external class
@@ -26,7 +26,7 @@ public class OperatorDescriptor {
 	private final TaskConfigurations taskConfigurations;
 	private boolean stateful = false;
 
-	public OperatorDescriptor(int operatorID, String name, int parallelism, Map<Integer, Task> tasks) {
+	public OperatorDescriptor(int operatorID, String name, int parallelism, Map<Integer, TaskDescriptor> tasks) {
 		this.operatorID = operatorID;
 		this.name = name;
 		this.taskConfigurations = new TaskConfigurations(parallelism, tasks);
@@ -245,9 +245,9 @@ public class OperatorDescriptor {
 		// task id -> key mapping
 		public Map<Integer, Map<Integer, List<Integer>>> keyMapping;
 		// task id -> task(slots, location)
-		public Map<Integer, Task> tasks;
+		public Map<Integer, TaskDescriptor> tasks;
 
-		TaskConfigurations(int parallelism, Map<Integer, Task> tasks) {
+		TaskConfigurations(int parallelism, Map<Integer, TaskDescriptor> tasks) {
 			this.parallelism = parallelism;
 			keyStateAllocation = new HashMap<>();
 			keyMapping = new HashMap<>();

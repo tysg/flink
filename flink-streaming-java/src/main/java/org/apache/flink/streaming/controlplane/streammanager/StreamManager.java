@@ -55,11 +55,10 @@ import org.apache.flink.runtime.rescale.reconfigure.JobGraphRescaler;
 import org.apache.flink.streaming.controlplane.jobgraph.NormalInstantiateFactory;
 import org.apache.flink.streaming.controlplane.rescale.StreamJobGraphRescaler;
 import org.apache.flink.streaming.controlplane.streammanager.exceptions.StreamManagerException;
-import org.apache.flink.streaming.controlplane.streammanager.insts.ExecutionPlanWithUpdatingFlag;
+import org.apache.flink.streaming.controlplane.streammanager.insts.ExecutionPlanWithLock;
 import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
-import org.apache.flink.streaming.controlplane.streammanager.insts.ExecutionPlanWithUpdatingFlagImpl;
+import org.apache.flink.streaming.controlplane.streammanager.insts.ExecutionPlanWithLockImpl;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
-import org.apache.flink.streaming.controlplane.udm.DummyController;
 import org.apache.flink.streaming.controlplane.udm.PerformanceEvaluator;
 import org.apache.flink.util.OptionalConsumer;
 import org.slf4j.Logger;
@@ -68,7 +67,6 @@ import org.slf4j.LoggerFactory;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import static org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor.ExecutionLogic.UDF;
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -112,7 +110,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 	private final List<ControlPolicy> controlPolicyList = new LinkedList<>();
 
-	private ExecutionPlanWithUpdatingFlag jobExecutionPlan;
+	private ExecutionPlanWithLock executionPlan;
 
 	private CompletableFuture<Acknowledge> rescalePartitionFuture;
 
@@ -337,7 +335,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			// scale in is not support now
 			checkState(keyStateAllocation.size() == newParallelism,
 				"new parallelism not match key state allocation");
-			this.jobExecutionPlan.setStateUpdatingFlag(waitingController);
+			this.executionPlan.setStateUpdatingFlag(waitingController);
 
 			// operatorId to TaskIdList mapping, representing affected tasks.
 			Map<Integer, List<Integer>> tasks = new HashMap<>();
@@ -345,7 +343,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			Map<Integer, List<Integer>> updateKeyMappingTasks = new HashMap<>();
 			Map<Integer, List<Integer>> deployingTasks = new HashMap<>();
 
-			OperatorDescriptor targetDescriptor = jobExecutionPlan.getOperatorDescriptorByID(operatorID);
+			OperatorDescriptor targetDescriptor = executionPlan.getOperatorByID(operatorID);
 			// put tasks in target vertex
 			tasks.put(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
 			updateStateTasks.put(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
@@ -385,37 +383,37 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			final String UPDATE_STATE = "updateState timer";
 			log.info("++++++ start update");
 			runAsync(() -> jobMasterGateway.callOperations(
-				enforcement -> {
+				coordinator -> {
 					// prepare andsynchronize among affected tasks
 					CompletableFuture<?> syncFuture = FutureUtils.completedVoidFuture()
 						.thenCompose(o -> {
 							reconfigurationProfiler.onOtherStart(PREPARE);
-							return enforcement.prepareExecutionPlan(jobExecutionPlan);
+							return coordinator.prepareExecutionPlan(executionPlan);
 						})
 						.thenCompose(o -> {
 							reconfigurationProfiler.onOtherEnd(PREPARE);
 							reconfigurationProfiler.onOtherStart(SYN);
-							return enforcement.synchronizeTasks(tasks, o);
+							return coordinator.synchronizeTasks(tasks, o);
 						});
 					// run update asynchronously.
 					List<CompletableFuture<?>> updateFutureList = new ArrayList<>();
 					updateFutureList.add(syncFuture.thenCompose(o -> {
 						reconfigurationProfiler.onOtherEnd(SYN);
 						reconfigurationProfiler.onOtherStart(UPDATE_MAPPING);
-						return enforcement.updateKeyMapping(updateKeyMappingTasks, o);
+						return coordinator.updateKeyMapping(updateKeyMappingTasks, o);
 					}));
 					updateFutureList.add(syncFuture.thenCompose(o -> {
 						reconfigurationProfiler.onOtherEnd(UPDATE_MAPPING);
 						reconfigurationProfiler.onOtherStart(UPDATE_STATE);
-						return enforcement.updateState(updateStateTasks, o);
+						return coordinator.updateState(updateStateTasks, o);
 					}));
 					updateFutureList.add(syncFuture.thenCompose(o -> {
-						return enforcement.updateTaskResources(deployingTasks, isScaleIn);
+						return coordinator.updateTaskResources(deployingTasks, isScaleIn);
 					}));
 
 					// finish the reconfiguration after all asynchronous update completed
 					return FutureUtils.completeAll(updateFutureList)
-						.thenCompose(o -> enforcement.resumeTasks())
+						.thenCompose(o -> coordinator.resumeTasks())
 						.whenComplete((o, failure) -> {
 							if (failure != null) {
 								LOG.error("Reconfiguration failed: ", failure);
@@ -426,7 +424,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 								log.info("++++++ finished update");
 								// TODO: extract the deployment overhead
 								reconfigurationProfiler.onOtherEnd(UPDATE_STATE);
-								this.jobExecutionPlan.notifyUpdateFinished(failure);
+								this.executionPlan.notifyUpdateFinished(failure);
 								reconfigurationProfiler.onReconfigurationEnd();
 							} catch (Exception e) {
 								e.printStackTrace();
@@ -448,7 +446,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 //			checkState(keyStateAllocation.size() == newParallelism,
 //				"new parallelism not match key state allocation");
 			executionPlan.getParallelism(operatorID);
-			this.jobExecutionPlan.setStateUpdatingFlag(waitingController);
+			this.executionPlan.setStateUpdatingFlag(waitingController);
 
 			// operatorId to TaskIdList mapping, representing affected tasks.
 			Map<Integer, List<Integer>> tasks = new HashMap<>();
@@ -456,7 +454,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			Map<Integer, List<Integer>> updateKeyMappingTasks = new HashMap<>();
 			Map<Integer, List<Integer>> deployingTasks = new HashMap<>();
 
-			OperatorDescriptor targetDescriptor = jobExecutionPlan.getOperatorDescriptorByID(operatorID);
+			OperatorDescriptor targetDescriptor = this.executionPlan.getOperatorByID(operatorID);
 			// put tasks in target vertex
 			tasks.put(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
 			updateStateTasks.put(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
@@ -485,37 +483,37 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			final String UPDATE_STATE = "updateState timer";
 			log.info("++++++ start update");
 			runAsync(() -> jobMasterGateway.callOperations(
-				enforcement -> {
+				coordinator -> {
 					// prepare andsynchronize among affected tasks
 					CompletableFuture<?> syncFuture = FutureUtils.completedVoidFuture()
 						.thenCompose(o -> {
 							reconfigurationProfiler.onOtherStart(PREPARE);
-							return enforcement.prepareExecutionPlan(jobExecutionPlan);
+							return coordinator.prepareExecutionPlan(this.executionPlan);
 						})
 						.thenCompose(o -> {
 							reconfigurationProfiler.onOtherEnd(PREPARE);
 							reconfigurationProfiler.onOtherStart(SYN);
-							return enforcement.synchronizeTasks(tasks, o);
+							return coordinator.synchronizeTasks(tasks, o);
 						});
 					// run update asynchronously.
 					List<CompletableFuture<?>> updateFutureList = new ArrayList<>();
 					updateFutureList.add(syncFuture.thenCompose(o -> {
 						reconfigurationProfiler.onOtherEnd(SYN);
 						reconfigurationProfiler.onOtherStart(UPDATE_MAPPING);
-						return enforcement.updateKeyMapping(updateKeyMappingTasks, o);
+						return coordinator.updateKeyMapping(updateKeyMappingTasks, o);
 					}));
 					updateFutureList.add(syncFuture.thenCompose(o -> {
 						reconfigurationProfiler.onOtherEnd(UPDATE_MAPPING);
 						reconfigurationProfiler.onOtherStart(UPDATE_STATE);
-						return enforcement.updateState(updateStateTasks, o);
+						return coordinator.updateState(updateStateTasks, o);
 					}));
 					updateFutureList.add(syncFuture.thenCompose(o -> {
-						return enforcement.updateTaskResources(deployingTasks, isScaleIn);
+						return coordinator.updateTaskResources(deployingTasks, isScaleIn);
 					}));
 
 					// finish the reconfiguration after all asynchronous update completed
 					return FutureUtils.completeAll(updateFutureList)
-						.thenCompose(o -> enforcement.resumeTasks())
+						.thenCompose(o -> coordinator.resumeTasks())
 						.whenComplete((o, failure) -> {
 							if (failure != null) {
 								LOG.error("Reconfiguration failed: ", failure);
@@ -526,7 +524,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 								log.info("++++++ finished update");
 								// TODO: extract the deployment overhead
 								reconfigurationProfiler.onOtherEnd(UPDATE_STATE);
-								this.jobExecutionPlan.notifyUpdateFinished(failure);
+								this.executionPlan.notifyUpdateFinished(failure);
 								reconfigurationProfiler.onReconfigurationEnd();
 							} catch (Exception e) {
 								e.printStackTrace();
@@ -546,9 +544,9 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			reconfigurationProfiler.onReconfigurationStart();
 			// typically, the target operator should contain key state,
 			// todo if keyStateAllocation is null, means it is stateless operator, but not support now
-			this.jobExecutionPlan.setStateUpdatingFlag(waitingController);
+			this.executionPlan.setStateUpdatingFlag(waitingController);
 
-			OperatorDescriptor targetDescriptor = jobExecutionPlan.getOperatorDescriptorByID(operatorID);
+			OperatorDescriptor targetDescriptor = executionPlan.getOperatorByID(operatorID);
 
 			for (OperatorDescriptor parent : targetDescriptor.getParents()) {
 				parent.setOutputKeyMapping(operatorID, keyStateAllocation);
@@ -580,24 +578,24 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			final String UPDATE_STATE = "updateState timer";
 			if (stateful) {
 				runAsync(() -> jobMasterGateway.callOperations(
-				enforcement -> {
+				coordinator -> {
 					// prepare and synchronize among affected tasks
 					CompletableFuture<?> syncFuture = FutureUtils.completedVoidFuture()
 						.thenCompose(o -> {
 							reconfigurationProfiler.onOtherStart(PREPARE);
-							return enforcement.prepareExecutionPlan(jobExecutionPlan);
+							return coordinator.prepareExecutionPlan(executionPlan);
 						})
 						.thenCompose(o -> {
 							reconfigurationProfiler.onOtherEnd(PREPARE);
 							reconfigurationProfiler.onOtherStart(SYN);
-							return enforcement.synchronizeTasks(tasks, o);
+							return coordinator.synchronizeTasks(tasks, o);
 						});
 					// run update asynchronously.
 					List<CompletableFuture<?>> updateFutureList = new ArrayList<>();
 					updateFutureList.add(syncFuture.thenCompose(o -> {
 						reconfigurationProfiler.onOtherEnd(SYN);
 						reconfigurationProfiler.onOtherStart(UPDATE_MAPPING);
-						return enforcement.updateKeyMapping(updateKeyMappingTasks, o);
+						return coordinator.updateKeyMapping(updateKeyMappingTasks, o);
 					})
 //						.thenCompose(o -> {
 //						reconfigurationProfiler.onOtherEnd(UPDATE_MAPPING);
@@ -606,14 +604,14 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					updateFutureList.add(syncFuture.thenCompose(o -> {
 						reconfigurationProfiler.onOtherEnd(UPDATE_MAPPING);
 						reconfigurationProfiler.onOtherStart(UPDATE_STATE);
-						return enforcement.updateState(updateStateTasks, o);
+						return coordinator.updateState(updateStateTasks, o);
 					}).thenCompose(o -> {
 						reconfigurationProfiler.onOtherEnd(UPDATE_STATE);
 						return CompletableFuture.completedFuture(o);
 					}));
 					// finish the reconfiguration after all asynchronous update completed
 					return FutureUtils.completeAll(updateFutureList)
-//						.thenCompose(o -> enforcement.resumeTasks()) // resume all tasks who has both state and mapping to update (to be appeared in the future).
+//						.thenCompose(o -> coordinator.resumeTasks()) // resume all tasks who has both state and mapping to update (to be appeared in the future).
 						.whenComplete((o, failure) -> {
 						if (failure != null) {
 							failure.printStackTrace();
@@ -622,7 +620,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 							System.out.println("++++++ finished update");
 							LOG.info("++++++ finished update");
 							reconfigurationProfiler.onReconfigurationEnd();
-							this.jobExecutionPlan.notifyUpdateFinished(failure);
+							this.executionPlan.notifyUpdateFinished(failure);
 						} catch (Exception e) {
 							e.printStackTrace();
 						}
@@ -630,16 +628,16 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 				}));
 			} else {
 				runAsync(() -> jobMasterGateway.callOperations(
-					enforcement -> FutureUtils.completedVoidFuture()
-						.thenCompose(o -> enforcement.prepareExecutionPlan(jobExecutionPlan))
-						.thenCompose(o -> enforcement.updateKeyMapping(operatorID, o))
+					coordinator -> FutureUtils.completedVoidFuture()
+						.thenCompose(o -> coordinator.prepareExecutionPlan(executionPlan))
+						.thenCompose(o -> coordinator.updateKeyMapping(operatorID, o))
 						.whenComplete((o, failure) -> {
 							if (failure != null) {
 								failure.printStackTrace();
 							}
 							try {
 								reconfigurationProfiler.onReconfigurationEnd();
-								this.jobExecutionPlan.notifyUpdateFinished(failure);
+								this.executionPlan.notifyUpdateFinished(failure);
 							} catch (Exception e) {
 								e.printStackTrace();
 							}
@@ -657,9 +655,9 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			reconfigurationProfiler.onReconfigurationStart();
 			// typically, the target operator should contain key state,
 			// todo if keyStateAllocation is null, means it is stateless operator, but not support now
-			this.jobExecutionPlan.setStateUpdatingFlag(waitingController);
+			this.executionPlan.setStateUpdatingFlag(waitingController);
 
-			OperatorDescriptor targetDescriptor = executionPlan.getOperatorDescriptorByID(operatorID);
+			OperatorDescriptor targetDescriptor = executionPlan.getOperatorByID(operatorID);
 			Map<Integer, List<Integer>> keyStateAllocation = executionPlan.getKeyStateAllocation(operatorID);
 
 			for (OperatorDescriptor parent : targetDescriptor.getParents()) {
@@ -691,24 +689,24 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			final String UPDATE_MAPPING = "updateKeyMapping timer";
 			final String UPDATE_STATE = "updateState timer";
 			runAsync(() -> jobMasterGateway.callOperations(
-				enforcement -> {
+				coordinator -> {
 					// prepare and synchronize among affected tasks
 					CompletableFuture<?> syncFuture = FutureUtils.completedVoidFuture()
 						.thenCompose(o -> {
 							reconfigurationProfiler.onOtherStart(PREPARE);
-							return enforcement.prepareExecutionPlan(jobExecutionPlan);
+							return coordinator.prepareExecutionPlan(this.executionPlan);
 						})
 						.thenCompose(o -> {
 							reconfigurationProfiler.onOtherEnd(PREPARE);
 							reconfigurationProfiler.onOtherStart(SYN);
-							return enforcement.synchronizeTasks(tasks, o);
+							return coordinator.synchronizeTasks(tasks, o);
 						});
 					// run update asynchronously.
 					List<CompletableFuture<?>> updateFutureList = new ArrayList<>();
 					updateFutureList.add(syncFuture.thenCompose(o -> {
 							reconfigurationProfiler.onOtherEnd(SYN);
 							reconfigurationProfiler.onOtherStart(UPDATE_MAPPING);
-							return enforcement.updateKeyMapping(updateKeyMappingTasks, o);
+							return coordinator.updateKeyMapping(updateKeyMappingTasks, o);
 						})
 //						.thenCompose(o -> {
 //						reconfigurationProfiler.onOtherEnd(UPDATE_MAPPING);
@@ -717,14 +715,14 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					updateFutureList.add(syncFuture.thenCompose(o -> {
 						reconfigurationProfiler.onOtherEnd(UPDATE_MAPPING);
 						reconfigurationProfiler.onOtherStart(UPDATE_STATE);
-						return enforcement.updateState(updateStateTasks, o);
+						return coordinator.updateState(updateStateTasks, o);
 					}).thenCompose(o -> {
 						reconfigurationProfiler.onOtherEnd(UPDATE_STATE);
 						return CompletableFuture.completedFuture(o);
 					}));
 					// finish the reconfiguration after all asynchronous update completed
 					return FutureUtils.completeAll(updateFutureList)
-//						.thenCompose(o -> enforcement.resumeTasks()) // resume all tasks who has both state and mapping to update (to be appeared in the future).
+//						.thenCompose(o -> coordinator.resumeTasks()) // resume all tasks who has both state and mapping to update (to be appeared in the future).
 						.whenComplete((o, failure) -> {
 							if (failure != null) {
 								failure.printStackTrace();
@@ -733,7 +731,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 								System.out.println("++++++ finished update");
 								LOG.info("++++++ finished update");
 								reconfigurationProfiler.onReconfigurationEnd();
-								this.jobExecutionPlan.notifyUpdateFinished(failure);
+								this.executionPlan.notifyUpdateFinished(failure);
 							} catch (Exception e) {
 								e.printStackTrace();
 							}
@@ -748,29 +746,29 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	public void reconfigureUserFunction(int operatorID, Object function, ControlPolicy waitingController) {
 		try {
 			// very similar to acquire a positive spin write lock
-			this.jobExecutionPlan.setStateUpdatingFlag(waitingController);
-			OperatorDescriptor target = jobExecutionPlan.getOperatorDescriptorByID(operatorID);
+			this.executionPlan.setStateUpdatingFlag(waitingController);
+			OperatorDescriptor target = executionPlan.getOperatorByID(operatorID);
 			target.setControlAttribute(UDF, function);
 			final String PREPARE = "prepare timer";
 			final String SYN = "synchronize timer";
 			final String UPDATE_FUNCTION = "updateFunction timer";
 			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
 			runAsync(() -> jobMasterGateway.callOperations(
-				enforcement -> FutureUtils.completedVoidFuture()
+				coordinator -> FutureUtils.completedVoidFuture()
 					.thenCompose(o -> {
 						reconfigurationProfiler.onReconfigurationStart();
 						reconfigurationProfiler.onOtherStart(PREPARE);
-						return enforcement.prepareExecutionPlan(jobExecutionPlan);
+						return coordinator.prepareExecutionPlan(executionPlan);
 					})
 					.thenCompose(o -> {
 						reconfigurationProfiler.onOtherEnd(PREPARE);
 						reconfigurationProfiler.onOtherStart(SYN);
-						return enforcement.synchronizeTasks(Collections.singletonList(Tuple2.of(operatorID, -1)), o);
+						return coordinator.synchronizeTasks(Collections.singletonList(Tuple2.of(operatorID, -1)), o);
 					})
 					.thenCompose(o -> {
 						reconfigurationProfiler.onOtherEnd(SYN);
 						reconfigurationProfiler.onOtherStart(UPDATE_FUNCTION);
-						return enforcement.updateFunction(operatorID, o);
+						return coordinator.updateFunction(operatorID, o);
 					})
 					.whenComplete((o, failure) -> {
 						if (failure != null) {
@@ -779,7 +777,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						try {
 							reconfigurationProfiler.onOtherEnd(UPDATE_FUNCTION);
 							reconfigurationProfiler.onReconfigurationEnd();
-							this.jobExecutionPlan.notifyUpdateFinished(failure);
+							this.executionPlan.notifyUpdateFinished(failure);
 						} catch (Exception e) {
 							e.printStackTrace();
 						}
@@ -794,25 +792,25 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	public void noOp(int operatorID, ControlPolicy waitingController) {
 		try {
 			// very similar to acquire a positive spin write lock
-			this.jobExecutionPlan.setStateUpdatingFlag(waitingController);
+			this.executionPlan.setStateUpdatingFlag(waitingController);
 			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
 			final String SYN = "synchronize timer";
 			runAsync(() -> jobMasterGateway.callOperations(
-				enforcement -> FutureUtils.completedVoidFuture()
+				coordinator -> FutureUtils.completedVoidFuture()
 					.thenCompose(o -> {
 						reconfigurationProfiler.onOtherStart(SYN);
-						return enforcement.synchronizeTasks(Collections.singletonList(Tuple2.of(operatorID, -1)), null);
+						return coordinator.synchronizeTasks(Collections.singletonList(Tuple2.of(operatorID, -1)), null);
 					})
 					.thenCompose(o -> {
 						reconfigurationProfiler.onOtherEnd(SYN);
-						return enforcement.resumeTasks();
+						return coordinator.resumeTasks();
 					})
 					.whenComplete((o, failure) -> {
 						if (failure != null) {
 							failure.printStackTrace();
 						}
 						try {
-							this.jobExecutionPlan.notifyUpdateFinished(failure);
+							this.executionPlan.notifyUpdateFinished(failure);
 						} catch (Exception e) {
 							e.printStackTrace();
 						}
@@ -848,7 +846,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		runAsync(
 			() -> {
 				if (jobAbstraction != null) {
-					this.jobExecutionPlan = new ExecutionPlanWithUpdatingFlagImpl(jobAbstraction);
+					this.executionPlan = new ExecutionPlanWithLockImpl(jobAbstraction);
 				}
 				if (newJobStatus == JobStatus.RUNNING) {
 					for (ControlPolicy policy : controlPolicyList) {
@@ -986,8 +984,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	}
 
 	@Override
-	public ExecutionPlan getJobExecutionPlan() {
-		return checkNotNull(jobExecutionPlan, "stream job abstraction (execution plan) have not been initialized");
+	public ExecutionPlan getExecutionPlan() {
+		return checkNotNull(executionPlan, "stream job abstraction (execution plan) have not been initialized");
 	}
 
 	// ------------------------------------------------------------------------
