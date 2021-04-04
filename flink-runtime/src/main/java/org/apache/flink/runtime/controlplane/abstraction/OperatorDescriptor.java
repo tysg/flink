@@ -5,7 +5,10 @@ import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.functions.Function;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.runtime.rescale.JobRescaleCoordinator;
 import org.apache.flink.util.Preconditions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Field;
 import java.util.*;
@@ -16,6 +19,8 @@ import static org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan.*;
  * this class make sure all field is not modifiable for external class
  */
 public class OperatorDescriptor {
+	private static final Logger LOG = LoggerFactory.getLogger(OperatorDescriptor.class);
+
 
 	private final int operatorID;
 	private final String name;
@@ -148,7 +153,7 @@ public class OperatorDescriptor {
 	 * @param keyStateAllocation
 	 */
 	@PublicEvolving
-	public void setKeySet(Map<Integer, List<Integer>> keyStateAllocation) {
+	public void updateKeyStateAllocation(Map<Integer, List<Integer>> keyStateAllocation) {
 		if (!stateful) {
 			System.out.println("not support now");
 			return;
@@ -160,7 +165,7 @@ public class OperatorDescriptor {
 				parent.taskConfigurations.keyMapping.put(operatorID, keyStateAllocation);
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
+			LOG.info("error while set key state allocation", e);
 		}
 	}
 
@@ -173,7 +178,7 @@ public class OperatorDescriptor {
 	 * @param keyMapping
 	 */
 	@PublicEvolving
-	public void setOutputKeyMapping(int targetOperatorID, Map<Integer, List<Integer>> keyMapping) {
+	public void updateKeyMapping(int targetOperatorID, Map<Integer, List<Integer>> keyMapping) {
 		try {
 			OperatorDescriptor child = checkOperatorIDExistInSet(targetOperatorID, children);
 			taskConfigurations.keyMapping.put(targetOperatorID, keyMapping);
@@ -181,7 +186,7 @@ public class OperatorDescriptor {
 				child.addAll(keyMapping);
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
+			LOG.info("error while set key output keymapping", e);
 		}
 	}
 
@@ -316,9 +321,9 @@ public class OperatorDescriptor {
 				field.set(operator, obj);
 				attributeMap.put(name, obj);
 			} catch (IllegalAccessException e) {
-				e.printStackTrace();
+				LOG.info("error while update field", e);
 				throw new Exception("update field fail", e);
-			}finally {
+			} finally {
 				field.setAccessible(access);
 			}
 		}

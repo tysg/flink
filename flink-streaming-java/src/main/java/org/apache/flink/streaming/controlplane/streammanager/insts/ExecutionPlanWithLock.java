@@ -18,11 +18,14 @@
 
 package org.apache.flink.streaming.controlplane.streammanager.insts;
 
-import org.apache.flink.annotation.Internal;
+import org.apache.flink.api.common.functions.Function;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
+import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan.*;
+import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 
-import javax.annotation.Nullable;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * The state of stream manager mainly contains the following information:
@@ -42,42 +45,104 @@ import javax.annotation.Nullable;
  * H represents the hosts in the cluster, each host has a certain number of CPU and memory resources.
  * T is the set of tasks, the main information in T is: number of threads owned by each task and task location.
  */
-public interface ExecutionPlanWithLock extends ExecutionPlan {
-	/**
-	 * get job graph from stream manager (the state of stream manager)
-	 *
-	 * @return current job graph of stream manager
-	 */
-//	OperatorGraphState getOperatorGraph();
+public class ExecutionPlanWithLock {
+//	implements ExecutionPlanWithLock {
 
-	/**
-	 * get user class loader of job graph (the state of stream manager)
-	 *
-	 * @return current user class loader of job graph
-	 */
-//	ClassLoader getUserClassLoader();
+	private final static int COMMITTED = 1;
+	private final static int STAGED = 0;
 
-//	/**
-//	 * @param operatorID      the id of target operarir
-//	 * @param operatorFactory the new stream operator factory
-//	 * @param <OUT>           Output type of StreamOperatorFactory
-//	 * @return the id of updated job vertex
-//	 * @throws Exception
-//	 */
-//	@Internal
-//	<OUT> JobVertexID updateOperator(OperatorID operatorID,
-//									 StreamOperatorFactory<OUT> operatorFactory,
-//									 @Nullable ControlPolicy waitingController) throws Exception;
+	private final AtomicInteger stateOfUpdate = new AtomicInteger(COMMITTED);
+	private ControlPolicy currentWaitingController;
 
-	@Internal
-	void setStateUpdatingFlag(@Nullable ControlPolicy waitingController) throws Exception;
+	private final ExecutionPlan executionPlan;
 
-	/**
-	 * Notify that current state update is finished.
-	 * This could only be invoke once
-	 *
-	 * @throws Exception
-	 */
-	@Internal
-	void notifyUpdateFinished(Throwable throwable) throws Exception;
+	public ExecutionPlanWithLock(ExecutionPlan executionPlan) {
+		this.executionPlan = executionPlan;
+	}
+
+//	@Override
+	public void setStateUpdatingFlag(ControlPolicy waitingController) throws Exception {
+		// some strategy needed here to ensure there is only one update at one time
+		if (!stateOfUpdate.compareAndSet(COMMITTED, STAGED)) {
+			throw new Exception("There is another state update not finished, the waiting controller is:" + currentWaitingController);
+		}
+		// the caller may want to wait the completion of this update.
+		currentWaitingController = waitingController;
+	}
+
+//	@Override
+	public void notifyUpdateFinished(Throwable throwable) throws Exception {
+		if (stateOfUpdate.compareAndSet(STAGED, COMMITTED)) {
+			if (currentWaitingController != null) {
+				currentWaitingController.onChangeCompleted(throwable);
+			}
+			return;
+		}
+		throw new Exception("There is not any state updating");
+	}
+
+	public ExecutionPlan getExecutionPlan() {
+		return executionPlan;
+	}
+
+	// delegate methods
+//	@Override
+	public Node[] getResourceDistribution() {
+		return executionPlan.getResourceDistribution();
+	}
+
+//	@Override
+	public TaskDescriptor getTask(Integer operatorID, int taskId) {
+		return executionPlan.getTask(operatorID, taskId);
+	}
+
+//	@Override
+	public Function getUserFunction(Integer operatorID) {
+		return executionPlan.getUserFunction(operatorID);
+	}
+
+//	@Override
+	public Map<Integer, List<Integer>> getKeyStateAllocation(Integer operatorID){
+		return executionPlan.getKeyStateAllocation(operatorID);
+	}
+
+//	@Override
+	public Map<Integer, Map<Integer, List<Integer>>> getKeyMapping(Integer operatorID) {
+		return executionPlan.getKeyMapping(operatorID);
+	}
+
+//	@Override
+	public int getParallelism(Integer operatorID) {
+		return executionPlan.getParallelism(operatorID);
+	}
+
+//	@Override
+	public Iterator<OperatorDescriptor> getAllOperator() {
+		return executionPlan.getAllOperator();
+	}
+
+//	@Override
+	public OperatorDescriptor getOperatorByID(Integer operatorID) {
+		return executionPlan.getOperatorByID(operatorID);
+	}
+
+//	@Override
+//	public ExecutionPlan redistribute(Integer operatorID, Map<Integer, List<Integer>> distribution) {
+//		return null;
+//	}
+//
+//	@Override
+//	public ExecutionPlan updateExecutionLogic(Integer operatorID, Object function) {
+//		return null;
+//	}
+//
+//	@Override
+//	public ExecutionPlan reDeploy(List<Integer> tasks, Map<Integer, Node> deployment) {
+//		return null;
+//	}
+//
+//	@Override
+//	public ExecutionPlan update(java.util.function.Function<ExecutionPlan, ExecutionPlan> applier) {
+//		return null;
+//	}
 }

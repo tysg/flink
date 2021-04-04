@@ -55,9 +55,8 @@ import org.apache.flink.runtime.rescale.reconfigure.JobGraphRescaler;
 import org.apache.flink.streaming.controlplane.jobgraph.NormalInstantiateFactory;
 import org.apache.flink.streaming.controlplane.rescale.StreamJobGraphRescaler;
 import org.apache.flink.streaming.controlplane.streammanager.exceptions.StreamManagerException;
-import org.apache.flink.streaming.controlplane.streammanager.insts.ExecutionPlanWithLock;
 import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
-import org.apache.flink.streaming.controlplane.streammanager.insts.ExecutionPlanWithLockImpl;
+import org.apache.flink.streaming.controlplane.streammanager.insts.ExecutionPlanWithLock;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 import org.apache.flink.streaming.controlplane.udm.PerformanceEvaluator;
 import org.apache.flink.util.OptionalConsumer;
@@ -372,7 +371,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 			// update the key set
 			for (OperatorDescriptor parent : targetDescriptor.getParents()) {
-				parent.setOutputKeyMapping(operatorID, keyStateAllocation);
+				parent.updateKeyMapping(operatorID, keyStateAllocation);
 			}
 
 
@@ -388,7 +387,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					CompletableFuture<?> syncFuture = FutureUtils.completedVoidFuture()
 						.thenCompose(o -> {
 							reconfigurationProfiler.onOtherStart(PREPARE);
-							return coordinator.prepareExecutionPlan(executionPlan);
+							return coordinator.prepareExecutionPlan(executionPlan.getExecutionPlan());
 						})
 						.thenCompose(o -> {
 							reconfigurationProfiler.onOtherEnd(PREPARE);
@@ -488,7 +487,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					CompletableFuture<?> syncFuture = FutureUtils.completedVoidFuture()
 						.thenCompose(o -> {
 							reconfigurationProfiler.onOtherStart(PREPARE);
-							return coordinator.prepareExecutionPlan(this.executionPlan);
+							return coordinator.prepareExecutionPlan(this.executionPlan.getExecutionPlan());
 						})
 						.thenCompose(o -> {
 							reconfigurationProfiler.onOtherEnd(PREPARE);
@@ -549,7 +548,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			OperatorDescriptor targetDescriptor = executionPlan.getOperatorByID(operatorID);
 
 			for (OperatorDescriptor parent : targetDescriptor.getParents()) {
-				parent.setOutputKeyMapping(operatorID, keyStateAllocation);
+				parent.updateKeyMapping(operatorID, keyStateAllocation);
 			}
 
 			// operatorId to TaskIdList mapping, representing affected tasks.
@@ -583,7 +582,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					CompletableFuture<?> syncFuture = FutureUtils.completedVoidFuture()
 						.thenCompose(o -> {
 							reconfigurationProfiler.onOtherStart(PREPARE);
-							return coordinator.prepareExecutionPlan(executionPlan);
+							return coordinator.prepareExecutionPlan(executionPlan.getExecutionPlan());
 						})
 						.thenCompose(o -> {
 							reconfigurationProfiler.onOtherEnd(PREPARE);
@@ -629,7 +628,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			} else {
 				runAsync(() -> jobMasterGateway.callOperations(
 					coordinator -> FutureUtils.completedVoidFuture()
-						.thenCompose(o -> coordinator.prepareExecutionPlan(executionPlan))
+						.thenCompose(o -> coordinator.prepareExecutionPlan(executionPlan.getExecutionPlan()))
 						.thenCompose(o -> coordinator.updateKeyMapping(operatorID, o))
 						.whenComplete((o, failure) -> {
 							if (failure != null) {
@@ -661,7 +660,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			Map<Integer, List<Integer>> keyStateAllocation = executionPlan.getKeyStateAllocation(operatorID);
 
 			for (OperatorDescriptor parent : targetDescriptor.getParents()) {
-				parent.setOutputKeyMapping(operatorID, keyStateAllocation);
+				parent.updateKeyMapping(operatorID, keyStateAllocation);
 			}
 
 			// operatorId to TaskIdList mapping, representing affected tasks.
@@ -694,7 +693,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					CompletableFuture<?> syncFuture = FutureUtils.completedVoidFuture()
 						.thenCompose(o -> {
 							reconfigurationProfiler.onOtherStart(PREPARE);
-							return coordinator.prepareExecutionPlan(this.executionPlan);
+							return coordinator.prepareExecutionPlan(this.executionPlan.getExecutionPlan());
 						})
 						.thenCompose(o -> {
 							reconfigurationProfiler.onOtherEnd(PREPARE);
@@ -758,7 +757,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					.thenCompose(o -> {
 						reconfigurationProfiler.onReconfigurationStart();
 						reconfigurationProfiler.onOtherStart(PREPARE);
-						return coordinator.prepareExecutionPlan(executionPlan);
+						return coordinator.prepareExecutionPlan(executionPlan.getExecutionPlan());
 					})
 					.thenCompose(o -> {
 						reconfigurationProfiler.onOtherEnd(PREPARE);
@@ -846,7 +845,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		runAsync(
 			() -> {
 				if (jobAbstraction != null) {
-					this.executionPlan = new ExecutionPlanWithLockImpl(jobAbstraction);
+					this.executionPlan = new ExecutionPlanWithLock(jobAbstraction);
 				}
 				if (newJobStatus == JobStatus.RUNNING) {
 					for (ControlPolicy policy : controlPolicyList) {
@@ -985,7 +984,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 	@Override
 	public ExecutionPlan getExecutionPlan() {
-		return checkNotNull(executionPlan, "stream job abstraction (execution plan) have not been initialized");
+		return checkNotNull(executionPlan.getExecutionPlan(), "stream job abstraction (execution plan) have not been initialized");
 	}
 
 	@Override

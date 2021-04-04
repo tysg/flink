@@ -203,7 +203,7 @@ public class PerformanceEvaluator extends AbstractControlPolicy {
 
 		// update the key set
 		for (OperatorDescriptor parent : targetDescriptor.getParents()) {
-			parent.setOutputKeyMapping(testingOpID, newKeyStateAllocation);
+			parent.updateKeyMapping(testingOpID, newKeyStateAllocation);
 		}
 
 		System.out.println(newKeyStateAllocation);

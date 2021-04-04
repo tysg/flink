@@ -142,7 +142,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 								vertex.setParallelism(heldDescriptor.getParallelism());
 								rescaleExecutionGraph(heldDescriptor.getOperatorID(), oldParallelism, operatorWorkloadsAssignment);
 							}
-							heldDescriptor.setKeySet(descriptor.getKeyStateAllocation());
+							heldDescriptor.updateKeyStateAllocation(descriptor.getKeyStateAllocation());
 							// update the partition assignment of Flink JobGrpah
 							updatePartitionAssignment(heldDescriptor, operatorWorkloadsAssignment, isRescale);
 							break;

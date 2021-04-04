@@ -42,6 +42,7 @@ import org.apache.flink.streaming.runtime.partitioner.KeyGroupStreamPartitioner;
 import org.apache.flink.streaming.runtime.partitioner.StreamPartitioner;
 import org.apache.flink.util.Preconditions;
 
+import javax.annotation.Nullable;
 import java.lang.reflect.Field;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -162,17 +163,36 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 
 	@Override
 	public ExecutionPlan redistribute(Integer operatorID, Map<Integer, List<Integer>> distribution) {
-		return null;
+		Preconditions.checkNotNull(getKeyStateAllocation(operatorID), "previous key state allocation should not be null");
+		OperatorDescriptor targetDescriptor = getOperatorByID(operatorID);
+		// update the key set
+		targetDescriptor.updateKeyStateAllocation(distribution);
+		// update the parallelism if the distribution key size is different
+		if (targetDescriptor.getParallelism() != distribution.size()) {
+			targetDescriptor.setParallelism(distribution.size());
+		}
+		// TODO: add to transformations
+		return this;
 	}
 
 	@Override
 	public ExecutionPlan updateExecutionLogic(Integer operatorID, Object function) {
-		return null;
+		return this;
 	}
 
 	@Override
-	public ExecutionPlan reDeploy(List<Integer> tasks, Map<Integer, Node> deployment) {
-		return null;
+	public ExecutionPlan reDeploy(Map<Integer, List<Integer>> tasks, @Nullable Map<Integer, List<Tuple2<Integer, Node>>> deployment) {
+		// TODO: deployment is null, default deployment, needs to assign tasks to nodes
+		// TODO: deployment is nonnull, assign tasks to target Node with resources
+		if (deployment == null) {
+		} else {
+		}
+		return this;
+	}
+
+	@Override
+	public ExecutionPlan update(java.util.function.Function<ExecutionPlan, ExecutionPlan> applier) {
+		return applier.apply(this);
 	}
 
 	public OperatorDescriptor[] getHeadOperators() {

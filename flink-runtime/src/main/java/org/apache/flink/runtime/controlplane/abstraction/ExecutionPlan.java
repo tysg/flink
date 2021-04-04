@@ -1,16 +1,15 @@
 package org.apache.flink.runtime.controlplane.abstraction;
 
-import org.apache.flink.api.common.functions.Function;
-import org.apache.flink.api.java.tuple.Tuple;
-import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.runtime.controlplane.PrimitiveOperation;
 
+import org.apache.flink.api.java.tuple.Tuple2;
+
+import javax.annotation.Nullable;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 
 /**
  * todo the interface is put in Flink runtime, seems a little not natural. another solution is
@@ -85,7 +84,7 @@ public interface ExecutionPlan {
 	 * @param operatorID the operator id of this operator
 	 * @return
 	 */
-	Function getUserFunction(Integer operatorID);
+	org.apache.flink.api.common.functions.Function getUserFunction(Integer operatorID);
 
 	/**
 	 * To get how the input key state was allocated among the sub operator instance.
@@ -128,7 +127,7 @@ public interface ExecutionPlan {
 
 	ExecutionPlan updateExecutionLogic(Integer operatorID, Object function);
 
-	ExecutionPlan reDeploy(List<Integer> tasks, Map<Integer, Node> deployment);
+	ExecutionPlan reDeploy(Map<Integer, List<Integer>> tasks, @Nullable Map<Integer, List<Tuple2<Integer, Node>>> deployment);
 
-//	ExecutionPlan update(Function applier);
+	ExecutionPlan update(Function<ExecutionPlan, ExecutionPlan> applier);
 }
