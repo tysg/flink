@@ -63,7 +63,8 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 	private final List<Node> resourceDistribution;
 
 	// transformation operations -> affected tasks grouped by operators.
-	private Map<String, Map<Integer, List<Integer>>> transformations;
+	// TODO: need to clear it every time.
+	private Map<String, Map<Integer, List<Integer>>> transformations = new HashMap<>();
 
 	@Internal
 	public ExecutionPlanImpl(JobGraph jobGraph, ExecutionGraph executionGraph, ClassLoader userLoader) {
