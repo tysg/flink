@@ -42,7 +42,7 @@ public interface ReconfigurationAPI {
 	 */
 	ExecutionPlan getExecutionPlan();
 
-	void execute();
+	void execute(ControlPolicy waitingController);
 
 	@Deprecated
 	void rescaleStreamJob(JobRescaleAction.RescaleParamsWrapper wrapper);

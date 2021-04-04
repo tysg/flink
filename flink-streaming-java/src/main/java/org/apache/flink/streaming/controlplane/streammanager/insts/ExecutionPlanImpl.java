@@ -41,13 +41,18 @@ import org.apache.flink.streaming.runtime.partitioner.AssignedKeyGroupStreamPart
 import org.apache.flink.streaming.runtime.partitioner.KeyGroupStreamPartitioner;
 import org.apache.flink.streaming.runtime.partitioner.StreamPartitioner;
 import org.apache.flink.util.Preconditions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.lang.reflect.Field;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor.ExecutionLogic.UDF;
+
 public final class ExecutionPlanImpl implements ExecutionPlan {
+	private static final Logger LOG = LoggerFactory.getLogger(ExecutionPlanImpl.class);
 	// operatorId -> operator
 	private final Map<Integer, OperatorDescriptor> operatorsMap = new LinkedHashMap<>();
 	private final OperatorDescriptor[] headOperators;
@@ -57,8 +62,8 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 	// node with resources
 	private final List<Node> resourceDistribution;
 
-	// transformation operations -> affected tasks.
-	private Map<String, Map<Integer, Integer>> transformations;
+	// transformation operations -> affected tasks grouped by operators.
+	private Map<String, Map<Integer, List<Integer>>> transformations;
 
 	@Internal
 	public ExecutionPlanImpl(JobGraph jobGraph, ExecutionGraph executionGraph, ClassLoader userLoader) {
@@ -171,21 +176,44 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 		if (targetDescriptor.getParallelism() != distribution.size()) {
 			targetDescriptor.setParallelism(distribution.size());
 		}
-		// TODO: add to transformations
+		// find out affected tasks, add them to transformations
+		Map<Integer, List<Integer>> updateStateTasks = new HashMap<>();
+		updateStateTasks.put(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
+		transformations.put("redistribute", updateStateTasks);
 		return this;
 	}
 
 	@Override
 	public ExecutionPlan updateExecutionLogic(Integer operatorID, Object function) {
+		Preconditions.checkNotNull(getUserFunction(operatorID), "previous key state allocation should not be null");
+		OperatorDescriptor targetDescriptor = getOperatorByID(operatorID);
+		try {
+			targetDescriptor.setControlAttribute(UDF, function);
+		} catch (Exception e) {
+			LOG.info("update function failed.", e);
+		}
+		// find out affected tasks, add them to transformations
+		Map<Integer, List<Integer>> updateFunctionTasks = new HashMap<>();
+		updateFunctionTasks.put(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
+		transformations.put("updateExecutionLogic", updateFunctionTasks);
 		return this;
 	}
 
 	@Override
-	public ExecutionPlan reDeploy(Map<Integer, List<Integer>> tasks, @Nullable Map<Integer, List<Tuple2<Integer, Node>>> deployment) {
+	public ExecutionPlan reDeploy(Integer operatorID, @Nullable Map<Integer, List<Tuple2<Integer, Node>>> deployment, Boolean isCreate) {
 		// TODO: deployment is null, default deployment, needs to assign tasks to nodes
 		// TODO: deployment is nonnull, assign tasks to target Node with resources
+		OperatorDescriptor targetDescriptor = getOperatorByID(operatorID);
 		if (deployment == null) {
 		} else {
+		}
+		// find out affected tasks, add them to transformations
+		Map<Integer, List<Integer>> reDeployingTasks = new HashMap<>();
+		reDeployingTasks.put(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
+		if (isCreate) {
+			transformations.put("creating", reDeployingTasks);
+		} else {
+			transformations.put("canceling", reDeployingTasks);
 		}
 		return this;
 	}
@@ -193,6 +221,11 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 	@Override
 	public ExecutionPlan update(java.util.function.Function<ExecutionPlan, ExecutionPlan> applier) {
 		return applier.apply(this);
+	}
+
+	@Override
+	public Map<String, Map<Integer, List<Integer>>> getTransformations() {
+		return transformations;
 	}
 
 	public OperatorDescriptor[] getHeadOperators() {

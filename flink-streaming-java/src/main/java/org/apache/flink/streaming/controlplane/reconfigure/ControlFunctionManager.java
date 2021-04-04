@@ -5,12 +5,12 @@ import org.apache.flink.streaming.controlplane.reconfigure.operator.ControlOpera
 import org.apache.flink.streaming.controlplane.reconfigure.type.FunctionTypeStorage;
 import org.apache.flink.streaming.controlplane.reconfigure.type.InMemoryFunctionStorge;
 import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
-import org.apache.flink.streaming.controlplane.udm.AbstractControlPolicy;
+import org.apache.flink.streaming.controlplane.udm.AbstractController;
 
 /**
  * Implement Function Transfer
  */
-public abstract class ControlFunctionManager extends AbstractControlPolicy implements ControlFunctionManagerService {
+public abstract class ControlFunctionManager extends AbstractController implements ControlFunctionManagerService {
 
 	private FunctionTypeStorage functionTypeStorage;
 

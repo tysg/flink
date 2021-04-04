@@ -58,6 +58,7 @@ import org.apache.flink.streaming.controlplane.streammanager.exceptions.StreamMa
 import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
 import org.apache.flink.streaming.controlplane.streammanager.insts.ExecutionPlanWithLock;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
+import org.apache.flink.streaming.controlplane.udm.DummyController;
 import org.apache.flink.streaming.controlplane.udm.PerformanceEvaluator;
 import org.apache.flink.util.OptionalConsumer;
 import org.slf4j.Logger;
@@ -163,9 +164,9 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		/* now the policy is temporary hard coded added */
 //		this.controlPolicyList.add(new FlinkStreamSwitchAdaptor(this, jobGraph));
 //		this.controlPolicyList.add(new TestingCFManager(this));
-//		this.controlPolicyList.add(new TestingControlPolicy(this));
-//		this.controlPolicyList.add(new DummyController(this));
-		this.controlPolicyList.add(new PerformanceEvaluator(this, streamManagerConfiguration.getConfiguration()));
+//		this.controlPolicyList.add(new TestingController(this));
+		this.controlPolicyList.add(new DummyController(this));
+//		this.controlPolicyList.add(new PerformanceEvaluator(this, streamManagerConfiguration.getConfiguration()));
 
 		reconfigurationProfiler = new ReconfigurationProfiler(streamManagerConfiguration.getConfiguration());
 	}
@@ -988,8 +989,87 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	}
 
 	@Override
-	public void execute() {
+	public void execute(ControlPolicy waitingController) {
+		try {
+			this.executionPlan.setStateUpdatingFlag(waitingController);
 
+			Map<String, Map<Integer, List<Integer>>> transformations = executionPlan.getTransformations();
+
+			// operatorId to TaskIdList mapping, representing affected tasks.
+			Boolean isScaleIn = false;
+			Map<Integer, List<Integer>> tasks = new HashMap<>();
+			Map<Integer, List<Integer>> updateStateTasks = new HashMap<>();
+			Map<Integer, List<Integer>> updateKeyMappingTasks = new HashMap<>();
+			Map<Integer, List<Integer>> deployingTasks = new HashMap<>();
+			Map<Integer, List<Integer>> updateFunctionTasks = new HashMap<>();
+			for (String operation : transformations.keySet()) {
+				Map<Integer, List<Integer>> transformation = transformations.get(operation);
+				if (operation.equals("redistribute")) {
+					updateKeyMappingTasks = transformation;
+					updateStateTasks = transformation;
+				} else if (operation.equals("creating")) {
+					deployingTasks = transformation;
+				} else if (operation.equals("canceling")) {
+					deployingTasks = transformation;
+					isScaleIn = true;
+				} else if (operation.equals("updateExecutionLogic")) {
+					updateFunctionTasks = transformation;
+				}
+				for (Integer operatorID : transformation.keySet()) {
+					tasks.putIfAbsent(operatorID, transformation.get(operatorID));
+				}
+			}
+
+			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
+			log.info("++++++ start update");
+			Map<Integer, List<Integer>> finalUpdateKeyMappingTasks = updateKeyMappingTasks;
+			Map<Integer, List<Integer>> finalUpdateStateTasks = updateStateTasks;
+			Map<Integer, List<Integer>> finalDeployingTasks = deployingTasks;
+			Boolean finalIsScaleIn = isScaleIn;
+			Map<Integer, List<Integer>> finalUpdateFunctionTasks = updateFunctionTasks;
+			runAsync(() -> jobMasterGateway.callOperations(
+				coordinator -> {
+					// prepare andsynchronize among affected tasks
+					CompletableFuture<?> syncFuture = FutureUtils.completedVoidFuture()
+						.thenCompose(o -> coordinator.prepareExecutionPlan(executionPlan.getExecutionPlan()))
+						.thenCompose(o -> coordinator.synchronizeTasks(tasks, o));
+					// run update asynchronously.
+					List<CompletableFuture<?>> updateFutureList = new ArrayList<>();
+					if (!finalUpdateKeyMappingTasks.isEmpty()) {
+						updateFutureList.add(syncFuture.thenCompose(o -> coordinator.updateKeyMapping(finalUpdateKeyMappingTasks, o)));
+					}
+					if (!finalUpdateStateTasks.isEmpty()) {
+						updateFutureList.add(syncFuture.thenCompose(o -> coordinator.updateState(finalUpdateStateTasks, o)));
+					}
+					if (!finalDeployingTasks.isEmpty()) {
+						updateFutureList.add(syncFuture.thenCompose(o -> coordinator.updateTaskResources(finalDeployingTasks, finalIsScaleIn)));
+					}
+					if (!finalUpdateFunctionTasks.isEmpty()) {
+						updateFutureList.add(syncFuture.thenCompose(o -> coordinator.updateFunction(finalUpdateFunctionTasks, o)));
+					}
+
+					// finish the reconfiguration after all asynchronous update completed
+					return FutureUtils.completeAll(updateFutureList)
+						.thenCompose(o -> coordinator.resumeTasks())
+						.whenComplete((o, failure) -> {
+							if (failure != null) {
+								LOG.error("Reconfiguration failed: ", failure);
+								failure.printStackTrace();
+							}
+							try {
+								System.out.println("++++++ finished update");
+								log.info("++++++ finished update");
+								this.executionPlan.notifyUpdateFinished(failure);
+							} catch (Exception e) {
+								e.printStackTrace();
+							}
+						});
+				}
+			));
+		} catch (Exception e) {
+			LOG.error("Reconfiguration failed: ", e);
+			e.printStackTrace();
+		}
 	}
 
 	// ------------------------------------------------------------------------

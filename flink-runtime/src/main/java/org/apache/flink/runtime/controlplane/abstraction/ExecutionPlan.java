@@ -127,7 +127,9 @@ public interface ExecutionPlan {
 
 	ExecutionPlan updateExecutionLogic(Integer operatorID, Object function);
 
-	ExecutionPlan reDeploy(Map<Integer, List<Integer>> tasks, @Nullable Map<Integer, List<Tuple2<Integer, Node>>> deployment);
+	ExecutionPlan reDeploy(Integer operatorID, @Nullable Map<Integer, List<Tuple2<Integer, Node>>> deployment, Boolean isCreate);
 
 	ExecutionPlan update(Function<ExecutionPlan, ExecutionPlan> applier);
+
+	Map<String, Map<Integer, List<Integer>>> getTransformations();
 }

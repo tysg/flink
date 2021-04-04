@@ -21,7 +21,6 @@ import static org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan.*;
 public class OperatorDescriptor {
 	private static final Logger LOG = LoggerFactory.getLogger(OperatorDescriptor.class);
 
-
 	private final int operatorID;
 	private final String name;
 

@@ -11,26 +11,26 @@ import org.apache.flink.streaming.controlplane.streammanager.insts.Reconfigurati
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class TestingControlPolicy extends AbstractControlPolicy {
+public class TestingController extends AbstractController {
 
 	private final Object object = new Object();
 	private final TestingThread testingThread;
 
-	public TestingControlPolicy(ReconfigurationAPI reconfigurationAPI) {
+	public TestingController(ReconfigurationAPI reconfigurationAPI) {
 		super(reconfigurationAPI);
 		testingThread = new TestingThread();
 	}
 
 	@Override
 	public synchronized void startControllers() {
-		System.out.println("Testing TestingControlPolicy is starting...");
+		System.out.println("Testing TestingController is starting...");
 		testingThread.setName("reconfiguration test");
 		testingThread.start();
 	}
 
 	@Override
 	public void stopControllers() {
-		System.out.println("Testing TestingControlPolicy is stopping...");
+		System.out.println("Testing TestingController is stopping...");
 		showOperatorInfo();
 	}
 

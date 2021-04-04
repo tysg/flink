@@ -11,7 +11,7 @@ import org.apache.flink.streaming.controlplane.streammanager.insts.Reconfigurati
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class DummyController extends AbstractControlPolicy {
+public class DummyController extends AbstractController {
 
 	private final Object object = new Object();
 	private final TestingThread testingThread;
@@ -23,14 +23,14 @@ public class DummyController extends AbstractControlPolicy {
 
 	@Override
 	public synchronized void startControllers() {
-		System.out.println("Testing TestingControlPolicy is starting...");
+		System.out.println("Testing TestingController is starting...");
 		testingThread.setName("reconfiguration test");
 		testingThread.start();
 	}
 
 	@Override
 	public void stopControllers() {
-		System.out.println("Testing TestingControlPolicy is stopping...");
+		System.out.println("Testing TestingController is stopping...");
 		showOperatorInfo();
 	}
 
@@ -246,6 +246,30 @@ public class DummyController extends AbstractControlPolicy {
 		}
 	}
 
+	private void rescaleV2(int operatorId, int newParallelism) throws InterruptedException {
+		ExecutionPlan executionPlan = getReconfigurationExecutor().getExecutionPlan();
+
+		Map<Integer, List<Integer>> curKeyStateAllocation = executionPlan.getKeyStateAllocation(operatorId);
+		int oldParallelism = executionPlan.getParallelism(operatorId);
+		assert oldParallelism == curKeyStateAllocation.size() : "old parallelism does not match the key set";
+
+		Map<Integer, List<Integer>> newKeyStateAllocation = preparePartitionAssignment(newParallelism);
+
+		int maxParallelism = 128;
+		for (int i = 0; i < maxParallelism; i++) {
+			newKeyStateAllocation.get(i%newParallelism).add(i);
+		}
+		executionPlan
+			.redistribute(operatorId, newKeyStateAllocation)
+			.reDeploy(operatorId, null, newParallelism>oldParallelism);
+
+		getReconfigurationExecutor().execute(this);
+
+		synchronized (object) {
+			object.wait();
+		}
+	}
+
 	private Map<Integer, List<Integer>> preparePartitionAssignment(int parallleism) {
 		Map<Integer, List<Integer>> newKeyStateAllocation = new HashMap<>();
 		for (int i = 0; i < parallleism; i++) {
@@ -443,14 +467,14 @@ public class DummyController extends AbstractControlPolicy {
 
 //				for (int i=0; i<100; i++) {
 
-				int i = 0;
-				while(true) {
-					testScaling(statefulOpID, (i%10 + 1));
-					sleep(100);
-					i++;
-				}
+//				int i = 0;
+//				while(true) {
+//					testScaling(statefulOpID, (i%10 + 1));
+//					sleep(100);
+//					i++;
+//				}
 
-//				testScaling(statefulOpID, 2);
+				testScaling(statefulOpID, 2);
 //				sleep(100);
 //				testScaling(statefulOpID, 3);
 //				sleep(100);

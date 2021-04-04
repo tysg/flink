@@ -12,7 +12,7 @@ import java.util.*;
 
 import static org.apache.flink.util.Preconditions.checkState;
 
-public class PerformanceEvaluator extends AbstractControlPolicy {
+public class PerformanceEvaluator extends AbstractController {
 	private static final Logger LOG = LoggerFactory.getLogger(PerformanceEvaluator.class);
 
 	private final Object lock = new Object();

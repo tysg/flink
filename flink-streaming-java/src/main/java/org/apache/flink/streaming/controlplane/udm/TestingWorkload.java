@@ -25,7 +25,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * This class should not be edited. This is a test work load for TestingControlPolicy.
+ * This class should not be edited. This is a test work load for TestingController.
  * To use this workload, copy it in another module and package it (may need to modify the package name).
  *
  *

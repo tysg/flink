@@ -19,11 +19,14 @@
 package org.apache.flink.streaming.controlplane.streammanager.insts;
 
 import org.apache.flink.api.common.functions.Function;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan.*;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -127,22 +130,26 @@ public class ExecutionPlanWithLock {
 	}
 
 //	@Override
-//	public ExecutionPlan redistribute(Integer operatorID, Map<Integer, List<Integer>> distribution) {
-//		return null;
-//	}
+	public ExecutionPlan redistribute(Integer operatorID, Map<Integer, List<Integer>> distribution) {
+		return executionPlan.redistribute(operatorID, distribution);
+	}
 //
 //	@Override
-//	public ExecutionPlan updateExecutionLogic(Integer operatorID, Object function) {
-//		return null;
-//	}
-//
+	public ExecutionPlan updateExecutionLogic(Integer operatorID, Object function) {
+		return executionPlan.updateExecutionLogic(operatorID, function);
+	}
+
 //	@Override
-//	public ExecutionPlan reDeploy(List<Integer> tasks, Map<Integer, Node> deployment) {
-//		return null;
-//	}
-//
+	public ExecutionPlan reDeploy(Integer operatorID, @Nullable Map<Integer, List<Tuple2<Integer, Node>>> deployment, Boolean isCreate) {
+		return executionPlan.reDeploy(operatorID, deployment, isCreate);
+	}
+
 //	@Override
-//	public ExecutionPlan update(java.util.function.Function<ExecutionPlan, ExecutionPlan> applier) {
-//		return null;
-//	}
+	public ExecutionPlan update(java.util.function.Function<ExecutionPlan, ExecutionPlan> applier) {
+		return executionPlan.update(applier);
+	}
+
+	public Map<String, Map<Integer, List<Integer>>> getTransformations() {
+		return executionPlan.getTransformations();
+	}
 }
