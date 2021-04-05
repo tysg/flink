@@ -56,7 +56,6 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 	// operatorId -> operator
 	private final Map<Integer, OperatorDescriptor> operatorsMap = new LinkedHashMap<>();
 	private final OperatorDescriptor[] headOperators;
-
 	// operatorId -> task
 	private final Map<Integer, Map<Integer, TaskDescriptor>> operatorToTaskMap = new HashMap<>();
 	// node with resources
@@ -129,7 +128,7 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 			OperatorDescriptorVisitor.attachOperator(descriptor).setKeyStateAllocation(keyStateAllocation);
 			// add execution logic info
 			try {
-				attachAppLogicToOperatorDescriptor(descriptor, streamConfigMap.get(descriptor.getOperatorID()), userCodeLoader);
+				initializeFunction(descriptor, streamConfigMap.get(descriptor.getOperatorID()), userCodeLoader);
 			} catch (IllegalAccessException e) {
 				e.printStackTrace();
 			}
@@ -172,15 +171,28 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 		Preconditions.checkNotNull(getKeyStateAllocation(operatorID), "previous key state allocation should not be null");
 		OperatorDescriptor targetDescriptor = getOperatorByID(operatorID);
 		// update the key set
-		targetDescriptor.updateKeyStateAllocation(distribution);
+//		targetDescriptor.updateKeyStateAllocation(distribution);
+		// update the key set
+		Map<Integer, List<Integer>> remappingTasks = transformations.getOrDefault("remapping", new HashMap<>());
+		for (OperatorDescriptor parent : targetDescriptor.getParents()) {
+			parent.updateKeyMapping(operatorID, distribution);
+			remappingTasks.put(parent.getOperatorID(), parent.getTaskIds());
+		}
 		// update the parallelism if the distribution key size is different
 		if (targetDescriptor.getParallelism() != distribution.size()) {
+			Map<Integer, List<Integer>> downStreamTasks = transformations.getOrDefault("downstream", new HashMap<>());
 			targetDescriptor.setParallelism(distribution.size());
+			// put tasks in downstream vertex
+			targetDescriptor.getChildren()
+				.forEach(c -> downStreamTasks.put(c.getOperatorID(), c.getTaskIds()));
+			transformations.put("downstream", downStreamTasks);
 		}
 		// find out affected tasks, add them to transformations
-		Map<Integer, List<Integer>> updateStateTasks = new HashMap<>();
+		Map<Integer, List<Integer>> updateStateTasks = transformations.getOrDefault("redistribute", new HashMap<>());
 		updateStateTasks.put(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
+
 		transformations.put("redistribute", updateStateTasks);
+		transformations.put("remapping", remappingTasks);
 		return this;
 	}
 
@@ -194,32 +206,36 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 			LOG.info("update function failed.", e);
 		}
 		// find out affected tasks, add them to transformations
-		Map<Integer, List<Integer>> updateFunctionTasks = new HashMap<>();
-		updateFunctionTasks.put(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
+		Map<Integer, List<Integer>> updateFunctionTasks = transformations.getOrDefault("updateExecutionLogic", new HashMap<>());
+		updateFunctionTasks.putIfAbsent(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
 		transformations.put("updateExecutionLogic", updateFunctionTasks);
 		return this;
 	}
 
 	@Override
-	public ExecutionPlan reDeploy(Integer operatorID, @Nullable Map<Integer, List<Tuple2<Integer, Node>>> deployment, Boolean isCreate) {
+	public ExecutionPlan redeploy(Integer operatorID, @Nullable Map<Integer, Node> deployment, Boolean isCreate) {
 		// TODO: deployment is null, default deployment, needs to assign tasks to nodes
 		// TODO: deployment is nonnull, assign tasks to target Node with resources
 		OperatorDescriptor targetDescriptor = getOperatorByID(operatorID);
 		if (deployment == null) {
 		} else {
 		}
-		// find out affected tasks, add them to transformations
-		Map<Integer, List<Integer>> reDeployingTasks = new HashMap<>();
-		reDeployingTasks.put(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
+		// find out affected tasks, add them to transformations, by far, we only need add all tasks into the set.
 		if (isCreate) {
+			// add to the value
+			Map<Integer, List<Integer>> reDeployingTasks = transformations.getOrDefault("creating", new HashMap<>());
+			reDeployingTasks.putIfAbsent(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
 			transformations.put("creating", reDeployingTasks);
 		} else {
+			Map<Integer, List<Integer>> reDeployingTasks = transformations.getOrDefault("canceling", new HashMap<>());
+			reDeployingTasks.putIfAbsent(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
 			transformations.put("canceling", reDeployingTasks);
 		}
 		return this;
 	}
 
 	@Override
+	// users need to implement their own update executionplan + add transformations
 	public ExecutionPlan update(java.util.function.Function<ExecutionPlan, ExecutionPlan> applier) {
 		return applier.apply(this);
 	}
@@ -227,6 +243,11 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 	@Override
 	public Map<String, Map<Integer, List<Integer>>> getTransformations() {
 		return transformations;
+	}
+
+	@Override
+	public void clearTransformations() {
+		transformations.clear();
 	}
 
 	public OperatorDescriptor[] getHeadOperators() {
@@ -279,7 +300,7 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 		return operatorToTaskMap.get(operatorID).get(taskId);
 	}
 
-	private static void attachAppLogicToOperatorDescriptor(
+	private static void initializeFunction(
 		OperatorDescriptor descriptor,
 		StreamConfig config,
 		ClassLoader userCodeLoader) throws IllegalAccessException {

@@ -55,6 +55,7 @@ import org.apache.flink.runtime.rescale.reconfigure.JobGraphRescaler;
 import org.apache.flink.streaming.controlplane.jobgraph.NormalInstantiateFactory;
 import org.apache.flink.streaming.controlplane.rescale.StreamJobGraphRescaler;
 import org.apache.flink.streaming.controlplane.streammanager.exceptions.StreamManagerException;
+import org.apache.flink.streaming.controlplane.streammanager.insts.ExecutionPlanImpl;
 import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
 import org.apache.flink.streaming.controlplane.streammanager.insts.ExecutionPlanWithLock;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
@@ -64,6 +65,7 @@ import org.apache.flink.util.OptionalConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.naming.ldap.Control;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
@@ -989,14 +991,21 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	}
 
 	@Override
-	public void execute(ControlPolicy waitingController) {
+	public ExecutionPlanWithLock getExecutionPlanWithLock() {
+//		ExecutionPlan executionPlanCopy = new ExecutionPlanImpl();
+//		ExecutionPlanWithLock executionPlanWithLockCopy = new ExecutionPlanWithLock(executionPlan.getExecutionPlan());
+		return executionPlan;
+	}
+
+	@Override
+	public void execute(ControlPolicy controller) {
 		try {
-			this.executionPlan.setStateUpdatingFlag(waitingController);
+			executionPlan.setStateUpdatingFlag(controller);
 
 			Map<String, Map<Integer, List<Integer>>> transformations = executionPlan.getTransformations();
 
 			// operatorId to TaskIdList mapping, representing affected tasks.
-			Boolean isScaleIn = false;
+			boolean isScaleIn = false;
 			Map<Integer, List<Integer>> tasks = new HashMap<>();
 			Map<Integer, List<Integer>> updateStateTasks = new HashMap<>();
 			Map<Integer, List<Integer>> updateKeyMappingTasks = new HashMap<>();
@@ -1004,16 +1013,22 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			Map<Integer, List<Integer>> updateFunctionTasks = new HashMap<>();
 			for (String operation : transformations.keySet()) {
 				Map<Integer, List<Integer>> transformation = transformations.get(operation);
-				if (operation.equals("redistribute")) {
-					updateKeyMappingTasks = transformation;
-					updateStateTasks = transformation;
-				} else if (operation.equals("creating")) {
-					deployingTasks = transformation;
-				} else if (operation.equals("canceling")) {
-					deployingTasks = transformation;
-					isScaleIn = true;
-				} else if (operation.equals("updateExecutionLogic")) {
-					updateFunctionTasks = transformation;
+				switch (operation) {
+					case "redistribute":
+						// TODO: by far, we find the upstream operators of target operator to do remapp, should update to only use "remapping"
+						updateKeyMappingTasks = transformation;
+						updateStateTasks = transformation;
+						break;
+					case "creating":
+						deployingTasks = transformation;
+						break;
+					case "canceling":
+						deployingTasks = transformation;
+						isScaleIn = true;
+						break;
+					case "updateExecutionLogic":
+						updateFunctionTasks = transformation;
+						break;
 				}
 				for (Integer operatorID : transformation.keySet()) {
 					tasks.putIfAbsent(operatorID, transformation.get(operatorID));
@@ -1025,7 +1040,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			Map<Integer, List<Integer>> finalUpdateKeyMappingTasks = updateKeyMappingTasks;
 			Map<Integer, List<Integer>> finalUpdateStateTasks = updateStateTasks;
 			Map<Integer, List<Integer>> finalDeployingTasks = deployingTasks;
-			Boolean finalIsScaleIn = isScaleIn;
+			boolean finalIsScaleIn = isScaleIn;
 			Map<Integer, List<Integer>> finalUpdateFunctionTasks = updateFunctionTasks;
 			runAsync(() -> jobMasterGateway.callOperations(
 				coordinator -> {
@@ -1035,6 +1050,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						.thenCompose(o -> coordinator.synchronizeTasks(tasks, o));
 					// run update asynchronously.
 					List<CompletableFuture<?>> updateFutureList = new ArrayList<>();
+					// TODO: by far, our method only support one operator, need to extend to support multiple operators.
 					if (!finalUpdateKeyMappingTasks.isEmpty()) {
 						updateFutureList.add(syncFuture.thenCompose(o -> coordinator.updateKeyMapping(finalUpdateKeyMappingTasks, o)));
 					}
@@ -1059,7 +1075,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 							try {
 								System.out.println("++++++ finished update");
 								log.info("++++++ finished update");
-								this.executionPlan.notifyUpdateFinished(failure);
+								executionPlan.clearTransformations();
+								executionPlan.notifyUpdateFinished(failure);
 							} catch (Exception e) {
 								e.printStackTrace();
 							}

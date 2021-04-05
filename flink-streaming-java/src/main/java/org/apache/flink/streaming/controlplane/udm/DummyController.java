@@ -6,6 +6,7 @@ import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
 import org.apache.flink.streaming.api.windowing.triggers.CountTrigger;
 import org.apache.flink.streaming.api.windowing.triggers.PurgingTrigger;
+import org.apache.flink.streaming.controlplane.streammanager.insts.ExecutionPlanWithLock;
 import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
 
 import java.util.*;
@@ -247,21 +248,22 @@ public class DummyController extends AbstractController {
 	}
 
 	private void rescaleV2(int operatorId, int newParallelism) throws InterruptedException {
-		ExecutionPlan executionPlan = getReconfigurationExecutor().getExecutionPlan();
+		// get the execution plan, will throw an exception if the execution plan is in used
+		ExecutionPlanWithLock executionPlan = getReconfigurationExecutor().getExecutionPlanWithLock();
 
-		Map<Integer, List<Integer>> curKeyStateAllocation = executionPlan.getKeyStateAllocation(operatorId);
+		Map<Integer, List<Integer>> curKeyDistribution = executionPlan.getKeyDistribution(operatorId);
 		int oldParallelism = executionPlan.getParallelism(operatorId);
-		assert oldParallelism == curKeyStateAllocation.size() : "old parallelism does not match the key set";
+		assert oldParallelism == curKeyDistribution.size() : "old parallelism does not match the key set";
 
-		Map<Integer, List<Integer>> newKeyStateAllocation = preparePartitionAssignment(newParallelism);
+		Map<Integer, List<Integer>> newKeyDistribution = preparePartitionAssignment(newParallelism);
 
 		int maxParallelism = 128;
 		for (int i = 0; i < maxParallelism; i++) {
-			newKeyStateAllocation.get(i%newParallelism).add(i);
+			newKeyDistribution.get(i%newParallelism).add(i);
 		}
 		executionPlan
-			.redistribute(operatorId, newKeyStateAllocation)
-			.reDeploy(operatorId, null, newParallelism>oldParallelism);
+			.redistribute(operatorId, newKeyDistribution)
+			.redeploy(operatorId, null, newParallelism>oldParallelism);
 
 		getReconfigurationExecutor().execute(this);
 
@@ -474,7 +476,11 @@ public class DummyController extends AbstractController {
 //					i++;
 //				}
 
-				testScaling(statefulOpID, 2);
+//				rescaleV2(statefulOpID, 2);
+//				testScaling(statefulOpID, 2);
+				rescaleV2(statefulOpID, 10);
+//				testScaling(statefulOpID, 10);
+
 //				sleep(100);
 //				testScaling(statefulOpID, 3);
 //				sleep(100);
