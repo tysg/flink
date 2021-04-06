@@ -25,7 +25,7 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.controlplane.PrimitiveOperation;
-import org.apache.flink.runtime.controlplane.StreamRelatedInstanceFactory;
+import org.apache.flink.runtime.controlplane.ExecutionPlanFactory;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
@@ -52,20 +52,17 @@ import org.apache.flink.runtime.rpc.akka.AkkaRpcServiceUtils;
 import org.apache.flink.runtime.util.profiling.ReconfigurationProfiler;
 import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
 import org.apache.flink.runtime.rescale.reconfigure.JobGraphRescaler;
-import org.apache.flink.streaming.controlplane.jobgraph.NormalInstantiateFactory;
+import org.apache.flink.streaming.controlplane.jobgraph.DefaultExecutionPlanFactory;
 import org.apache.flink.streaming.controlplane.rescale.StreamJobGraphRescaler;
 import org.apache.flink.streaming.controlplane.streammanager.exceptions.StreamManagerException;
-import org.apache.flink.streaming.controlplane.streammanager.insts.ExecutionPlanImpl;
 import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
 import org.apache.flink.streaming.controlplane.streammanager.insts.ExecutionPlanWithLock;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 import org.apache.flink.streaming.controlplane.udm.DummyController;
-import org.apache.flink.streaming.controlplane.udm.PerformanceEvaluator;
 import org.apache.flink.util.OptionalConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.naming.ldap.Control;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
@@ -864,8 +861,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	}
 
 	@Override
-	public StreamRelatedInstanceFactory getStreamRelatedInstanceFactory() {
-		return NormalInstantiateFactory.INSTANCE;
+	public ExecutionPlanFactory getStreamRelatedInstanceFactory() {
+		return DefaultExecutionPlanFactory.INSTANCE;
 	}
 
 	/**

@@ -2,7 +2,7 @@ package org.apache.flink.runtime.rescale.reconfigure;
 
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.controlplane.PrimitiveOperation;
-import org.apache.flink.runtime.controlplane.StreamRelatedInstanceFactory;
+import org.apache.flink.runtime.controlplane.ExecutionPlanFactory;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptorVisitor;
@@ -31,7 +31,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 	protected ExecutionGraph executionGraph;
 	protected ClassLoader userCodeClassLoader;
 
-	private StreamRelatedInstanceFactory streamRelatedInstanceFactory;
+	private ExecutionPlanFactory executionPlanFactory;
 
 	private JobGraphUpdater jobGraphUpdater;
 	protected WorkloadsAssignmentHandler workloadsAssignmentHandler;
@@ -54,16 +54,16 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 		this.createdCandidates = new HashMap<>();
 	}
 
-	public void setStreamRelatedInstanceFactory(StreamRelatedInstanceFactory streamRelatedInstanceFactory) {
-		heldExecutionPlan = streamRelatedInstanceFactory.createExecutionPlan(jobGraph, executionGraph, userCodeClassLoader);
+	public void setStreamRelatedInstanceFactory(ExecutionPlanFactory executionPlanFactory) {
+		heldExecutionPlan = executionPlanFactory.createExecutionPlan(jobGraph, executionGraph, userCodeClassLoader);
 		workloadsAssignmentHandler = new WorkloadsAssignmentHandler(heldExecutionPlan);
-		jobGraphUpdater = streamRelatedInstanceFactory.createJobGraphUpdater(jobGraph, userCodeClassLoader);
+		jobGraphUpdater = executionPlanFactory.createJobGraphUpdater(jobGraph, userCodeClassLoader);
 		operatorIDMap = jobGraphUpdater.getOperatorIDMap();
-		this.streamRelatedInstanceFactory = streamRelatedInstanceFactory;
+		this.executionPlanFactory = executionPlanFactory;
 	}
 
 	public ExecutionPlan getHeldExecutionPlanCopy() {
-		ExecutionPlan executionPlan = streamRelatedInstanceFactory.createExecutionPlan(jobGraph, executionGraph, userCodeClassLoader);
+		ExecutionPlan executionPlan = executionPlanFactory.createExecutionPlan(jobGraph, executionGraph, userCodeClassLoader);
 		for (Iterator<OperatorDescriptor> it = executionPlan.getAllOperator(); it.hasNext(); ) {
 			OperatorDescriptor descriptor = it.next();
 			OperatorDescriptor heldDescriptor = heldExecutionPlan.getOperatorByID(descriptor.getOperatorID());

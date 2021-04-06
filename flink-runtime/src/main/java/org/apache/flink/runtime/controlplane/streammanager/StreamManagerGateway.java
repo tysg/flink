@@ -22,7 +22,7 @@ import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
-import org.apache.flink.runtime.controlplane.StreamRelatedInstanceFactory;
+import org.apache.flink.runtime.controlplane.ExecutionPlanFactory;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobmaster.JobMaster;
@@ -83,6 +83,6 @@ public interface StreamManagerGateway extends FencedRpcGateway<StreamManagerId> 
 	 */
 	void jobStatusChanged(JobID jobId, JobStatus newJobStatus, long timestamp, Throwable error, ExecutionPlan jobAbstraction);
 
-	StreamRelatedInstanceFactory getStreamRelatedInstanceFactory();
+	ExecutionPlanFactory getStreamRelatedInstanceFactory();
 
 }

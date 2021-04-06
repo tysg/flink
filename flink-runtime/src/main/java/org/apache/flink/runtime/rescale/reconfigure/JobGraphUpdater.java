@@ -6,7 +6,7 @@ import org.apache.flink.runtime.jobgraph.OperatorID;
 
 import java.util.Map;
 
-public interface JobGraphUpdater extends JobGraphRescaler{
+public interface JobGraphUpdater extends JobGraphRescaler {
 
 	/**
 	 *

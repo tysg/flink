@@ -469,16 +469,19 @@ public class DummyController extends AbstractController {
 
 //				for (int i=0; i<100; i++) {
 
-//				int i = 0;
-//				while(true) {
-//					testScaling(statefulOpID, (i%10 + 1));
-//					sleep(100);
-//					i++;
-//				}
+				int i = 0;
+				while(true) {
+					rescaleV2(statefulOpID, (i%10 + 1));
+					sleep(100);
+					i++;
+				}
+//				rescaleV2(statefulOpID, 10);
+//				sleep(100);
+//				rescaleV2(statefulOpID, 5);
+//				sleep(100);
+//				rescaleV2(statefulOpID, 10);
 
-//				rescaleV2(statefulOpID, 2);
 //				testScaling(statefulOpID, 2);
-				rescaleV2(statefulOpID, 10);
 //				testScaling(statefulOpID, 10);
 
 //				sleep(100);
