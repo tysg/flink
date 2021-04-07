@@ -44,7 +44,7 @@ public interface ReconfigurationAPI {
 
 	ExecutionPlanWithLock getExecutionPlanWithLock();
 
-	void execute(ControlPolicy controller);
+	void execute(ControlPolicy controller, ExecutionPlanWithLock executionPlanCopy);
 
 	@Deprecated
 	void rescaleStreamJob(JobRescaleAction.RescaleParamsWrapper wrapper);

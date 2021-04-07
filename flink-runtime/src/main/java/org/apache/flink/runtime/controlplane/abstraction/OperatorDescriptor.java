@@ -5,7 +5,6 @@ import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.functions.Function;
 import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.runtime.rescale.JobRescaleCoordinator;
 import org.apache.flink.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,6 +33,13 @@ public class OperatorDescriptor {
 		this.operatorID = operatorID;
 		this.name = name;
 		this.taskConfigurations = new TaskConfigurations(parallelism, tasks);
+	}
+
+	public OperatorDescriptor(int operatorID, String name, Boolean stateful, TaskConfigurations taskConfigurations) {
+		this.operatorID = operatorID;
+		this.name = name;
+		this.taskConfigurations = taskConfigurations;
+		this.stateful = stateful;
 	}
 
 	public int getOperatorID() {
@@ -88,6 +94,10 @@ public class OperatorDescriptor {
 
 	public Map<String, Object> getControlAttributeMap() {
 		return Collections.unmodifiableMap(taskConfigurations.executionLogic.attributeMap);
+	}
+
+	public TaskDescriptor getTask(int taskId) {
+		return taskConfigurations.tasks.get(taskId);
 	}
 
 	@Internal
@@ -229,10 +239,23 @@ public class OperatorDescriptor {
 		}
 	}
 
+	public void addChildren(OperatorDescriptor child) {
+		children.add(child);
+	}
+
+	public void addParent(OperatorDescriptor parent) {
+		parents.add(parent);
+	}
+
 	@Override
 	public String toString() {
 		return "OperatorDescriptor{name='" + name + "'', parallelism=" + taskConfigurations.parallelism +
 			", parents:" + parents.size() + ", children:" + children.size() + '}';
+	}
+
+	public OperatorDescriptor copy(List<Node> resourceDistributionCopy) {
+		TaskConfigurations taskConfigurationsCopy = taskConfigurations.copy(resourceDistributionCopy);
+		return new OperatorDescriptor(operatorID, name, stateful, taskConfigurationsCopy);
 	}
 
 	/**
@@ -257,6 +280,47 @@ public class OperatorDescriptor {
 			keyMapping = new HashMap<>();
 			executionLogic = new ExecutionLogic();
 			this.tasks = tasks;
+		}
+
+		TaskConfigurations(int parallelism,
+						   ExecutionLogic executionLogic,
+						   Map<Integer, List<Integer>> keyStateAllocation,
+						   Map<Integer, Map<Integer, List<Integer>>> keyMapping,
+						   Map<Integer, TaskDescriptor> tasks) {
+			this.parallelism = parallelism;
+			this.executionLogic = executionLogic;
+			this.keyStateAllocation = keyStateAllocation;
+			this.keyMapping = keyMapping;
+			this.tasks = tasks;
+		}
+
+		public TaskConfigurations copy(List<Node> resourceDistributionCopy) {
+			ExecutionLogic executionLogicCopy = executionLogic.copy();
+			Map<Integer, TaskDescriptor> tasksCopy = new HashMap<>();
+			for (Integer taskId : tasks.keySet()) {
+				for (Node nodeCopy : resourceDistributionCopy) {
+					if (tasks.get(taskId).location.nodeAddress.equals(nodeCopy.nodeAddress)) {
+						TaskDescriptor taskCopy = tasks.get(taskId).copy(nodeCopy);
+						tasksCopy.put(taskId, taskCopy);
+					}
+				}
+			}
+			Map<Integer, List<Integer>> keyStateAllocationCopy = new HashMap<>();
+			copyKeySet(keyStateAllocation, keyStateAllocationCopy);
+			Map<Integer, Map<Integer, List<Integer>>> keyMappingCopy = new HashMap<>();
+			for (Integer operatorID : keyMapping.keySet()) {
+				Map<Integer, List<Integer>> keySetCopy = new HashMap<>();
+				copyKeySet(keyMapping.get(operatorID), keySetCopy);
+				keyMappingCopy.put(operatorID, keySetCopy);
+			}
+			return new TaskConfigurations(parallelism, executionLogicCopy, keyStateAllocationCopy, keyMappingCopy, tasksCopy);
+		}
+
+		private void copyKeySet(Map<Integer, List<Integer>> keyset, Map<Integer, List<Integer>> keysetCopy) {
+			for (Integer taskId : keyset.keySet()) {
+				List<Integer> keysCopy = new ArrayList<>(keyset.get(taskId));
+				keysetCopy.put(taskId, keysCopy);
+			}
 		}
 	}
 
@@ -325,6 +389,15 @@ public class OperatorDescriptor {
 			} finally {
 				field.setAccessible(access);
 			}
+		}
+
+		public ExecutionLogic copy() {
+			ExecutionLogic executionLogicCopy = new ExecutionLogic();
+			executionLogicCopy.attributeMap.putAll(attributeMap);
+			executionLogicCopy.fields.putAll(fields);
+			executionLogicCopy.udf = udf;
+			executionLogicCopy.operator = operator;
+			return executionLogicCopy;
 		}
 	}
 

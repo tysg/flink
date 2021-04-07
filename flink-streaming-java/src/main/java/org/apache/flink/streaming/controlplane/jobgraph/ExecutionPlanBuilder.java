@@ -3,9 +3,9 @@ package org.apache.flink.streaming.controlplane.jobgraph;
 import org.apache.flink.api.common.functions.Function;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
-import org.apache.flink.runtime.controlplane.ExecutionPlanFactory;
 import org.apache.flink.runtime.controlplane.abstraction.ControlAttribute;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
+import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan.*;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptorVisitor;
 import org.apache.flink.runtime.execution.ExecutionState;
@@ -17,7 +17,6 @@ import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobmaster.LogicalSlot;
-import org.apache.flink.runtime.rescale.reconfigure.JobGraphUpdater;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.graph.StreamEdge;
 import org.apache.flink.streaming.api.operators.SimpleUdfStreamOperatorFactory;
@@ -28,30 +27,21 @@ import org.apache.flink.streaming.runtime.partitioner.AssignedKeyGroupStreamPart
 import org.apache.flink.streaming.runtime.partitioner.KeyGroupStreamPartitioner;
 import org.apache.flink.streaming.runtime.partitioner.StreamPartitioner;
 import org.apache.flink.util.Preconditions;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Field;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public enum DefaultExecutionPlanFactory implements ExecutionPlanFactory {
-	INSTANCE;
-
-	private static final Logger LOG = LoggerFactory.getLogger(ExecutionPlanImpl.class);
+public class ExecutionPlanBuilder {
 	// operatorId -> operator
 	private final Map<Integer, OperatorDescriptor> operatorsMap = new LinkedHashMap<>();
-	private OperatorDescriptor[] headOperators;
+	private final OperatorDescriptor[] headOperators;
 	// operatorId -> task
-	private final Map<Integer, Map<Integer, ExecutionPlan.TaskDescriptor>> operatorToTaskMap = new HashMap<>();
+	private final Map<Integer, Map<Integer, TaskDescriptor>> operatorToTaskMap = new HashMap<>();
 	// node with resources
-	private List<ExecutionPlan.Node> resourceDistribution;
+	private final List<Node> resourceDistribution;
 
-	// transformation operations -> affected tasks grouped by operators.
-	private final Map<String, Map<Integer, List<Integer>>> transformations = new HashMap<>();
-
-	@Override
-	public ExecutionPlan createExecutionPlan(JobGraph jobGraph, ExecutionGraph executionGraph, ClassLoader userClassLoader) {
+	public ExecutionPlanBuilder(JobGraph jobGraph, ExecutionGraph executionGraph, ClassLoader userClassLoader) {
 		Map<OperatorID, Integer> operatorIdToVertexId = new HashMap<>();
 		for (JobVertex vertex : jobGraph.getVertices()) {
 			StreamConfig streamConfig = new StreamConfig(vertex.getConfiguration());
@@ -62,24 +52,23 @@ public enum DefaultExecutionPlanFactory implements ExecutionPlanFactory {
 		}
 		resourceDistribution = initDeploymentGraphState(executionGraph, operatorIdToVertexId);
 		headOperators = initializeOperatorGraphState(jobGraph, userClassLoader);
-
-//		return new ExecutionPlanImpl(jobGraph, executionGraph, userClassLoader);
-		return new ExecutionPlanImpl(operatorsMap, headOperators, operatorToTaskMap, resourceDistribution);
 	}
 
-	@Override
-	public JobGraphUpdater createJobGraphUpdater(JobGraph jobGraph, ClassLoader classLoader) {
-		return new StreamJobGraphUpdater(jobGraph, classLoader);
+
+	public ExecutionPlanImpl build() {
+//		return new ExecutionPlanImpl(operatorsMap, headOperators, operatorToTaskMap, resourceDistribution);
+//		return new ExecutionPlanImpl(operatorsMap, operatorToTaskMap, resourceDistribution);
+		return new ExecutionPlanImpl(operatorsMap, resourceDistribution);
 	}
 
 	// DeployGraphState related
-	private List<ExecutionPlan.Node> initDeploymentGraphState(ExecutionGraph executionGraph, Map<OperatorID, Integer> operatorIdToVertexId) {
-		Map<ResourceID, ExecutionPlan.Node> hosts = new HashMap<>();
+	private List<Node> initDeploymentGraphState(ExecutionGraph executionGraph, Map<OperatorID, Integer> operatorIdToVertexId) {
+		Map<ResourceID, Node> hosts = new HashMap<>();
 
 		for (ExecutionJobVertex jobVertex : executionGraph.getAllVertices().values()) {
 			// contains all tasks of the same parallel operator instances
 //			List<Task> taskList = new ArrayList<>(jobVertex.getParallelism());
-			Map<Integer, ExecutionPlan.TaskDescriptor> taskMap = new HashMap<>();
+			Map<Integer, TaskDescriptor> taskMap = new HashMap<>();
 			for (ExecutionVertex vertex : jobVertex.getTaskVertices()) {
 				Execution execution;
 				do {
@@ -92,13 +81,13 @@ public enum DefaultExecutionPlanFactory implements ExecutionPlanFactory {
 					}
 				} while (execution == null || execution.getState() != ExecutionState.RUNNING);
 				LogicalSlot slot = execution.getAssignedResource();
-				ExecutionPlan.Node node = hosts.get(slot.getTaskManagerLocation().getResourceID());
+				Node node = hosts.get(slot.getTaskManagerLocation().getResourceID());
 				if (node == null) {
-					node = new ExecutionPlan.Node(slot.getTaskManagerLocation().address(), 0);
+					node = new Node(slot.getTaskManagerLocation().address(), 0);
 					hosts.put(slot.getTaskManagerLocation().getResourceID(), node);
 				}
 				// todo how to get number of slots?
-				ExecutionPlan.TaskDescriptor task = new ExecutionPlan.TaskDescriptor(slot.getPhysicalSlotNumber(), node);
+				TaskDescriptor task = new TaskDescriptor(slot.getPhysicalSlotNumber(), node);
 				taskMap.put(vertex.getParallelSubtaskIndex(), task);
 			}
 			for (OperatorID operatorID : jobVertex.getOperatorIDs()) {
@@ -231,3 +220,4 @@ public enum DefaultExecutionPlanFactory implements ExecutionPlanFactory {
 		}
 	}
 }
+

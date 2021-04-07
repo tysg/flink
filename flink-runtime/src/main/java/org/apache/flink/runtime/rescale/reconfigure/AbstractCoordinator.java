@@ -2,7 +2,7 @@ package org.apache.flink.runtime.rescale.reconfigure;
 
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.controlplane.PrimitiveOperation;
-import org.apache.flink.runtime.controlplane.ExecutionPlanFactory;
+import org.apache.flink.runtime.controlplane.ExecutionPlanAndJobGraphUpdaterFactory;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptorVisitor;
@@ -31,7 +31,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 	protected ExecutionGraph executionGraph;
 	protected ClassLoader userCodeClassLoader;
 
-	private ExecutionPlanFactory executionPlanFactory;
+	private ExecutionPlanAndJobGraphUpdaterFactory executionPlanAndJobGraphUpdaterFactory;
 
 	private JobGraphUpdater jobGraphUpdater;
 	protected WorkloadsAssignmentHandler workloadsAssignmentHandler;
@@ -54,16 +54,16 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 		this.createdCandidates = new HashMap<>();
 	}
 
-	public void setStreamRelatedInstanceFactory(ExecutionPlanFactory executionPlanFactory) {
-		heldExecutionPlan = executionPlanFactory.createExecutionPlan(jobGraph, executionGraph, userCodeClassLoader);
+	public void setStreamRelatedInstanceFactory(ExecutionPlanAndJobGraphUpdaterFactory executionPlanAndJobGraphUpdaterFactory) {
+		heldExecutionPlan = executionPlanAndJobGraphUpdaterFactory.createExecutionPlan(jobGraph, executionGraph, userCodeClassLoader);
 		workloadsAssignmentHandler = new WorkloadsAssignmentHandler(heldExecutionPlan);
-		jobGraphUpdater = executionPlanFactory.createJobGraphUpdater(jobGraph, userCodeClassLoader);
+		jobGraphUpdater = executionPlanAndJobGraphUpdaterFactory.createJobGraphUpdater(jobGraph, userCodeClassLoader);
 		operatorIDMap = jobGraphUpdater.getOperatorIDMap();
-		this.executionPlanFactory = executionPlanFactory;
+		this.executionPlanAndJobGraphUpdaterFactory = executionPlanAndJobGraphUpdaterFactory;
 	}
 
 	public ExecutionPlan getHeldExecutionPlanCopy() {
-		ExecutionPlan executionPlan = executionPlanFactory.createExecutionPlan(jobGraph, executionGraph, userCodeClassLoader);
+		ExecutionPlan executionPlan = executionPlanAndJobGraphUpdaterFactory.createExecutionPlan(jobGraph, executionGraph, userCodeClassLoader);
 		for (Iterator<OperatorDescriptor> it = executionPlan.getAllOperator(); it.hasNext(); ) {
 			OperatorDescriptor descriptor = it.next();
 			OperatorDescriptor heldDescriptor = heldExecutionPlan.getOperatorByID(descriptor.getOperatorID());
@@ -91,10 +91,10 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 	}
 
 	@Override
-	public final CompletableFuture<Map<Integer, Map<Integer, Diff>>> prepareExecutionPlan(ExecutionPlan jobExecutionPlan) {
+	public final CompletableFuture<Map<Integer, Map<Integer, Diff>>> prepareExecutionPlan(ExecutionPlan executionPlan) {
 		rescaleID = RescaleID.generateNextID();
 		Map<Integer, Map<Integer, Diff>> differenceMap = new HashMap<>();
-		for (Iterator<OperatorDescriptor> it = jobExecutionPlan.getAllOperator(); it.hasNext();) {
+		for (Iterator<OperatorDescriptor> it = executionPlan.getAllOperator(); it.hasNext();) {
 			OperatorDescriptor descriptor = it.next();
 			int operatorID = descriptor.getOperatorID();
 			OperatorDescriptor heldDescriptor = heldExecutionPlan.getOperatorByID(operatorID);

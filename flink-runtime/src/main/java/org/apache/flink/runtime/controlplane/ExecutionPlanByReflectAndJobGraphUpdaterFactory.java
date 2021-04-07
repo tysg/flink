@@ -8,11 +8,11 @@ import org.apache.flink.runtime.rescale.reconfigure.JobGraphUpdater;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 
-public class ExecutionPlanByReflectFactory implements ExecutionPlanFactory {
+public class ExecutionPlanByReflectAndJobGraphUpdaterFactory implements ExecutionPlanAndJobGraphUpdaterFactory {
 
 	private final StreamingClassGroup classGroup;
 
-	public ExecutionPlanByReflectFactory(StreamingClassGroup classGroup){
+	public ExecutionPlanByReflectAndJobGraphUpdaterFactory(StreamingClassGroup classGroup){
 		this.classGroup = classGroup;
 	}
 

@@ -265,7 +265,7 @@ public class DummyController extends AbstractController {
 			.redistribute(operatorId, newKeyDistribution)
 			.redeploy(operatorId, null, newParallelism>oldParallelism);
 
-		getReconfigurationExecutor().execute(this);
+		getReconfigurationExecutor().execute(this, executionPlan);
 
 		synchronized (object) {
 			object.wait();

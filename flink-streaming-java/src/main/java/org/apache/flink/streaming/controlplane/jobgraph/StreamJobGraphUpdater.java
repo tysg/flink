@@ -68,7 +68,7 @@ public class StreamJobGraphUpdater implements JobGraphRescaler, JobGraphUpdater 
 		OperatorID operatorID = operatorIDMap.get(vertexId);
 		StreamConfig config = findStreamConfig(operatorID);
 		StreamOperatorFactory<?> factory = config.getStreamOperatorFactory(userClassLoader);
-		if(factory instanceof SimpleOperatorFactory){
+		if(factory instanceof SimpleOperatorFactory) {
 			StreamOperator<?> operator = ((SimpleOperatorFactory<?>) factory).getOperator();
 			Map<String, Field> fieldMap = executionLogic.getControlAttributeFieldMap();
 			for(Map.Entry<String, Object> entry : executionLogic.getControlAttributeMap().entrySet()){

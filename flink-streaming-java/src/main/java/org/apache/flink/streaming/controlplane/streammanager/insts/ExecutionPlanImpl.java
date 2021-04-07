@@ -27,20 +27,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor.ExecutionLogic.UDF;
 
 public final class ExecutionPlanImpl implements ExecutionPlan {
 	private static final Logger LOG = LoggerFactory.getLogger(ExecutionPlanImpl.class);
 	// operatorId -> operator
-	private final Map<Integer, OperatorDescriptor> operatorsMap;
-	private final OperatorDescriptor[] headOperators;
-	// operatorId -> task
-	private final Map<Integer, Map<Integer, TaskDescriptor>> operatorToTaskMap;
+	private final Map<Integer, OperatorDescriptor> jobConfigurations;
 	// node with resources
 	private final List<Node> resourceDistribution;
 
@@ -48,44 +42,40 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 	private final Map<String, Map<Integer, List<Integer>>> transformations = new HashMap<>();
 
 	@Internal
-	public ExecutionPlanImpl(Map<Integer, OperatorDescriptor> operatorsMap,
-							 OperatorDescriptor[] headOperators,
-							 Map<Integer, Map<Integer, TaskDescriptor>> operatorToTaskMap,
+	public ExecutionPlanImpl(Map<Integer, OperatorDescriptor> jobConfigurations,
 							 List<Node> resourceDistribution) {
-		this.operatorsMap = operatorsMap;
-		this.headOperators = headOperators;
-		this.operatorToTaskMap = operatorToTaskMap;
+		this.jobConfigurations = jobConfigurations;
 		this.resourceDistribution = resourceDistribution;
 	}
 
 	@Override
 	public int getParallelism(Integer operatorID) {
-		return this.operatorsMap.get(operatorID).getParallelism();
+		return this.jobConfigurations.get(operatorID).getParallelism();
 	}
 
 	@Override
 	public Function getUserFunction(Integer operatorID) {
-		return operatorsMap.get(operatorID).getUdf();
+		return jobConfigurations.get(operatorID).getUdf();
 	}
 
 	@Override
 	public Map<Integer, List<Integer>> getKeyStateAllocation(Integer operatorID) {
-		return operatorsMap.get(operatorID).getKeyStateAllocation();
+		return jobConfigurations.get(operatorID).getKeyStateAllocation();
 	}
 
 	@Override
 	public Map<Integer, Map<Integer, List<Integer>>> getKeyMapping(Integer operatorID) {
-		return operatorsMap.get(operatorID).getKeyMapping();
+		return jobConfigurations.get(operatorID).getKeyMapping();
 	}
 
 	@Override
 	public Iterator<OperatorDescriptor> getAllOperator() {
-		return operatorsMap.values().iterator();
+		return jobConfigurations.values().iterator();
 	}
 
 	@Override
 	public OperatorDescriptor getOperatorByID(Integer operatorID) {
-		return operatorsMap.get(operatorID);
+		return jobConfigurations.get(operatorID);
 	}
 
 	@Override
@@ -172,18 +162,48 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 		transformations.clear();
 	}
 
-	public OperatorDescriptor[] getHeadOperators() {
-		return headOperators;
-	}
+//	public OperatorDescriptor[] getHeadOperators() {
+//		return headOperators;
+//	}
 
 	@Override
-	public Node[] getResourceDistribution() {
-		return resourceDistribution.toArray(new Node[0]);
+	public List<Node> getResourceDistribution() {
+		return resourceDistribution;
 	}
 
 	@Override
 	public TaskDescriptor getTask(Integer operatorID, int taskId) {
-		return operatorToTaskMap.get(operatorID).get(taskId);
+		return jobConfigurations.get(operatorID).getTask(taskId);
+//		return operatorToTaskMap.get(operatorID).get(taskId);
 	}
 
+	public ExecutionPlan copy() {
+		List<Node> resourceDistributionCopy = new ArrayList<>();
+		for (Node node : resourceDistribution) {
+			Node nodeCopy = node.copy();
+			resourceDistributionCopy.add(nodeCopy);
+		}
+		Map<Integer, OperatorDescriptor> jobConfigurationsCopy = new HashMap<>();
+		for (Integer operatorID : jobConfigurations.keySet()) {
+			OperatorDescriptor operatorDescriptor = jobConfigurations.get(operatorID);
+			OperatorDescriptor operatorDescriptorCopy = operatorDescriptor.copy(resourceDistributionCopy);
+			jobConfigurationsCopy.put(operatorID, operatorDescriptorCopy);
+		}
+
+		// construct the DAG
+		for (Integer operatorID : jobConfigurations.keySet()) {
+			OperatorDescriptor operatorDescriptor = jobConfigurations.get(operatorID);
+			OperatorDescriptor operatorDescriptorCopy = jobConfigurationsCopy.get(operatorID);
+			for (OperatorDescriptor upstream : operatorDescriptor.getParents()) {
+				OperatorDescriptor upstreamCopy = jobConfigurationsCopy.get(upstream.getOperatorID());
+				operatorDescriptorCopy.addParent(upstreamCopy);
+			}
+			for (OperatorDescriptor downstream : operatorDescriptor.getChildren()) {
+				OperatorDescriptor downstreamCopy = jobConfigurationsCopy.get(downstream.getOperatorID());
+				operatorDescriptorCopy.addChildren(downstreamCopy);
+			}
+		}
+
+		return new ExecutionPlanImpl(jobConfigurationsCopy, resourceDistributionCopy);
+	}
 }

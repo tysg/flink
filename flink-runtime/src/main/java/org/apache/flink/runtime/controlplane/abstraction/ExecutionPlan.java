@@ -22,7 +22,7 @@ public interface ExecutionPlan {
 	 *
 	 * @return
 	 */
-	Node[] getResourceDistribution();
+	List<Node> getResourceDistribution();
 
 	/**
 	 * Get one of the parallel task of one operator.
@@ -44,6 +44,10 @@ public interface ExecutionPlan {
 			this.location = location;
 			// taskId = <Operator, taskIdx>
 			location.addContainedTask(this);
+		}
+
+		public TaskDescriptor copy(Node nodeCopy) {
+			return new TaskDescriptor(allocatedSlot, nodeCopy);
 		}
 	}
 
@@ -70,6 +74,13 @@ public interface ExecutionPlan {
 			this.nodeAddress = nodeAddress;
 			this.numOfSlots = numOfSlots;
 			deployedTasks = new ArrayList<>();
+		}
+
+		public Node copy() {
+//			this.address = address;
+//			this.numCpus = numCpus;
+//			this.memory = memory;
+			return new Node(this.nodeAddress, this.numOfSlots);
 		}
 
 		void addContainedTask(TaskDescriptor task){
@@ -134,4 +145,6 @@ public interface ExecutionPlan {
 	Map<String, Map<Integer, List<Integer>>> getTransformations();
 
 	void clearTransformations();
+
+	ExecutionPlan copy();
 }

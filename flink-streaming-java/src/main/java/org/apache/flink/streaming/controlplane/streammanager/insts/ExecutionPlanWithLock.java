@@ -88,7 +88,7 @@ public class ExecutionPlanWithLock {
 
 	// delegate methods
 //	@Override
-	public Node[] getResourceDistribution() {
+	public List<Node> getResourceDistribution() {
 		return executionPlan.getResourceDistribution();
 	}
 
@@ -154,4 +154,8 @@ public class ExecutionPlanWithLock {
 	public void clearTransformations() {
 		executionPlan.clearTransformations();
 	}
+
+    public ExecutionPlanWithLock copy() {
+		return new ExecutionPlanWithLock(executionPlan.copy());
+    }
 }

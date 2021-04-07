@@ -13,10 +13,10 @@ public class WorkloadsAssignmentHandler {
 	private final Map<Integer, OperatorWorkloadsAssignment> heldWorkloadsAssignmentMap;
 	private final Map<Integer, Map<Integer, List<Integer>>> heldExecutorMapping;
 
-	public WorkloadsAssignmentHandler(ExecutionPlan jobExecutionPlan) {
+	public WorkloadsAssignmentHandler(ExecutionPlan executionPlan) {
 		heldWorkloadsAssignmentMap = new HashMap<>();
 		heldExecutorMapping = new HashMap<>();
-		setupWorkloadsAssignmentMapFromExecutionPlan(jobExecutionPlan);
+		setupWorkloadsAssignmentMapFromExecutionPlan(executionPlan);
 	}
 
 	public void setupWorkloadsAssignmentMapFromExecutionPlan(ExecutionPlan heldExecutionPlan) {

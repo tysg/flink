@@ -25,9 +25,11 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.controlplane.PrimitiveOperation;
-import org.apache.flink.runtime.controlplane.ExecutionPlanFactory;
+import org.apache.flink.runtime.controlplane.ExecutionPlanAndJobGraphUpdaterFactory;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
+import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan.*;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
+import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptorVisitor;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerId;
 import org.apache.flink.runtime.dispatcher.DispatcherGateway;
@@ -52,9 +54,10 @@ import org.apache.flink.runtime.rpc.akka.AkkaRpcServiceUtils;
 import org.apache.flink.runtime.util.profiling.ReconfigurationProfiler;
 import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
 import org.apache.flink.runtime.rescale.reconfigure.JobGraphRescaler;
-import org.apache.flink.streaming.controlplane.jobgraph.DefaultExecutionPlanFactory;
+import org.apache.flink.streaming.controlplane.jobgraph.DefaultExecutionPlanAndJobGraphUpdaterFactory;
 import org.apache.flink.streaming.controlplane.rescale.StreamJobGraphRescaler;
 import org.apache.flink.streaming.controlplane.streammanager.exceptions.StreamManagerException;
+import org.apache.flink.streaming.controlplane.streammanager.insts.ExecutionPlanImpl;
 import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
 import org.apache.flink.streaming.controlplane.streammanager.insts.ExecutionPlanWithLock;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
@@ -861,8 +864,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	}
 
 	@Override
-	public ExecutionPlanFactory getStreamRelatedInstanceFactory() {
-		return DefaultExecutionPlanFactory.INSTANCE;
+	public ExecutionPlanAndJobGraphUpdaterFactory getStreamRelatedInstanceFactory() {
+		return DefaultExecutionPlanAndJobGraphUpdaterFactory.INSTANCE;
 	}
 
 	/**
@@ -991,12 +994,13 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	public ExecutionPlanWithLock getExecutionPlanWithLock() {
 //		ExecutionPlan executionPlanCopy = new ExecutionPlanImpl();
 //		ExecutionPlanWithLock executionPlanWithLockCopy = new ExecutionPlanWithLock(executionPlan.getExecutionPlan());
-		return executionPlan;
+		return executionPlan.copy();
 	}
 
 	@Override
-	public void execute(ControlPolicy controller) {
+	public void execute(ControlPolicy controller, ExecutionPlanWithLock executionPlanCopy) {
 		try {
+			executionPlan = executionPlanCopy;
 			executionPlan.setStateUpdatingFlag(controller);
 
 			Map<String, Map<Integer, List<Integer>>> transformations = executionPlan.getTransformations();
