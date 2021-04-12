@@ -9,7 +9,7 @@ import org.apache.flink.runtime.state.KeyGroupRangeAssignment;
 import org.apache.flink.streaming.controlplane.rescale.RescaleActionConsumer;
 import org.apache.flink.streaming.controlplane.rescale.controller.OperatorController;
 import org.apache.flink.streaming.controlplane.rescale.controller.OperatorControllerListener;
-import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
+import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationExecutor;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,10 +34,10 @@ public class FlinkStreamSwitchAdaptor implements ControlPolicy {
 //	private final long migrationInterval;
 
 	public FlinkStreamSwitchAdaptor(
-		ReconfigurationAPI reconfigurationAPI,
+		ReconfigurationExecutor reconfigurationExecutor,
 		JobGraph jobGraph) {
 
-		this.actionConsumer = new RescaleActionConsumer(reconfigurationAPI, this);
+		this.actionConsumer = new RescaleActionConsumer(reconfigurationExecutor, this);
 
 		this.controllers = new HashMap<>(jobGraph.getNumberOfVertices());
 
@@ -107,6 +107,11 @@ public class FlinkStreamSwitchAdaptor implements ControlPolicy {
 		for (OperatorController controller : controllers.values()) {
 			controller.stopGracefully();
 		}
+	}
+
+	@Override
+	public void onChangeStarted() throws InterruptedException {
+
 	}
 
 	@Override

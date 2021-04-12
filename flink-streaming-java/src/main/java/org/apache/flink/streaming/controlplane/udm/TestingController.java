@@ -6,7 +6,7 @@ import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
 import org.apache.flink.streaming.api.windowing.triggers.CountTrigger;
 import org.apache.flink.streaming.api.windowing.triggers.PurgingTrigger;
-import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
+import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationExecutor;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -16,8 +16,8 @@ public class TestingController extends AbstractController {
 	private final Object object = new Object();
 	private final TestingThread testingThread;
 
-	public TestingController(ReconfigurationAPI reconfigurationAPI) {
-		super(reconfigurationAPI);
+	public TestingController(ReconfigurationExecutor reconfigurationExecutor) {
+		super(reconfigurationExecutor);
 		testingThread = new TestingThread();
 	}
 

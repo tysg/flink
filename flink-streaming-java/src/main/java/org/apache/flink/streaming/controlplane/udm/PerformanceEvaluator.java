@@ -3,7 +3,7 @@ package org.apache.flink.streaming.controlplane.udm;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
-import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
+import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,8 +34,8 @@ public class PerformanceEvaluator extends AbstractController {
 
 	private int latestUnusedSubTaskIdx = 0;
 
-	public PerformanceEvaluator(ReconfigurationAPI reconfigurationAPI, Configuration configuration) {
-		super(reconfigurationAPI);
+	public PerformanceEvaluator(ReconfigurationExecutor reconfigurationExecutor, Configuration configuration) {
+		super(reconfigurationExecutor);
 		profiler = new Profiler();
 		experimentConfig = configuration.toMap();
 	}

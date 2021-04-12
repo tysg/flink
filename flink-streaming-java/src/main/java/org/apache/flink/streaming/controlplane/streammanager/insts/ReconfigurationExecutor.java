@@ -33,7 +33,7 @@ import java.util.function.Function;
  * This interface defined some instruction which could be called by several control policy user defined model
  * to update the stream job execution plan which is maintained by stream manager.
  */
-public interface ReconfigurationAPI {
+public interface ReconfigurationExecutor {
 
 	/**
 	 * Get the state of stream job managed by this stream manager
@@ -42,7 +42,7 @@ public interface ReconfigurationAPI {
 	 */
 	ExecutionPlan getExecutionPlan();
 
-	ExecutionPlanWithLock getExecutionPlanWithLock();
+	ExecutionPlanWithLock getExecutionPlanCopy();
 
 	void execute(ControlPolicy controller, ExecutionPlanWithLock executionPlanCopy);
 

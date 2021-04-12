@@ -7,8 +7,9 @@ import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
 import org.apache.flink.streaming.api.windowing.triggers.CountTrigger;
 import org.apache.flink.streaming.api.windowing.triggers.PurgingTrigger;
 import org.apache.flink.streaming.controlplane.streammanager.insts.ExecutionPlanWithLock;
-import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
+import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationExecutor;
 
+import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -17,8 +18,8 @@ public class DummyController extends AbstractController {
 	private final Object object = new Object();
 	private final TestingThread testingThread;
 
-	public DummyController(ReconfigurationAPI reconfigurationAPI) {
-		super(reconfigurationAPI);
+	public DummyController(ReconfigurationExecutor reconfigurationExecutor) {
+		super(reconfigurationExecutor);
 		testingThread = new TestingThread();
 	}
 
@@ -33,6 +34,14 @@ public class DummyController extends AbstractController {
 	public void stopControllers() {
 		System.out.println("Testing TestingController is stopping...");
 		showOperatorInfo();
+	}
+
+	@Override
+	public void onChangeStarted() throws InterruptedException {
+		// wait for operation completed
+		synchronized (object) {
+			object.wait();
+		}
 	}
 
 	@Override
@@ -249,11 +258,11 @@ public class DummyController extends AbstractController {
 
 	private void rescaleV2(int operatorId, int newParallelism) throws InterruptedException {
 		// get the execution plan, will throw an exception if the execution plan is in used
-		ExecutionPlanWithLock executionPlan = getReconfigurationExecutor().getExecutionPlanWithLock();
+		ExecutionPlanWithLock executionPlan = getReconfigurationExecutor().getExecutionPlanCopy();
 
-		Map<Integer, List<Integer>> curKeyDistribution = executionPlan.getKeyDistribution(operatorId);
+//		Map<Integer, List<Integer>> curKeyDistribution = executionPlan.getKeyDistribution(operatorId);
 		int oldParallelism = executionPlan.getParallelism(operatorId);
-		assert oldParallelism == curKeyDistribution.size() : "old parallelism does not match the key set";
+//		assert oldParallelism == curKeyDistribution.size() : "old parallelism does not match the key set";
 
 		Map<Integer, List<Integer>> newKeyDistribution = preparePartitionAssignment(newParallelism);
 
@@ -261,14 +270,42 @@ public class DummyController extends AbstractController {
 		for (int i = 0; i < maxParallelism; i++) {
 			newKeyDistribution.get(i%newParallelism).add(i);
 		}
-		executionPlan
-			.redistribute(operatorId, newKeyDistribution)
-			.redeploy(operatorId, null, newParallelism>oldParallelism);
+//		executionPlan
+//			.redistribute(operatorId, newKeyDistribution)
+//			.redeploy(operatorId, null, newParallelism>oldParallelism);
+//
+//		getReconfigurationExecutor().execute(this, executionPlan);
+//
+//		onChangeStarted();
+		if (newParallelism != oldParallelism) {
+			rescale(operatorId, newKeyDistribution, null, newParallelism > oldParallelism);
+		} else {
+			remap(operatorId, newKeyDistribution);
+		}
+	}
 
-		getReconfigurationExecutor().execute(this, executionPlan);
+	private void measureFunctionUpdate(int testOpID) throws InterruptedException {
+		ExecutionPlanWithLock executionPlan = getReconfigurationExecutor().getExecutionPlanCopy();
+		try {
+			ClassLoader userClassLoader = executionPlan.getUserFunction(testOpID).getClass().getClassLoader();
+			Class IncreaseCommunicationOverheadMapClass = userClassLoader.loadClass("flinkapp.StatefulDemoLongRun$IncreaseCommunicationOverheadMap");
+			Class IncreaseComputationOverheadMap = userClassLoader.loadClass("flinkapp.StatefulDemoLongRun$IncreaseComputationOverheadMap");
+			int i = 0;
+			Random random = new Random();
+			Object func;
+			if (random.nextInt(2) > 0) {
+				func = IncreaseCommunicationOverheadMapClass.getConstructor(int.class)
+					.newInstance(random.nextInt(10) + 1);
+			} else {
+				func = IncreaseComputationOverheadMap.getConstructor(int.class)
+					.newInstance(random.nextInt(10));
+			}
 
-		synchronized (object) {
-			object.wait();
+			System.out.println("\nnumber of function update test: " + i);
+			System.out.println("new function:" + func);
+			changeOfLogic(testOpID, func);
+		} catch (ClassNotFoundException | NoSuchMethodException | IllegalAccessException | InstantiationException | InvocationTargetException e) {
+			e.printStackTrace();
 		}
 	}
 
@@ -469,17 +506,18 @@ public class DummyController extends AbstractController {
 
 //				for (int i=0; i<100; i++) {
 
-				int i = 0;
-				while(true) {
-					rescaleV2(statefulOpID, (i%10 + 1));
-					sleep(100);
-					i++;
-				}
-//				rescaleV2(statefulOpID, 10);
-//				sleep(100);
-//				rescaleV2(statefulOpID, 5);
-//				sleep(100);
-//				rescaleV2(statefulOpID, 10);
+//				int i = 0;
+//				while(true) {
+//					rescaleV2(statefulOpID, (i%10 + 1));
+//					sleep(100);
+//					i++;
+//				}
+//				measureFunctionUpdate(statefulOpID);
+				rescaleV2(statefulOpID, 10);
+				sleep(100);
+				rescaleV2(statefulOpID, 5);
+				sleep(100);
+				rescaleV2(statefulOpID, 10);
 
 //				testScaling(statefulOpID, 2);
 //				testScaling(statefulOpID, 10);

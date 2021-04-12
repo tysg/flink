@@ -11,6 +11,9 @@ public interface ControlPolicy {
 
 	void stopControllers();
 
+	// pause the current control logic
+	void onChangeStarted() throws InterruptedException;
+
 	/**
 	 * How stream manager notify one User Defined Model that one state update is completed?
 	 */

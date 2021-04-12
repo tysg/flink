@@ -138,7 +138,7 @@ public class ExecutionPlanWithLock {
 	}
 
 //	@Override
-	public ExecutionPlan reDeploy(Integer operatorID, @Nullable Map<Integer, Node> deployment, Boolean isCreate) {
+	public ExecutionPlan redeploy(Integer operatorID, @Nullable Map<Integer, Node> deployment, Boolean isCreate) {
 		return executionPlan.redeploy(operatorID, deployment, isCreate);
 	}
 

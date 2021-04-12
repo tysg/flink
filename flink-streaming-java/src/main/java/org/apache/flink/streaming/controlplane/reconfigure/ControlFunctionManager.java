@@ -4,7 +4,7 @@ import org.apache.flink.streaming.controlplane.reconfigure.operator.ControlFunct
 import org.apache.flink.streaming.controlplane.reconfigure.operator.ControlOperatorFactory;
 import org.apache.flink.streaming.controlplane.reconfigure.type.FunctionTypeStorage;
 import org.apache.flink.streaming.controlplane.reconfigure.type.InMemoryFunctionStorge;
-import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
+import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationExecutor;
 import org.apache.flink.streaming.controlplane.udm.AbstractController;
 
 /**
@@ -14,8 +14,8 @@ public abstract class ControlFunctionManager extends AbstractController implemen
 
 	private FunctionTypeStorage functionTypeStorage;
 
-	ControlFunctionManager(ReconfigurationAPI reconfigurationAPI) {
-		super(reconfigurationAPI);
+	ControlFunctionManager(ReconfigurationExecutor reconfigurationExecutor) {
+		super(reconfigurationExecutor);
 		this.functionTypeStorage = new InMemoryFunctionStorge();
 	}
 

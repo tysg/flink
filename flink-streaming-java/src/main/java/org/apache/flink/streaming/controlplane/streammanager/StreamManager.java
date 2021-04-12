@@ -27,9 +27,7 @@ import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.controlplane.PrimitiveOperation;
 import org.apache.flink.runtime.controlplane.ExecutionPlanAndJobGraphUpdaterFactory;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
-import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan.*;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
-import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptorVisitor;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerId;
 import org.apache.flink.runtime.dispatcher.DispatcherGateway;
@@ -57,8 +55,7 @@ import org.apache.flink.runtime.rescale.reconfigure.JobGraphRescaler;
 import org.apache.flink.streaming.controlplane.jobgraph.DefaultExecutionPlanAndJobGraphUpdaterFactory;
 import org.apache.flink.streaming.controlplane.rescale.StreamJobGraphRescaler;
 import org.apache.flink.streaming.controlplane.streammanager.exceptions.StreamManagerException;
-import org.apache.flink.streaming.controlplane.streammanager.insts.ExecutionPlanImpl;
-import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
+import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationExecutor;
 import org.apache.flink.streaming.controlplane.streammanager.insts.ExecutionPlanWithLock;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 import org.apache.flink.streaming.controlplane.udm.DummyController;
@@ -83,7 +80,7 @@ import static org.apache.flink.util.Preconditions.checkState;
  * 2. initialize other fields
  * 3. i do not know how to decouple the connection between stream manager and flink job master
  */
-public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements StreamManagerGateway, StreamManagerService, ReconfigurationAPI {
+public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements StreamManagerGateway, StreamManagerService, ReconfigurationExecutor {
 
 
 	private static final Logger LOG = LoggerFactory.getLogger(StreamManager.class);
@@ -991,7 +988,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	}
 
 	@Override
-	public ExecutionPlanWithLock getExecutionPlanWithLock() {
+	public ExecutionPlanWithLock getExecutionPlanCopy() {
 //		ExecutionPlan executionPlanCopy = new ExecutionPlanImpl();
 //		ExecutionPlanWithLock executionPlanWithLockCopy = new ExecutionPlanWithLock(executionPlan.getExecutionPlan());
 		return executionPlan.copy();

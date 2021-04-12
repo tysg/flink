@@ -2,14 +2,14 @@ package org.apache.flink.streaming.controlplane.reconfigure;
 
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.streaming.controlplane.reconfigure.operator.ControlFunction;
-import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationAPI;
+import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationExecutor;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 
 public class TestingCFManager extends ControlFunctionManager implements ControlPolicy {
 
 
-	public TestingCFManager(ReconfigurationAPI reconfigurationAPI) {
-		super(reconfigurationAPI);
+	public TestingCFManager(ReconfigurationExecutor reconfigurationExecutor) {
+		super(reconfigurationExecutor);
 	}
 
 	@Override
