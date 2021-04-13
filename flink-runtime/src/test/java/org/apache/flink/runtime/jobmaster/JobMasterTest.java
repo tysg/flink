@@ -52,6 +52,7 @@ import org.apache.flink.runtime.checkpoint.savepoint.SavepointV2;
 import org.apache.flink.runtime.clusterframework.types.AllocationID;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.clusterframework.types.ResourceProfile;
+import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.concurrent.ComponentMainThreadExecutor;
 import org.apache.flink.runtime.deployment.ResultPartitionDeploymentDescriptor;
 import org.apache.flink.runtime.deployment.TaskDeploymentDescriptor;
@@ -608,6 +609,11 @@ public class JobMasterTest extends TestLogger {
 				.collect(Collectors.toList());
 
 			return new AllocatedSlotReport(jobId, allocatedSlotInfos);
+		}
+
+		@Override
+		public CompletableFuture<PhysicalSlot> requestAllocatedSlot(@Nonnull SlotRequestId slotRequestId, @Nonnull ResourceProfile resourceProfile, Time timeout, SlotID slotId) {
+			return null;
 		}
 
 		@Override

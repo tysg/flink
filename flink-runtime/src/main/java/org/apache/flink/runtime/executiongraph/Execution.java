@@ -32,6 +32,7 @@ import org.apache.flink.runtime.checkpoint.CheckpointType;
 import org.apache.flink.runtime.checkpoint.JobManagerTaskRestore;
 import org.apache.flink.runtime.clusterframework.types.AllocationID;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
+import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.clusterframework.types.SlotProfile;
 import org.apache.flink.runtime.concurrent.ComponentMainThreadExecutor;
 import org.apache.flink.runtime.concurrent.FutureUtils;
@@ -507,6 +508,24 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 			.thenCompose(slot -> registerProducedPartitions(slot.getTaskManagerLocation(), false));
 	}
 
+	public CompletableFuture<Execution> allocateAndAssignSlotForExecution(RescaleID rescaleId, SlotID slotId) {
+		final ExecutionGraph executionGraph = getVertex().getExecutionGraph();
+		getVertex().updateRescaleId(rescaleId);
+		return allocateAndAssignSlotForExecution(
+			executionGraph.getSlotProviderStrategy(),
+			LocationPreferenceConstraint.ANY,
+			Collections.emptySet(),
+			slotId)
+			.thenCompose(slot -> registerProducedPartitions(slot.getTaskManagerLocation(), false));
+	}
+
+	private CompletableFuture<LogicalSlot> allocateAndAssignSlotForExecution(
+		SlotProviderStrategy slotProviderStrategy,
+		LocationPreferenceConstraint locationPreferenceConstraint,
+		@Nonnull Set<AllocationID> allPreviousExecutionGraphAllocationIds) {
+		return allocateAndAssignSlotForExecution(slotProviderStrategy, locationPreferenceConstraint, allPreviousExecutionGraphAllocationIds, null);
+	}
+
 	/**
 	 * Allocates and assigns a slot obtained from the slot provider to the execution.
 	 *
@@ -520,7 +539,8 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 	private CompletableFuture<LogicalSlot> allocateAndAssignSlotForExecution(
 			SlotProviderStrategy slotProviderStrategy,
 			LocationPreferenceConstraint locationPreferenceConstraint,
-			@Nonnull Set<AllocationID> allPreviousExecutionGraphAllocationIds) {
+			@Nonnull Set<AllocationID> allPreviousExecutionGraphAllocationIds,
+			SlotID slotId) {
 
 		checkNotNull(slotProviderStrategy);
 
@@ -568,7 +588,8 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 								getPhysicalSlotResourceProfile(vertex),
 								preferredLocations,
 								previousAllocationIDs,
-								allPreviousExecutionGraphAllocationIds)));
+								allPreviousExecutionGraphAllocationIds),
+							slotId));
 
 			// register call back to cancel slot request in case that the execution gets canceled
 			releaseFuture.whenComplete(

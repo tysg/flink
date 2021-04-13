@@ -128,4 +128,6 @@ public interface SlotManager extends AutoCloseable {
 
 	@VisibleForTesting
 	void unregisterTaskManagersAndReleaseResources();
+
+    void allocateSlot(SlotRequest slotRequest, SlotID slotID) throws ResourceManagerException;
 }

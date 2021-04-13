@@ -80,6 +80,12 @@ public interface ResourceManagerGateway extends FencedRpcGateway<ResourceManager
 		SlotRequest slotRequest,
 		@RpcTimeout Time timeout);
 
+	CompletableFuture<Acknowledge> requestSlot(
+		JobMasterId jobMasterId,
+		SlotRequest slotRequest,
+		@RpcTimeout Time timeout,
+		SlotID slotId);
+
 	/**
 	 * Cancel the slot allocation requests from the resource manager.
 	 *

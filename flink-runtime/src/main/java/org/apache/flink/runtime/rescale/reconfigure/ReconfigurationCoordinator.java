@@ -6,6 +6,7 @@ import org.apache.flink.runtime.checkpoint.CheckpointCoordinator;
 import org.apache.flink.runtime.checkpoint.OperatorState;
 import org.apache.flink.runtime.checkpoint.PendingCheckpoint;
 import org.apache.flink.runtime.checkpoint.StateAssignmentOperation;
+import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
 import org.apache.flink.runtime.execution.ExecutionState;
@@ -221,6 +222,66 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 			).thenCompose(executions -> {
 					Collection<CompletableFuture<Void>> deployFutures =
 						new ArrayList<>(jobVertex.getParallelism());
+					for (Execution execution : executions) {
+						try {
+							deployFutures.add(execution.deploy(
+								remappingAssignment.getAlignedKeyGroupRange(execution.getParallelSubtaskIndex()),
+								remappingAssignment.getIdInModel(execution.getParallelSubtaskIndex())));
+						} catch (JobException e) {
+							e.printStackTrace();
+						}
+					}
+					return FutureUtils.waitForAll(deployFutures);
+				}
+			).thenCompose(executions -> {
+				CheckpointCoordinator checkpointCoordinator = executionGraph.getCheckpointCoordinator();
+				checkNotNull(checkpointCoordinator);
+				checkpointCoordinator.addVertices(createdCandidates.get(operatorID).toArray(new ExecutionVertex[0]), false);
+
+				// clear all created candidates
+				createdCandidates.get(operatorID).clear();
+
+				// only deploy success that downstream task could start receiving data in its input gates
+				return updateDownstreamGates(operatorID);
+			});
+	}
+
+	public CompletableFuture<Void> deployTasks(int operatorID, int oldParallelism, List<SlotID> slotIds) {
+		// TODO: add the task to the checkpointCoordinator
+		System.out.println("deploying... tasks of " + operatorID);
+		LOG.info("++++++ deploying tasks" + operatorID);
+		JobVertexID jobVertexID = rawVertexIDToJobVertexID(operatorID);
+		ExecutionJobVertex jobVertex = executionGraph.getJobVertex(jobVertexID);
+		OperatorWorkloadsAssignment remappingAssignment = workloadsAssignmentHandler.getHeldOperatorWorkloadsAssignment(operatorID);
+		Preconditions.checkNotNull(jobVertex, "Execution job vertex not found: " + jobVertexID);
+		jobVertex.cleanBeforeRescale();
+
+		Collection<CompletableFuture<Execution>> allocateSlotFutures =
+			new ArrayList<>(jobVertex.getParallelism() - oldParallelism);
+
+		if (slotIds != null) {
+			List<ExecutionVertex> vertices = createdCandidates.get(operatorID);
+			for (int i = 0; i < vertices.size(); i++) {
+				Execution executionAttempt = vertices.get(i).getCurrentExecutionAttempt();
+				allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(rescaleID, slotIds.get(i)));
+			}
+		} else {
+			for (ExecutionVertex vertex : createdCandidates.get(operatorID)) {
+				Execution executionAttempt = vertex.getCurrentExecutionAttempt();
+				allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(rescaleID));
+			}
+		}
+
+		return FutureUtils.combineAll(allocateSlotFutures)
+			.whenComplete((executions, throwable) -> {
+					if (throwable != null) {
+						throwable.printStackTrace();
+						throw new CompletionException(throwable);
+					}
+				}
+			).thenCompose(executions -> {
+					Collection<CompletableFuture<Void>> deployFutures =
+						new ArrayList<>(jobVertex.getParallelism() - oldParallelism);
 					for (Execution execution : executions) {
 						try {
 							deployFutures.add(execution.deploy(

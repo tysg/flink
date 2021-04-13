@@ -444,6 +444,36 @@ public abstract class ResourceManager<WorkerType extends ResourceIDRetrievable>
 		}
 	}
 
+	public CompletableFuture<Acknowledge> requestSlot(JobMasterId jobMasterId, SlotRequest slotRequest, final Time timeout, SlotID slotID) {
+		JobID jobId = slotRequest.getJobId();
+		JobManagerRegistration jobManagerRegistration = jobManagerRegistrations.get(jobId);
+
+		if (null != jobManagerRegistration) {
+			if (Objects.equals(jobMasterId, jobManagerRegistration.getJobMasterId())) {
+				log.info("Request slot {} with profile {} for job {} with allocation id {}.",
+					slotID,
+					slotRequest.getResourceProfile(),
+					slotRequest.getJobId(),
+					slotRequest.getAllocationId());
+
+				try {
+					slotManager.allocateSlot(slotRequest, slotID);
+				} catch (ResourceManagerException e) {
+					return FutureUtils.completedExceptionally(e);
+				}
+
+				return CompletableFuture.completedFuture(Acknowledge.get());
+			} else {
+				return FutureUtils.completedExceptionally(new ResourceManagerException("The job leader's id " +
+					jobManagerRegistration.getJobMasterId() + " does not match the received id " + jobMasterId + '.'));
+			}
+
+		} else {
+			return FutureUtils.completedExceptionally(new ResourceManagerException("Could not find registered job manager for job " + jobId + '.'));
+		}
+	}
+
+
 	@Override
 	public void cancelSlotRequest(AllocationID allocationID) {
 		// As the slot allocations are async, it can not avoid all redundant slots, but should best effort.
