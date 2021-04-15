@@ -193,6 +193,11 @@ public class TestingResourceManagerGateway implements ResourceManagerGateway {
 	}
 
 	@Override
+	public CompletableFuture<Acknowledge> requestSlot(JobMasterId jobMasterId, SlotRequest slotRequest, Time timeout, SlotID slotId) {
+		return null;
+	}
+
+	@Override
 	public void cancelSlotRequest(AllocationID allocationID) {
 		Consumer<AllocationID> currentCancelSlotConsumer = cancelSlotConsumer;
 

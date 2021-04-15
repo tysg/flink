@@ -344,6 +344,8 @@ public class OperatorDescriptor {
 
 		private final Map<String, Object> attributeMap = new HashMap<>();
 		private final Map<String, Field> fields = new HashMap<>();
+
+		@Deprecated
 		private Function udf;
 
 		@VisibleForTesting

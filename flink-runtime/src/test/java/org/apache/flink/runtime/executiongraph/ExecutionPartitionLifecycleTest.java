@@ -28,6 +28,7 @@ import org.apache.flink.runtime.blob.VoidBlobWriter;
 import org.apache.flink.runtime.checkpoint.StandaloneCheckpointRecoveryFactory;
 import org.apache.flink.runtime.client.JobExecutionException;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
+import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.clusterframework.types.SlotProfile;
 import org.apache.flink.runtime.concurrent.ComponentMainThreadExecutorServiceAdapter;
 import org.apache.flink.runtime.deployment.ResultPartitionDeploymentDescriptor;
@@ -241,6 +242,11 @@ public class ExecutionPartitionLifecycleTest extends TestLogger {
 						.setTaskManagerGateway(taskManagerGateway)
 						.setSlotOwner(new SingleSlotTestingSlotOwner())
 						.createTestingLogicalSlot());
+			}
+
+			@Override
+			public CompletableFuture<LogicalSlot> allocateSlot(SlotRequestId slotRequestId, ScheduledUnit scheduledUnit, SlotProfile slotProfile, Time allocationTimeout, SlotID slotId) {
+				return null;
 			}
 
 			@Override

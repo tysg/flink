@@ -59,6 +59,7 @@ import org.apache.flink.streaming.controlplane.streammanager.insts.Reconfigurati
 import org.apache.flink.streaming.controlplane.streammanager.insts.ExecutionPlanWithLock;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 import org.apache.flink.streaming.controlplane.udm.DummyController;
+import org.apache.flink.streaming.controlplane.udm.FraudDetectionController;
 import org.apache.flink.util.OptionalConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -164,7 +165,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 //		this.controlPolicyList.add(new FlinkStreamSwitchAdaptor(this, jobGraph));
 //		this.controlPolicyList.add(new TestingCFManager(this));
 //		this.controlPolicyList.add(new TestingController(this));
-		this.controlPolicyList.add(new DummyController(this));
+		this.controlPolicyList.add(new FraudDetectionController(this));
 //		this.controlPolicyList.add(new PerformanceEvaluator(this, streamManagerConfiguration.getConfiguration()));
 
 		reconfigurationProfiler = new ReconfigurationProfiler(streamManagerConfiguration.getConfiguration());
