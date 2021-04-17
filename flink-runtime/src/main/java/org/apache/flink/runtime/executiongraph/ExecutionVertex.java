@@ -240,6 +240,7 @@ public class ExecutionVertex implements AccessExecutionVertex, Archiveable<Archi
 		// save an old index for checkpoint and operator state operation
 		this.oldSubTaskIndex = this.subTaskIndex;
 		this.subTaskIndex = subTaskIndex;
+		this.executionVertexId.setSubtaskIndex(subTaskIndex);
 
 		for (IntermediateResultPartition irp : this.resultPartitions.values()) {
 			irp.updatePartitionNumber(subTaskIndex);

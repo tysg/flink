@@ -84,7 +84,7 @@ public interface PrimitiveOperation<M> {
 
 	CompletableFuture<Void> updateTaskResources(int operatorID, int oldParallelism);
 
-	CompletableFuture<Void> updateTaskResources(Map<Integer, List<Integer>> tasks, boolean isScaleIn);
+	CompletableFuture<Void> updateTaskResources(Map<Integer, List<Integer>> tasks);
 
 	/**
 	 * Update key mappings between destOp and its parents

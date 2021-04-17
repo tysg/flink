@@ -36,8 +36,18 @@ public class OperatorWorkloadsAssignment implements AbstractCoordinator.Diff {
 
 	// this is used for remove the corresponding subtask
 	private final Map<Integer, Boolean> removedSubtaskMap;
+	private final Map<Integer, Boolean> createdSubtaskMap;
 
 	private final boolean isScaling;
+
+	private final Action action;
+
+	enum Action {
+		NONE,
+		REMAP,
+		RESCALE,
+		PLACEMENT
+	}
 
 	public OperatorWorkloadsAssignment(
 		Map<Integer, List<Integer>> executorMapping,
@@ -60,6 +70,7 @@ public class OperatorWorkloadsAssignment implements AbstractCoordinator.Diff {
 		this.alignedKeyGroupRanges = new ArrayList<>();
 		this.modifiedSubtaskMap = new HashMap<>();
 		this.removedSubtaskMap = new HashMap<>();
+		this.createdSubtaskMap = new HashMap<>();
 
 		// here we copy and translate passed-in mapping
 //		Map<Integer, List<Integer>> executorMapping = generateIntegerMap(executorMapping);
@@ -70,13 +81,24 @@ public class OperatorWorkloadsAssignment implements AbstractCoordinator.Diff {
 
 		if (newParallelism > oldParallelism) {
 			isScaling = true;
+			action = Action.RESCALE;
 			setupFollowScaleOut(executorMapping, oldExecutorMapping);
 		} else if (newParallelism < oldParallelism) {
+			action = Action.RESCALE;
 			isScaling = true;
 			setupFollowScaleIn(executorMapping, oldExecutorMapping);
 		} else {
-			isScaling = false;
-			setupFollowRepartition(executorMapping, oldExecutorMapping);
+			if (!executorMapping.keySet().containsAll(oldExecutorMapping.keySet())) {
+				// placement, placement can be regarded as scaling in our case.
+				isScaling = true;
+				action = Action.PLACEMENT;
+				setupFollowPlacement(executorMapping, oldExecutorMapping);
+			} else {
+				// rebalance
+				isScaling = false;
+				action = Action.REMAP;
+				setupFollowRepartition(executorMapping, oldExecutorMapping);
+			}
 		}
 		fillingUnused(executorMapping.keySet().size());
 
@@ -101,8 +123,10 @@ public class OperatorWorkloadsAssignment implements AbstractCoordinator.Diff {
 		this.alignedKeyGroupRanges = new ArrayList<>();
 		this.modifiedSubtaskMap = new HashMap<>();
 		this.removedSubtaskMap = new HashMap<>();
+		this.createdSubtaskMap = new HashMap<>();
 
 		isScaling = false;
+		action = Action.NONE;
 
 		generateAlignedKeyGroupRanges();
 		generateExecutorIdMapping();
@@ -112,38 +136,39 @@ public class OperatorWorkloadsAssignment implements AbstractCoordinator.Diff {
 		Map<Integer, List<Integer>> executorMapping,
 		Map<Integer, List<Integer>> oldExecutorMapping) {
 
-		List<Integer> createdIdList = executorMapping.keySet().stream()
+		List<Integer> createdExecutorIdList = executorMapping.keySet().stream()
 			.filter(id -> !oldExecutorMapping.containsKey(id))
 			.collect(Collectors.toList());
-//		checkState(createdIdList.size() == 1, "more than one created");
+//		checkState(createdExecutorIdList.size() == 1, "more than one created");
 
-//		int createdExecutorId = createdIdList.get(0);
+//		int createdExecutorId = createdExecutorIdList.get(0);
 
-		List<Integer> modifiedIdList = oldExecutorMapping.keySet().stream()
+		List<Integer> modifiedExecutorIdList = oldExecutorMapping.keySet().stream()
 //			.filter(id -> oldExecutorMapping.get(id).size() != executorMapping.get(id).size())
 			.filter(id ->
 				// listEqualsIgnoreOrder(executorMapping.get(id), oldExecutorMapping.get(id))
 				!(executorMapping.get(id).size() == oldExecutorMapping.get(id).size()
 					&& executorMapping.get(id).containsAll(oldExecutorMapping.get(id))))
 			.collect(Collectors.toList());
-//		checkState(modifiedIdList.size() == 1, "more than one modified in scale out");
+//		checkState(modifiedExecutorIdList.size() == 1, "more than one modified in scale out");
 
-//		int modifiedExecutorId = modifiedIdList.get(0);
+//		int modifiedExecutorId = modifiedExecutorIdList.get(0);
 
-		Map<Integer, Integer> unUsedSubtaskList = findNextUnusedSubtask(createdIdList);
+		Map<Integer, Integer> unUsedSubtaskMap = findNextUnusedSubtask(createdExecutorIdList);
 
 		for (Map.Entry<Integer, List<Integer>> entry : executorMapping.entrySet()) {
 			int executorId = entry.getKey();
 			List<Integer> partition = entry.getValue();
 
-			int subtaskIndex = (createdIdList.contains(executorId)) ?
-				unUsedSubtaskList.get(executorId):
+			// if the subtask is to be created, find out the corresponding subtask index from unUsedSubtaskMap
+			int subtaskIndex = (createdExecutorIdList.contains(executorId)) ?
+				unUsedSubtaskMap.get(executorId):
 				oldRescalePA.getSubTaskId(executorId);
 
 			putExecutorToSubtask(subtaskIndex, executorId, partition);
 
 //			if (executorId == createdExecutorId || executorId == modifiedExecutorId) {
-			if (createdIdList.contains(executorId) || modifiedIdList.contains(executorId)) {
+			if (createdExecutorIdList.contains(executorId) || modifiedExecutorIdList.contains(executorId)) {
 				modifiedSubtaskMap.put(subtaskIndex, true);
 			}
 		}
@@ -153,20 +178,20 @@ public class OperatorWorkloadsAssignment implements AbstractCoordinator.Diff {
 		Map<Integer, List<Integer>> executorMapping,
 		Map<Integer, List<Integer>> oldExecutorMapping) {
 
-		List<Integer> removedIdList = oldExecutorMapping.keySet().stream()
+		List<Integer> removedExecutorIdList = oldExecutorMapping.keySet().stream()
 			.filter(id -> !executorMapping.containsKey(id))
 			.collect(Collectors.toList());
-//		checkState(removedIdList.size() == 1, "more than one removed");
+//		checkState(removedExecutorIdList.size() == 1, "more than one removed");
 
-//		int removedId = removedIdList.get(0);
+//		int removedId = removedExecutorIdList.get(0);
 //		modifiedSubtaskMap.put(oldRescalePA.getSubTaskId(removedId), true);
 //		removedSubtaskMap.put(oldRescalePA.getSubTaskId(removedId), true);
-		for (int removedId : removedIdList) {
-			modifiedSubtaskMap.put(oldRescalePA.getSubTaskId(removedId), true);
-			removedSubtaskMap.put(oldRescalePA.getSubTaskId(removedId), true);
+		for (int removedExecutorId : removedExecutorIdList) {
+			modifiedSubtaskMap.put(oldRescalePA.getSubTaskId(removedExecutorId), true);
+			removedSubtaskMap.put(oldRescalePA.getSubTaskId(removedExecutorId), true);
 		}
 
-		List<Integer> modifiedIdList = executorMapping.keySet().stream()
+		List<Integer> modifiedExecutorIdList = executorMapping.keySet().stream()
 //			.filter(id -> executorMapping.get(id).size() != oldExecutorMapping.get(id).size())
 			.filter(id ->
 				// listEqualsIgnoreOrder(executorMapping.get(id), oldExecutorMapping.get(id))
@@ -184,7 +209,7 @@ public class OperatorWorkloadsAssignment implements AbstractCoordinator.Diff {
 			int subtaskIndex = oldRescalePA.getSubTaskId(executorId);
 			putExecutorToSubtask(subtaskIndex, executorId, partition);
 
-			if (modifiedIdList.contains(executorId) || removedIdList.contains(executorId)) {
+			if (modifiedExecutorIdList.contains(executorId) || removedExecutorIdList.contains(executorId)) {
 				modifiedSubtaskMap.put(subtaskIndex, true);
 			}
 		}
@@ -195,7 +220,7 @@ public class OperatorWorkloadsAssignment implements AbstractCoordinator.Diff {
 		Map<Integer, List<Integer>> oldExecutorMapping) {
 
 		// the state can be shuffled among all tasks, so the size of keys in each task can be the same.
-		List<Integer> modifiedIdList = executorMapping.keySet().stream()
+		List<Integer> modifiedExecutorIdList = executorMapping.keySet().stream()
 			.filter(id -> {
 				// size are different
 //				listEqualsIgnoreOrder(executorMapping.get(id), oldExecutorMapping.get(id));
@@ -204,7 +229,7 @@ public class OperatorWorkloadsAssignment implements AbstractCoordinator.Diff {
 //				return CollectionUtils.isEqualCollection(executorMapping.get(id), executorMapping.get(id));
 			 })
 			.collect(Collectors.toList());
-//		checkState(modifiedIdList.size() == 2, "not exactly two are modified in repartition");
+//		checkState(modifiedExecutorIdList.size() == 2, "not exactly two are modified in repartition");
 
 		for (Map.Entry<Integer, List<Integer>> entry : executorMapping.entrySet()) {
 			int executorId = entry.getKey();
@@ -213,29 +238,90 @@ public class OperatorWorkloadsAssignment implements AbstractCoordinator.Diff {
 			int subtaskIndex = oldRescalePA.getSubTaskId(executorId);
 			putExecutorToSubtask(subtaskIndex, executorId, partition);
 
-			if (modifiedIdList.contains(executorId)) {
+			if (modifiedExecutorIdList.contains(executorId)) {
 				modifiedSubtaskMap.put(subtaskIndex, true);
 			}
 		}
 	}
 
-	private Map<Integer, Integer> findNextUnusedSubtask(List<Integer> createdIdList) {
-		checkState(createdIdList.size() > 0, "null created task list");
+	private void setupFollowPlacement(Map<Integer, List<Integer>> executorMapping,
+									  Map<Integer, List<Integer>> oldExecutorMapping) {
+		List<Integer> removedExecutorIdList = oldExecutorMapping.keySet().stream()
+			.filter(id -> !executorMapping.containsKey(id))
+			.collect(Collectors.toList());
+		List<Integer> createdExecutorIdList = executorMapping.keySet().stream()
+			.filter(id -> !oldExecutorMapping.containsKey(id))
+			.collect(Collectors.toList());
 
-		int n = createdIdList.size();
-		Map<Integer, Integer> subtaskIndex = new HashMap<>(n);
+		for (int removedExecutorId : removedExecutorIdList) {
+			modifiedSubtaskMap.put(oldRescalePA.getSubTaskId(removedExecutorId), true);
+			removedSubtaskMap.put(oldRescalePA.getSubTaskId(removedExecutorId), true);
+		}
+
+		// add up the removed executor to the nnumber of opened subtask
+		// because placement is to remove some task and create them to other places.
+		numOpenedSubtask = numOpenedSubtask + createdExecutorIdList.size();
+		Map<Integer, Integer> unUsedSubtaskMap = findNextUnusedSubtask(createdExecutorIdList, removedExecutorIdList);
+
+		for (int createdSubtaskId : unUsedSubtaskMap.values()) {
+			createdSubtaskMap.put(createdSubtaskId, true);
+		}
+
+		for (Map.Entry<Integer, List<Integer>> entry : executorMapping.entrySet()) {
+			int executorId = entry.getKey();
+			List<Integer> partition = entry.getValue();
+
+			int subtaskIndex = (createdExecutorIdList.contains(executorId)) ?
+				unUsedSubtaskMap.get(executorId):
+				oldRescalePA.getSubTaskId(executorId);
+
+			putExecutorToSubtask(subtaskIndex, executorId, partition);
+
+//			if (executorId == createdExecutorId || executorId == modifiedExecutorId) {
+			if (createdExecutorIdList.contains(executorId) || removedExecutorIdList.contains(executorId)) {
+				modifiedSubtaskMap.put(subtaskIndex, true);
+			}
+		}
+	}
+
+	private Map<Integer, Integer> findNextUnusedSubtask(List<Integer> createdExecutorIdList) {
+		checkState(createdExecutorIdList.size() > 0, "null created task list");
+
+		int n = createdExecutorIdList.size();
+		Map<Integer, Integer> unUsedSubtaskMap = new HashMap<>(n);
 		for (int i = 0; i < numOpenedSubtask; i++) {
 			if (oldRescalePA.getIdInModel(i) == UNUSED_SUBTASK) {
-				subtaskIndex.put(createdIdList.get(createdIdList.size()-n), i);
+				unUsedSubtaskMap.put(createdExecutorIdList.get(createdExecutorIdList.size()-n), i);
 				n--;
 				if (n == 0) {
 					break;
 				}
 			}
 		}
-		checkState(subtaskIndex.size() > 0, "cannot find valid subtask for created executor");
+		checkState(unUsedSubtaskMap.size() > 0, "cannot find valid subtask for created executor");
 
-		return subtaskIndex;
+		return unUsedSubtaskMap;
+	}
+
+	private Map<Integer, Integer> findNextUnusedSubtask(List<Integer> createdExecutorIdList, List<Integer> removedExecutorIdList) {
+		checkState(createdExecutorIdList.size() > 0, "null created task list");
+
+		int n = createdExecutorIdList.size();
+		Map<Integer, Integer> unUsedSubtaskMap = new HashMap<>(n);
+		// add up the removed executor to the nnumber of opened subtask
+		// because placement is to remove some task and create them to other places.
+		for (int i = 0; i < numOpenedSubtask; i++) {
+			if (oldRescalePA.getIdInModel(i) == UNUSED_SUBTASK) {
+				unUsedSubtaskMap.put(createdExecutorIdList.get(createdExecutorIdList.size()-n), i);
+				n--;
+				if (n == 0) {
+					break;
+				}
+			}
+		}
+		checkState(unUsedSubtaskMap.size() > 0, "cannot find valid subtask for created executor");
+
+		return unUsedSubtaskMap;
 	}
 
 	private void putExecutorToSubtask(int subtaskIndex, int executorId, List<Integer> partition) {
@@ -348,6 +434,9 @@ public class OperatorWorkloadsAssignment implements AbstractCoordinator.Diff {
 		return new ArrayList<>(removedSubtaskMap.keySet());
 	}
 
+	public List<Integer> getCreatedSubtask() {
+		return new ArrayList<>(createdSubtaskMap.keySet());
+	}
 
 	private static boolean checkPartitionAssignmentValidity(
 		Map<Integer, List<Integer>> partitionAssignment) {
@@ -399,6 +488,10 @@ public class OperatorWorkloadsAssignment implements AbstractCoordinator.Diff {
 
 	public boolean isScaling() {
 		return isScaling;
+	}
+
+	public boolean isPlacement() {
+		return action == Action.PLACEMENT;
 	}
 
 	public static <T> boolean listEqualsIgnoreOrder(List<T> list1, List<T> list2) {

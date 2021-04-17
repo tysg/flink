@@ -348,7 +348,7 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 		}
 
 		// scale up given ejv, update involved edges & partitions
-		this.createCandidates = this.targetVertex.scaleOut(executionGraph.getRpcTimeout(), executionGraph.getGlobalModVersion(), System.currentTimeMillis());
+		this.createCandidates = this.targetVertex.scaleOut(executionGraph.getRpcTimeout(), executionGraph.getGlobalModVersion(), System.currentTimeMillis(), null);
 
 		for (JobVertexID downstreamID : updatedDownstream) {
 			ExecutionJobVertex downstream = tasks.get(downstreamID);

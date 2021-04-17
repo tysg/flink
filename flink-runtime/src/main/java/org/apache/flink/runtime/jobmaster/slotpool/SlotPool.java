@@ -29,6 +29,7 @@ import org.apache.flink.runtime.jobmaster.AllocatedSlotReport;
 import org.apache.flink.runtime.jobmaster.JobMasterId;
 import org.apache.flink.runtime.jobmaster.SlotRequestId;
 import org.apache.flink.runtime.resourcemanager.ResourceManagerGateway;
+import org.apache.flink.runtime.resourcemanager.slotmanager.TaskManagerSlot;
 import org.apache.flink.runtime.taskexecutor.slot.SlotOffer;
 import org.apache.flink.runtime.taskmanager.TaskManagerLocation;
 
@@ -192,4 +193,6 @@ public interface SlotPool extends AllocatedSlotActions, AutoCloseable {
 		@Nonnull ResourceProfile resourceProfile,
 		Time timeout,
 		SlotID slotId);
+
+	CompletableFuture<Collection<TaskManagerSlot>> getAllSlots();
 }

@@ -487,7 +487,8 @@ public class ExecutionJobVertex implements AccessExecutionJobVertex, Archiveable
 	public List<ExecutionVertex> scaleOut(
 		Time timeout,
 		long initialGlobalModVersion,
-		long createTimestamp) {
+		long createTimestamp,
+		@Nullable List<Integer> createdTaskIds) {
 
 		cleanBeforeRescale();
 
@@ -495,6 +496,9 @@ public class ExecutionJobVertex implements AccessExecutionJobVertex, Archiveable
 
 		oldParallelism = parallelism;
 		int numNewTaskVertices = getJobVertex().getParallelism();
+		if (createdTaskIds != null && parallelism == numNewTaskVertices) {
+			numNewTaskVertices = numNewTaskVertices + createdTaskIds.size();
+		}
 		this.parallelism = numNewTaskVertices;
 
 		for (IntermediateResult producedDataSet : producedDataSets) {
@@ -593,7 +597,6 @@ public class ExecutionJobVertex implements AccessExecutionJobVertex, Archiveable
 				throw new RuntimeException("The intermediate result's partitions were not correctly assigned when doing rescaling.");
 			}
 		}
-
 
 		// TODO scaling: whether need to do something for InputSplitSource?
 

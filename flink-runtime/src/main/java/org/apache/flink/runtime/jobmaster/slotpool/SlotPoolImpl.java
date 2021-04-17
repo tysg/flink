@@ -39,6 +39,7 @@ import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.resourcemanager.ResourceManagerGateway;
 import org.apache.flink.runtime.resourcemanager.SlotRequest;
 import org.apache.flink.runtime.resourcemanager.exceptions.UnfulfillableSlotRequestException;
+import org.apache.flink.runtime.resourcemanager.slotmanager.TaskManagerSlot;
 import org.apache.flink.runtime.taskexecutor.slot.SlotOffer;
 import org.apache.flink.runtime.taskmanager.TaskManagerLocation;
 import org.apache.flink.runtime.util.clock.Clock;
@@ -807,6 +808,14 @@ public class SlotPoolImpl implements SlotPool {
 	// ------------------------------------------------------------------------
 	//  Resource
 	// ------------------------------------------------------------------------
+
+	@Override
+	public CompletableFuture<Collection<TaskManagerSlot>> getAllSlots() {
+		if (resourceManagerGateway == null) {
+			return CompletableFuture.completedFuture(null);
+		}
+		return resourceManagerGateway.getAllSlots();
+	}
 
 	/**
 	 * Register TaskManager to this pool, only those slots come from registered TaskManager will be considered valid.

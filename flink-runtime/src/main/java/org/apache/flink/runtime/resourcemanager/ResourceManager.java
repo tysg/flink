@@ -54,6 +54,7 @@ import org.apache.flink.runtime.resourcemanager.registration.JobManagerRegistrat
 import org.apache.flink.runtime.resourcemanager.registration.WorkerRegistration;
 import org.apache.flink.runtime.resourcemanager.slotmanager.ResourceActions;
 import org.apache.flink.runtime.resourcemanager.slotmanager.SlotManager;
+import org.apache.flink.runtime.resourcemanager.slotmanager.TaskManagerSlot;
 import org.apache.flink.runtime.rest.messages.taskmanager.TaskManagerInfo;
 import org.apache.flink.runtime.rpc.FatalErrorHandler;
 import org.apache.flink.runtime.rpc.FencedRpcEndpoint;
@@ -266,6 +267,10 @@ public abstract class ResourceManager<WorkerType extends ResourceIDRetrievable>
 	// ------------------------------------------------------------------------
 	//  RPC methods
 	// ------------------------------------------------------------------------
+
+	public CompletableFuture<Collection<TaskManagerSlot>> getAllSlots() {
+		return CompletableFuture.completedFuture(slotManager.getAllSlots());
+	}
 
 	@Override
 	public CompletableFuture<RegistrationResponse> registerJobManager(
