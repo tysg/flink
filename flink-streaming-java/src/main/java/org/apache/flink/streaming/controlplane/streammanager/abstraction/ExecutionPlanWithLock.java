@@ -16,9 +16,10 @@
  * limitations under the License.
  */
 
-package org.apache.flink.streaming.controlplane.streammanager.insts;
+package org.apache.flink.streaming.controlplane.streammanager.abstraction;
 
 import org.apache.flink.api.common.functions.Function;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan.*;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
@@ -138,8 +139,8 @@ public class ExecutionPlanWithLock {
 	}
 
 //	@Override
-	public ExecutionPlan redeploy(Integer operatorID, @Nullable Map<Integer, Node> deployment, Boolean isCreate) {
-		return executionPlan.redeploy(operatorID, deployment, isCreate);
+	public ExecutionPlan redeploy(Integer operatorID, @Nullable Map<Integer, Tuple2<Integer, String>> deployment) {
+		return executionPlan.redeploy(operatorID, deployment);
 	}
 
 //	@Override

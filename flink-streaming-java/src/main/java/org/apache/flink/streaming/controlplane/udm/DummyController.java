@@ -6,8 +6,8 @@ import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
 import org.apache.flink.streaming.api.windowing.triggers.CountTrigger;
 import org.apache.flink.streaming.api.windowing.triggers.PurgingTrigger;
-import org.apache.flink.streaming.controlplane.streammanager.insts.ExecutionPlanWithLock;
-import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationExecutor;
+import org.apache.flink.streaming.controlplane.streammanager.abstraction.ExecutionPlanWithLock;
+import org.apache.flink.streaming.controlplane.streammanager.abstraction.ReconfigurationExecutor;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.*;
@@ -256,6 +256,31 @@ public class DummyController extends AbstractController {
 		}
 	}
 
+	private void placement(int testingOpID) throws InterruptedException {
+		ExecutionPlan streamJobState = getReconfigurationExecutor().getExecutionPlan();
+
+		Map<Integer, List<Integer>> curKeyStateAllocation = streamJobState.getKeyStateAllocation(testingOpID);
+		int oldParallelism = streamJobState.getParallelism(testingOpID);
+		assert oldParallelism == curKeyStateAllocation.size() : "old parallelism does not match the key set";
+
+		Map<Integer, List<Integer>> newKeyStateAllocation = new HashMap<>();
+
+		newKeyStateAllocation.put(0, curKeyStateAllocation.get(0));
+		newKeyStateAllocation.put(2, curKeyStateAllocation.get(1));
+
+		Map<Integer, Tuple2<Integer, String>> deployment = new HashMap<>();
+		deployment.put(0, Tuple2.of(0, ""));
+		// migrate 1 to 2 with the assigned slot, but now we let slot to be assigned by default.
+		deployment.put(1, Tuple2.of(2, ""));
+
+
+//		getReconfigurationExecutor().placement(testingOpID, newKeyStateAllocation, this);
+		placement(testingOpID, deployment);
+		synchronized (object) {
+			object.wait();
+		}
+	}
+
 	private void rescaleV2(int operatorId, int newParallelism) throws InterruptedException {
 		// get the execution plan, will throw an exception if the execution plan is in used
 		ExecutionPlanWithLock executionPlan = getReconfigurationExecutor().getExecutionPlanCopy();
@@ -278,7 +303,7 @@ public class DummyController extends AbstractController {
 //
 //		onChangeStarted();
 		if (newParallelism != oldParallelism) {
-			rescale(operatorId, newKeyDistribution, null, newParallelism > oldParallelism);
+			rescale(operatorId, newKeyDistribution, null);
 		} else {
 			remap(operatorId, newKeyDistribution);
 		}
@@ -519,6 +544,8 @@ public class DummyController extends AbstractController {
 				sleep(100);
 				rescaleV2(statefulOpID, 10);
 
+//				placement(statefulOpID);
+
 //				testScaling(statefulOpID, 2);
 //				testScaling(statefulOpID, 10);
 
@@ -534,7 +561,6 @@ public class DummyController extends AbstractController {
 //				sleep(100);
 //
 //				testScaling(statefulOpID, 4);
-
 
 			} catch (InterruptedException e) {
 				e.printStackTrace();

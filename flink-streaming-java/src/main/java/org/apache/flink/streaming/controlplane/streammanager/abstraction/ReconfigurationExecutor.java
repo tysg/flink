@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.streaming.controlplane.streammanager.insts;
+package org.apache.flink.streaming.controlplane.streammanager.abstraction;
 
 import org.apache.flink.runtime.controlplane.PrimitiveOperation;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
@@ -52,6 +52,8 @@ public interface ReconfigurationExecutor {
 	void rescale(int operatorID, int newParallelism, Map<Integer, List<Integer>> keyStateAllocation, ControlPolicy waitingController);
 
 	void rescale(ExecutionPlan executionPlan, int operatorID, Boolean isScaleIn, ControlPolicy waitingController);
+
+	void placement(int operatorID, Map<Integer, List<Integer>> keyStateAllocation, ControlPolicy waitingController);
 
 	void rebalance(int operatorID, Map<Integer, List<Integer>> keyStateAllocation, boolean stateful, ControlPolicy waitingController);
 

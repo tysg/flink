@@ -4,7 +4,6 @@ import org.apache.flink.api.common.functions.Function;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.controlplane.abstraction.ControlAttribute;
-import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan.*;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptorVisitor;
@@ -22,7 +21,7 @@ import org.apache.flink.streaming.api.graph.StreamEdge;
 import org.apache.flink.streaming.api.operators.SimpleUdfStreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.StreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
-import org.apache.flink.streaming.controlplane.streammanager.insts.ExecutionPlanImpl;
+import org.apache.flink.streaming.controlplane.streammanager.abstraction.ExecutionPlanImpl;
 import org.apache.flink.streaming.runtime.partitioner.AssignedKeyGroupStreamPartitioner;
 import org.apache.flink.streaming.runtime.partitioner.KeyGroupStreamPartitioner;
 import org.apache.flink.streaming.runtime.partitioner.StreamPartitioner;
@@ -63,7 +62,7 @@ public class ExecutionPlanBuilder {
 
 	// DeployGraphState related
 	private List<Node> initDeploymentGraphState(ExecutionGraph executionGraph, Map<OperatorID, Integer> operatorIdToVertexId) {
-		Map<ResourceID, Node> hosts = new HashMap<>();
+		Map<ResourceID, Node> resources = new HashMap<>();
 
 		for (ExecutionJobVertex jobVertex : executionGraph.getAllVertices().values()) {
 			// contains all tasks of the same parallel operator instances
@@ -81,10 +80,10 @@ public class ExecutionPlanBuilder {
 					}
 				} while (execution == null || execution.getState() != ExecutionState.RUNNING);
 				LogicalSlot slot = execution.getAssignedResource();
-				Node node = hosts.get(slot.getTaskManagerLocation().getResourceID());
+				Node node = resources.get(slot.getTaskManagerLocation().getResourceID());
 				if (node == null) {
 					node = new Node(slot.getTaskManagerLocation().address(), 0);
-					hosts.put(slot.getTaskManagerLocation().getResourceID(), node);
+					resources.put(slot.getTaskManagerLocation().getResourceID(), node);
 				}
 				// todo how to get number of slots?
 				TaskDescriptor task = new TaskDescriptor(slot.getPhysicalSlotNumber(), node);
@@ -94,7 +93,7 @@ public class ExecutionPlanBuilder {
 				operatorToTaskMap.put(operatorIdToVertexId.get(operatorID), taskMap);
 			}
 		}
-		return new ArrayList<>(hosts.values());
+		return new ArrayList<>(resources.values());
 	}
 
 	// OperatorGraphState related

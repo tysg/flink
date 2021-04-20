@@ -1,12 +1,14 @@
 package org.apache.flink.streaming.controlplane.udm;
 
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
-import org.apache.flink.streaming.controlplane.streammanager.insts.ExecutionPlanWithLock;
-import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationExecutor;
+import org.apache.flink.streaming.controlplane.streammanager.abstraction.ExecutionPlanWithLock;
+import org.apache.flink.streaming.controlplane.streammanager.abstraction.ReconfigurationExecutor;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -63,19 +65,19 @@ public abstract class AbstractController implements ControlPolicy {
 	}
 
 	protected void rescale(int operatorId, Map<Integer, List<Integer>> newKeyDistribution,
-						   @Nullable Map<Integer, ExecutionPlan.Node> deployment, Boolean isCreate) throws InterruptedException {
+						   @Nullable Map<Integer, Tuple2<Integer, String>> deployment) throws InterruptedException {
 		ExecutionPlanWithLock executionPlan = getReconfigurationExecutor().getExecutionPlanCopy();
 		executionPlan
 			.redistribute(operatorId, newKeyDistribution)
-			.redeploy(operatorId, deployment, isCreate);
+			.redeploy(operatorId, deployment);
 		getReconfigurationExecutor().execute(this, executionPlan);
 		onChangeStarted();
 	}
 
-	protected void replacement(Integer operatorId, @Nullable Map<Integer, ExecutionPlan.Node> deployment, Boolean isCreate) throws InterruptedException {
+	protected void placement(Integer operatorId, @Nullable Map<Integer, Tuple2<Integer, String>> deployment) throws InterruptedException {
 		ExecutionPlanWithLock executionPlan = getReconfigurationExecutor().getExecutionPlanCopy();
 		executionPlan
-			.redeploy(operatorId, deployment, isCreate);
+			.redeploy(operatorId, deployment);
 		getReconfigurationExecutor().execute(this, executionPlan);
 		onChangeStarted();
 	}

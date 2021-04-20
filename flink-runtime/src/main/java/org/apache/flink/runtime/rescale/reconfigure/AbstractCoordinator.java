@@ -63,6 +63,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 	}
 
 	public ExecutionPlan getHeldExecutionPlanCopy() {
+		// TODO: the object is not deep copied in this method, should use the deep copy defined in execution plan
 		ExecutionPlan executionPlan = executionPlanAndJobGraphUpdaterFactory.createExecutionPlan(jobGraph, executionGraph, userCodeClassLoader);
 		for (Iterator<OperatorDescriptor> it = executionPlan.getAllOperator(); it.hasNext(); ) {
 			OperatorDescriptor descriptor = it.next();
