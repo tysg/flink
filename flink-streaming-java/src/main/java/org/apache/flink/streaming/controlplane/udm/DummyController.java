@@ -527,7 +527,7 @@ public class DummyController extends AbstractController {
 			try {
 				showOperatorInfo();
 				// todo, if the time of sleep is too short, may cause receiving not belong key
-				Thread.sleep(2000);
+				Thread.sleep(50000);
 
 //				for (int i=0; i<100; i++) {
 
@@ -539,10 +539,10 @@ public class DummyController extends AbstractController {
 //				}
 //				measureFunctionUpdate(statefulOpID);
 				rescaleV2(statefulOpID, 10);
-				sleep(100);
-				rescaleV2(statefulOpID, 5);
-				sleep(100);
-				rescaleV2(statefulOpID, 10);
+//				sleep(100);
+//				rescaleV2(statefulOpID, 5);
+//				sleep(100);
+//				rescaleV2(statefulOpID, 10);
 
 //				placement(statefulOpID);
 
