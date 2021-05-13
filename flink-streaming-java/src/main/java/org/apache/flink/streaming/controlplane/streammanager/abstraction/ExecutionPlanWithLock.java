@@ -129,18 +129,18 @@ public class ExecutionPlanWithLock {
 	}
 
 //	@Override
-	public ExecutionPlan redistribute(Integer operatorID, Map<Integer, List<Integer>> distribution) {
-		return executionPlan.redistribute(operatorID, distribution);
+	public ExecutionPlan assignWorkload(Integer operatorID, Map<Integer, List<Integer>> distribution) {
+		return executionPlan.assignWorkload(operatorID, distribution);
 	}
 //
 //	@Override
-	public ExecutionPlan updateExecutionLogic(Integer operatorID, Object function) {
-		return executionPlan.updateExecutionLogic(operatorID, function);
+	public ExecutionPlan assignExecutionLogic(Integer operatorID, Object function) {
+		return executionPlan.assignExecutionLogic(operatorID, function);
 	}
 
 //	@Override
-	public ExecutionPlan redeploy(Integer operatorID, @Nullable Map<Integer, Tuple2<Integer, String>> deployment) {
-		return executionPlan.redeploy(operatorID, deployment);
+	public ExecutionPlan assignResources(Integer operatorID, @Nullable Map<Integer, Tuple2<Integer, String>> deployment) {
+		return executionPlan.assignResources(operatorID, deployment);
 	}
 
 //	@Override

@@ -135,11 +135,11 @@ public interface ExecutionPlan {
 
 	OperatorDescriptor getOperatorByID(Integer operatorID);
 
-	ExecutionPlan redistribute(Integer operatorID, Map<Integer, List<Integer>> distribution);
+	ExecutionPlan assignWorkload(Integer operatorID, Map<Integer, List<Integer>> distribution);
 
-	ExecutionPlan updateExecutionLogic(Integer operatorID, Object function);
+	ExecutionPlan assignExecutionLogic(Integer operatorID, Object function);
 
-	ExecutionPlan redeploy(Integer operatorID, @Nullable Map<Integer, Tuple2<Integer, String>> deployment);
+	ExecutionPlan assignResources(Integer operatorID, @Nullable Map<Integer, Tuple2<Integer, String>> deployment);
 
 	ExecutionPlan update(Function<ExecutionPlan, ExecutionPlan> applier);
 

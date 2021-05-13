@@ -91,7 +91,7 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 	}
 
 	@Override
-	public ExecutionPlan redistribute(Integer operatorID, Map<Integer, List<Integer>> distribution) {
+	public ExecutionPlan assignWorkload(Integer operatorID, Map<Integer, List<Integer>> distribution) {
 		Preconditions.checkNotNull(getKeyStateAllocation(operatorID), "previous key state allocation should not be null");
 		OperatorDescriptor targetDescriptor = getOperatorByID(operatorID);
 		// update the key set
@@ -125,7 +125,7 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 	}
 
 	@Override
-	public ExecutionPlan updateExecutionLogic(Integer operatorID, Object function) {
+	public ExecutionPlan assignExecutionLogic(Integer operatorID, Object function) {
 		Preconditions.checkNotNull(getUserFunction(operatorID), "previous key state allocation should not be null");
 		OperatorDescriptor targetDescriptor = getOperatorByID(operatorID);
 		try {
@@ -144,7 +144,7 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 	/**
 	 * @param deployment : TaskId -> Tuple2<newTaskId, SlotID>
 	 */
-	public ExecutionPlan redeploy(Integer operatorID, @Nullable Map<Integer, Tuple2<Integer, String>> deployment) {
+	public ExecutionPlan assignResources(Integer operatorID, @Nullable Map<Integer, Tuple2<Integer, String>> deployment) {
 		// TODO: deployment is null, default deployment, needs to assign tasks to nodes
 		// TODO: deployment is nonnull, assign tasks to target Node with resources
 		OperatorDescriptor targetDescriptor = getOperatorByID(operatorID);
