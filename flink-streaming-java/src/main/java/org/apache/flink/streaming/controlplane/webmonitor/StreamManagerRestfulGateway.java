@@ -43,6 +43,16 @@ public interface StreamManagerRestfulGateway extends RpcGateway {
 	 */
 	CompletableFuture<JobResult> requestJobResult(JobID jobId, @RpcTimeout Time timeout);
 
+
+	default CompletableFuture<Boolean> registerNewController(
+		JobID jobId,
+		String controllerID,
+		String className,
+		String sourceCode,
+		@RpcTimeout Time timeout) {
+		throw new UnsupportedOperationException();
+	}
+
 	/**
 	 * Request the {@link JobStatus} of the given job.
 	 *

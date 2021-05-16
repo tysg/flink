@@ -27,7 +27,7 @@ import org.apache.flink.shaded.netty4.io.netty.handler.codec.http.HttpResponseSt
 /**
  * These headers define the protocol for submitting a job to a flink cluster.
  */
-public class StreamManagerControllerHeaders implements MessageHeaders<EmptyRequestBody, EmptyResponseBody, EmptyMessageParameters> {
+public class StreamManagerControllerHeaders implements MessageHeaders<SubmitControllerRequestBody, EmptyResponseBody, JobMessageParameters> {
 
 	private static final String URL = "/jobs/:" + JobIDPathParameter.KEY + "/smcontroller";
 	private static final StreamManagerControllerHeaders INSTANCE = new StreamManagerControllerHeaders();
@@ -36,8 +36,8 @@ public class StreamManagerControllerHeaders implements MessageHeaders<EmptyReque
 	}
 
 	@Override
-	public Class<EmptyRequestBody> getRequestClass() {
-		return EmptyRequestBody.class;
+	public Class<SubmitControllerRequestBody> getRequestClass() {
+		return SubmitControllerRequestBody.class;
 	}
 
 	@Override
@@ -61,8 +61,8 @@ public class StreamManagerControllerHeaders implements MessageHeaders<EmptyReque
 	}
 
 	@Override
-	public EmptyMessageParameters getUnresolvedMessageParameters() {
-		return EmptyMessageParameters.getInstance();
+	public JobMessageParameters getUnresolvedMessageParameters() {
+		return new JobMessageParameters();
 	}
 
 	public static StreamManagerControllerHeaders getInstance() {

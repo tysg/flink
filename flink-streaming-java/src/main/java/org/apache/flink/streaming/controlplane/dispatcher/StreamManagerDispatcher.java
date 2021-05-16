@@ -292,6 +292,7 @@ public abstract class StreamManagerDispatcher extends PermanentlyFencedRpcEndpoi
 	private CompletableFuture<Void> runStreamManager(JobGraph jobGraph) {
 
 		final CompletableFuture<StreamManagerRunner> streamManagerRunnerFuture = createStreamManagerRunner(jobGraph);
+		this.streamManagerRunnerFutures.put(jobGraph.getJobID(), streamManagerRunnerFuture);
 
 		return streamManagerRunnerFuture
 			.thenApply(FunctionUtils.uncheckedFunction(this::startStreamManagerRunner))
