@@ -131,6 +131,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 	private JobID jobId = null;
 
+	public final static String CONTROLLER = "trisk.controller";
+
 	// ------------------------------------------------------------------------
 
 	public StreamManager(RpcService rpcService,
@@ -163,12 +165,18 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		this.jobGraphRescaler = new StreamJobGraphRescaler(jobGraph, userCodeLoader);
 
 		/* now the policy is temporary hard coded added */
-//		this.controlPolicyList.add(new FlinkStreamSwitchAdaptor(this, jobGraph));
-//		this.controlPolicyList.add(new TestingCFManager(this));
-//		this.controlPolicyList.add(new TestingController(this));
-//		this.controlPolicyList.add(new DummyController(this));
-		this.controlPolicyList.add(new StockController(this, streamManagerConfiguration.getConfiguration()));
-//		this.controlPolicyList.add(new PerformanceEvaluator(this, streamManagerConfiguration.getConfiguration()));
+		String controllerName = streamManagerConfiguration.getConfiguration().getString(CONTROLLER, "DummyController");
+		switch (controllerName) {
+			case "DummyController":
+				this.controlPolicyList.add(new DummyController(this));
+				break;
+			case "StockController":
+				this.controlPolicyList.add(new StockController(this, streamManagerConfiguration.getConfiguration()));
+				break;
+			case "PerformanceEvaluator":
+				this.controlPolicyList.add(new PerformanceEvaluator(this, streamManagerConfiguration.getConfiguration()));
+				break;
+		}
 
 		reconfigurationProfiler = new ReconfigurationProfiler(streamManagerConfiguration.getConfiguration());
 	}

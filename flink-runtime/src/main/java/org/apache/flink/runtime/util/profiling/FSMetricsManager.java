@@ -28,7 +28,6 @@ import java.io.FileOutputStream;
 import java.io.OutputStream;
 import java.io.Serializable;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 
 /**
@@ -291,12 +290,14 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 //			kgNRecordsMap.getOrDefault(keyGroup, 0)+1);
 //		kgLatencyMap.put(keyGroup,
 //			kgLatencyMap.getOrDefault(keyGroup, 0L)+(completionTs - arrivalTs));
-		outputStreamDecorator.println(String.format("keygroup: %d, latency: %d", keyGroup, (completionTs - arrivalTs)));
+//		outputStreamDecorator.println(String.format("keygroup: %d, latency: %d", keyGroup, (completionTs - arrivalTs)));
+		outputStreamDecorator.println(String.format("ts: %d endToEnd latency: %d", arrivalTs, (completionTs - arrivalTs)));
 	}
 
 	@Override
-	public void groundTruth(int keyGroup, long latency) {
-		outputStreamDecorator.println(String.format("keygroup: %d, latency: %d", keyGroup, latency));
+	public void groundTruth(long arrivalTs, long latency) {
+		outputStreamDecorator.println(String.format("ts: %d endToEnd latency: %d", arrivalTs, latency));
+		System.out.printf("ts: %d endToEnd latency: %d%n", arrivalTs, latency);
 	}
 
 	/**

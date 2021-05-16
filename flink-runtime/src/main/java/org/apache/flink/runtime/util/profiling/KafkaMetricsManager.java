@@ -24,13 +24,7 @@ import java.io.Serializable;
 import java.util.*;
 
 import org.apache.flink.runtime.jobgraph.JobVertexID;
-import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.consumer.ConsumerRecords;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
-import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.common.TopicPartition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -298,7 +292,7 @@ public class KafkaMetricsManager implements Serializable, MetricsManager {
 	}
 
 	@Override
-	public void groundTruth(int keyGroup, long latency) {
+	public void groundTruth(long arrivalTs, long latency) {
 
 	}
 

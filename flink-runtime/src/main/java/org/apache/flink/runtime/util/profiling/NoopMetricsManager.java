@@ -65,7 +65,7 @@ public class NoopMetricsManager implements Serializable, MetricsManager {
 	}
 
 	@Override
-	public void groundTruth(int keyGroup, long latency) {
+	public void groundTruth(long arrivalTs, long latency) {
 
 	}
 
