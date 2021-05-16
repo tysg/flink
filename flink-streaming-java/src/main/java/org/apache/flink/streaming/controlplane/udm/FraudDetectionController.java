@@ -1,28 +1,24 @@
 package org.apache.flink.streaming.controlplane.udm;
 
 import org.apache.flink.api.common.functions.Function;
-import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.type.TypeReference;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.flink.streaming.controlplane.streammanager.insts.ExecutionPlanWithLock;
 import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationExecutor;
 
-import javax.annotation.Nullable;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 
 public class FraudDetectionController extends AbstractController {
 
 	private final String USER_AGENT = "Mozilla/5.0";
-	private int requestID = 0;
+	private int requestTime = 0;
 
 	public FraudDetectionController(ReconfigurationExecutor reconfigurationExecutor) {
 		super(reconfigurationExecutor);
@@ -48,21 +44,38 @@ public class FraudDetectionController extends AbstractController {
 	@Override
 	protected void defineControlAction() throws Exception {
 		super.defineControlAction();
-		while (true) {
-			try {
-				ExecutionPlanWithLock planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
-				updatePreprocessingScaleParameter(planWithLock);
-				updateDecisionTreeParameter(planWithLock);
-				Thread.sleep(5 * 60 * 1000);
-				requestID ++;
-			} catch (InterruptedException e) {
-				break;
-			}
-		}
+		ExecutionPlanWithLock planWithLock;
+//		while (true) {
+//			try {
+		// random
+		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
+		updatePreprocessingScaleParameter(planWithLock);
+		updateDecisionTreeParameter(planWithLock);
+		Thread.sleep(2 * 60 * 1000);
+		requestTime += 2 * 60;
+		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
+		updatePreprocessingScaleParameter(planWithLock);
+		updateDecisionTreeParameter(planWithLock);
+
+		Thread.sleep(3 * 60 * 1000);
+		requestTime += 3 * 60;
+//		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
+//		updatePreprocessingScaleParameter(planWithLock);
+//		updateDecisionTreeParameter(planWithLock);
+//
+		Thread.sleep(2 * 60 * 1000);
+		requestTime += 2 * 60;
+		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
+		updatePreprocessingScaleParameter(planWithLock);
+		updateDecisionTreeParameter(planWithLock);
+//			} catch (InterruptedException e) {
+//				break;
+//			}
+//		}
 	}
 
 	private void updatePreprocessingScaleParameter(ExecutionPlanWithLock planWithLock) throws Exception {
-		String scalePara = sendGet("http://127.0.0.1:5000/scale/"+requestID);
+		String scalePara = sendGet("http://127.0.0.1:5000/scale/" + requestTime);
 		Map<String, Object> res = parseJsonString(scalePara);
 		ArrayList<Double> center = (ArrayList<Double>) res.get("center");
 		ArrayList<Double> scale = (ArrayList<Double>) res.get("scale");
@@ -86,7 +99,7 @@ public class FraudDetectionController extends AbstractController {
 	}
 
 	private void updateDecisionTreeParameter(ExecutionPlanWithLock planWithLock) throws Exception {
-		String treePara = sendGet("http://127.0.0.1:5000/dtree/"+requestID);
+		String treePara = sendGet("http://127.0.0.1:5000/dtree/" + requestTime);
 		Map<String, Object> res = parseJsonString(treePara);
 		ArrayList<Integer> feature = (ArrayList<Integer>) res.get("feature");
 		ArrayList<Integer> leftChildren = (ArrayList<Integer>) res.get("children_left");

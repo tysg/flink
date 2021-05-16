@@ -37,6 +37,7 @@ import org.apache.flink.runtime.webmonitor.history.ArchivedJson;
 import org.apache.flink.runtime.webmonitor.history.JsonArchivist;
 import org.apache.flink.runtime.webmonitor.retriever.GatewayRetriever;
 import org.apache.flink.shaded.netty4.io.netty.channel.ChannelInboundHandler;
+import org.apache.flink.streaming.controlplane.rest.handler.job.RegisterStreamManagerControllerHandler;
 import org.apache.flink.streaming.controlplane.rest.handler.job.StreamManagerJobExecutionResultHandler;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.ExecutorUtils;
@@ -110,7 +111,13 @@ public class StreamManagerWebMonitorEndpoint<T extends StreamManagerRestfulGatew
 			timeout,
 			responseHeaders);
 
+		final RegisterStreamManagerControllerHandler registerStreamManagerControllerHandler = new RegisterStreamManagerControllerHandler(
+			leaderRetriever,
+			timeout,
+			responseHeaders);
+
 		handlers.add(Tuple2.of(jobExecutionResultHandler.getMessageHeaders(), jobExecutionResultHandler));
+		handlers.add(Tuple2.of(registerStreamManagerControllerHandler.getMessageHeaders(), registerStreamManagerControllerHandler));
 
 		return handlers;
 	}
