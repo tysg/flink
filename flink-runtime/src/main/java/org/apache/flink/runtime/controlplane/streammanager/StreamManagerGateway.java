@@ -85,4 +85,7 @@ public interface StreamManagerGateway extends FencedRpcGateway<StreamManagerId> 
 
 	ExecutionPlanAndJobGraphUpdaterFactory getStreamRelatedInstanceFactory();
 
+	boolean registerNewController(String controllerID, String className, String sourceCode);
+
+
 }

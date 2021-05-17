@@ -560,4 +560,17 @@ public abstract class StreamManagerDispatcher extends PermanentlyFencedRpcEndpoi
 		Optional<DispatcherGateway> dispatcherGateway = dispatcherGatewayRetriever.getNow();
 		return dispatcherGateway.map(gateway -> gateway.requestJobStatus(jobId, timeout)).orElse(null);
 	}
+
+	public CompletableFuture<Boolean> registerNewController(
+		JobID jobId,
+		String controllerID,
+		String className,
+		String sourceCode,
+		@RpcTimeout Time timeout) {
+
+		CompletableFuture<StreamManagerGateway> gatewayFuture = getStreamManagerGatewayFuture(jobId);
+		CompletableFuture<Boolean> registerFuture = gatewayFuture.thenApply(gateway ->
+			gateway.registerNewController(controllerID, className, sourceCode));
+		return registerFuture.exceptionally(throwable -> Boolean.FALSE);
+	}
 }

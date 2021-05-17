@@ -21,11 +21,11 @@ public class DummyController extends AbstractController {
 	@Override
 	protected void defineControlAction() throws Exception {
 		super.defineControlAction();
-		int id = super.findOperatorByName("test");
+		int id = super.findOperatorByName("Splitter FlatMap");
 		if (id == -1) {
-			System.out.println("i can not find operator with name: test");
+			System.out.println("I can not find operator with name: Splitter Flatmap");
 		} else {
-			System.out.println("the operator test has id: " + id);
+			System.out.println("The operator name with Splitter FlatMap has id: " + id);
 		}
 	}
 

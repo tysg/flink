@@ -24,8 +24,8 @@ import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
-import org.apache.flink.runtime.controlplane.PrimitiveOperation;
 import org.apache.flink.runtime.controlplane.ExecutionPlanAndJobGraphUpdaterFactory;
+import org.apache.flink.runtime.controlplane.PrimitiveOperation;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
@@ -41,6 +41,7 @@ import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.registration.RegistrationResponse;
 import org.apache.flink.runtime.rescale.JobRescaleAction;
 import org.apache.flink.runtime.rescale.reconfigure.AbstractCoordinator;
+import org.apache.flink.runtime.rescale.reconfigure.JobGraphRescaler;
 import org.apache.flink.runtime.resourcemanager.JobLeaderIdActions;
 import org.apache.flink.runtime.resourcemanager.JobLeaderIdService;
 import org.apache.flink.runtime.resourcemanager.registration.JobManagerRegistration;
@@ -51,19 +52,21 @@ import org.apache.flink.runtime.rpc.RpcUtils;
 import org.apache.flink.runtime.rpc.akka.AkkaRpcServiceUtils;
 import org.apache.flink.runtime.util.profiling.ReconfigurationProfiler;
 import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
-import org.apache.flink.runtime.rescale.reconfigure.JobGraphRescaler;
 import org.apache.flink.streaming.controlplane.jobgraph.DefaultExecutionPlanAndJobGraphUpdaterFactory;
 import org.apache.flink.streaming.controlplane.rescale.StreamJobGraphRescaler;
 import org.apache.flink.streaming.controlplane.streammanager.exceptions.StreamManagerException;
-import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationExecutor;
 import org.apache.flink.streaming.controlplane.streammanager.insts.ExecutionPlanWithLock;
+import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationExecutor;
+import org.apache.flink.streaming.controlplane.udm.AbstractController;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
-import org.apache.flink.streaming.controlplane.udm.DummyController;
 import org.apache.flink.streaming.controlplane.udm.FraudDetectionController;
 import org.apache.flink.util.OptionalConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
@@ -108,7 +111,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 	private final JobGraphRescaler jobGraphRescaler;
 
-	private final List<ControlPolicy> controlPolicyList = new LinkedList<>();
+	private final Map<String, ControlPolicy> controlPolicyList = new HashMap<>();
 
 	private ExecutionPlanWithLock executionPlan;
 
@@ -165,7 +168,9 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 //		this.controlPolicyList.add(new FlinkStreamSwitchAdaptor(this, jobGraph));
 //		this.controlPolicyList.add(new TestingCFManager(this));
 //		this.controlPolicyList.add(new TestingController(this));
-		this.controlPolicyList.add(new FraudDetectionController(this));
+		this.controlPolicyList.put(
+			FraudDetectionController.class.getCanonicalName(),
+			new FraudDetectionController(this));
 //		this.controlPolicyList.add(new PerformanceEvaluator(this, streamManagerConfiguration.getConfiguration()));
 
 		reconfigurationProfiler = new ReconfigurationProfiler(streamManagerConfiguration.getConfiguration());
@@ -836,7 +841,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 	@Override
 	public void streamSwitchCompleted(JobVertexID targetVertexID) {
-		for (ControlPolicy policy : controlPolicyList) {
+		for (ControlPolicy policy : controlPolicyList.values()) {
 			policy.onChangeCompleted(null);
 		}
 	}
@@ -849,11 +854,11 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					this.executionPlan = new ExecutionPlanWithLock(jobAbstraction);
 				}
 				if (newJobStatus == JobStatus.RUNNING) {
-					for (ControlPolicy policy : controlPolicyList) {
+					for (ControlPolicy policy : controlPolicyList.values()) {
 						policy.startControllers();
 					}
 				} else {
-					for (ControlPolicy policy : controlPolicyList) {
+					for (ControlPolicy policy : controlPolicyList.values()) {
 						policy.stopControllers();
 					}
 				}
@@ -864,6 +869,27 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	@Override
 	public ExecutionPlanAndJobGraphUpdaterFactory getStreamRelatedInstanceFactory() {
 		return DefaultExecutionPlanAndJobGraphUpdaterFactory.INSTANCE;
+	}
+
+	public boolean registerNewController(String controllerID, String className, String sourceCode){
+		ControlPolicy newController = null;
+		try {
+			byte[] classMetaData = ByteClassLoader.compileJavaClass(className, sourceCode);
+			Class<? extends AbstractController> controllerClass = ByteClassLoader.loadClassFromByteArray(classMetaData, className);
+			Constructor<? extends AbstractController> constructor= controllerClass.getConstructor(ReconfigurationExecutor.class);
+			newController = constructor.newInstance(this);
+		} catch (IOException | ClassNotFoundException | NoSuchMethodException
+			| InstantiationException | IllegalAccessException | InvocationTargetException e) {
+			e.printStackTrace();
+			return false;
+		}
+		ControlPolicy oldControlPolicy = this.controlPolicyList.putIfAbsent(controllerID, newController);
+		newController.startControllers();
+		if(oldControlPolicy != null){
+			oldControlPolicy.stopControllers();
+			return true;
+		}
+		return false;
 	}
 
 	/**
@@ -979,8 +1005,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	 * @return StreamManagerGateway belonging to this service
 	 */
 	@Override
-	public StreamManager getGateway() {
-		return getSelfGateway(StreamManager.class);
+	public StreamManagerGateway getGateway() {
+		return getSelfGateway(StreamManagerGateway.class);
 	}
 
 	@Override

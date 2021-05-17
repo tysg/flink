@@ -83,7 +83,7 @@ public class RegisterStreamManagerControllerHandler
 		));
 		return jobStatusFuture.thenCompose(
 			jobStatus -> {
-				if (jobStatus.isGloballyTerminalState()) {
+				if (!jobStatus.isGloballyTerminalState()) {
 					return sendControllerToGateway(gateway, jobId, className, classFileName, nameToFile);
 				} else {
 					return CompletableFuture.completedFuture(
