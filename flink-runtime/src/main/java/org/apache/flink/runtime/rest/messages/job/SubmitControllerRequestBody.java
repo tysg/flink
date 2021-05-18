@@ -24,8 +24,6 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonPro
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.Objects;
 
 /**
@@ -38,22 +36,28 @@ public final class SubmitControllerRequestBody implements RequestBody {
 
 	public static final String CONTROLLER_CLASS_NAME = "className";
 	private static final String CONTROLLER_FILE_NAME = "classFile";
+	private static final String CONTROLLER_ID = "controllerID";
 
 	@JsonProperty(CONTROLLER_CLASS_NAME)
-	@Nullable
+	@Nonnull
 	public final String controllerClassName;
 
-	/* temporary it is text representing source code rather than several class files*/
 	@JsonProperty(CONTROLLER_FILE_NAME)
 	@Nonnull
 	public final String classFile;
 
+	@JsonProperty(CONTROLLER_ID)
+	@Nullable
+	public final String controllerID;
+
 	@JsonCreator
 	public SubmitControllerRequestBody(
-			@Nullable @JsonProperty(CONTROLLER_CLASS_NAME) String controllerClassName,
-			@Nullable @JsonProperty(CONTROLLER_FILE_NAME) String classFile) {
+		@Nullable @JsonProperty(CONTROLLER_CLASS_NAME) String controllerClassName,
+		@Nullable @JsonProperty(CONTROLLER_FILE_NAME) String classFile,
+		@Nullable @JsonProperty(CONTROLLER_ID) String controllerID) {
 		this.controllerClassName = controllerClassName;
 		this.classFile = classFile;
+		this.controllerID = controllerID;
 	}
 
 	@Override
@@ -61,6 +65,7 @@ public final class SubmitControllerRequestBody implements RequestBody {
 		return "SubmitControllerRequestBody{" +
 			"controllerClassName='" + controllerClassName + '\'' +
 			", classFile='" + classFile + '\'' +
+			", controllerID='" + controllerID + '\'' +
 			'}';
 	}
 
@@ -74,12 +79,13 @@ public final class SubmitControllerRequestBody implements RequestBody {
 		}
 		SubmitControllerRequestBody that = (SubmitControllerRequestBody) o;
 		return Objects.equals(controllerClassName, that.controllerClassName) &&
-			Objects.equals(classFile, that.classFile);
+			Objects.equals(classFile, that.classFile) &&
+			Objects.equals(controllerID, that.controllerID);
 	}
 
 	@Override
 	public int hashCode() {
-		return Objects.hash(controllerClassName, classFile);
+		return Objects.hash(controllerClassName, classFile, controllerID);
 	}
 
 

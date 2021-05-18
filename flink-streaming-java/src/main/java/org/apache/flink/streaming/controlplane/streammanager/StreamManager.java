@@ -164,13 +164,13 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 		this.jobGraphRescaler = new StreamJobGraphRescaler(jobGraph, userCodeLoader);
 
-		/* now the policy is temporary hard coded added */
+		/* the policy could be temporary hard coded added, but we also could submit by restful API */
 //		this.controlPolicyList.add(new FlinkStreamSwitchAdaptor(this, jobGraph));
 //		this.controlPolicyList.add(new TestingCFManager(this));
 //		this.controlPolicyList.add(new TestingController(this));
-		this.controlPolicyList.put(
-			FraudDetectionController.class.getCanonicalName(),
-			new FraudDetectionController(this));
+//		this.controlPolicyList.put(
+//			FraudDetectionController.class.getCanonicalName(),
+//			new FraudDetectionController(this));
 //		this.controlPolicyList.add(new PerformanceEvaluator(this, streamManagerConfiguration.getConfiguration()));
 
 		reconfigurationProfiler = new ReconfigurationProfiler(streamManagerConfiguration.getConfiguration());
@@ -883,7 +883,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			e.printStackTrace();
 			return false;
 		}
-		ControlPolicy oldControlPolicy = this.controlPolicyList.putIfAbsent(controllerID, newController);
+		ControlPolicy oldControlPolicy = this.controlPolicyList.put(controllerID, newController);
 		newController.startControllers();
 		if(oldControlPolicy != null){
 			oldControlPolicy.stopControllers();

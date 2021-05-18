@@ -25,7 +25,7 @@ public class DummyController extends AbstractController {
 		if (id == -1) {
 			System.out.println("I can not find operator with name: Splitter Flatmap");
 		} else {
-			System.out.println("The operator name with Splitter FlatMap has id: " + id);
+			System.out.println("The operator whose name is Splitter FlatMap has id: " + id);
 		}
 	}
 

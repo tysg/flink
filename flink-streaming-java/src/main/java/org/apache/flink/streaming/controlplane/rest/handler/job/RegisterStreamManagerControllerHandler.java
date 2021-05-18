@@ -41,6 +41,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.stream.Collectors;
@@ -73,8 +74,9 @@ public class RegisterStreamManagerControllerHandler
 
 		final SubmitControllerRequestBody requestBody = request.getRequestBody();
 
-		String className = requestBody.controllerClassName;
-		String classFileName = requestBody.classFile;
+		String className = Objects.requireNonNull(requestBody.controllerClassName);
+		String classFileName = Objects.requireNonNull(requestBody.classFile);
+		String controllerID = Objects.requireNonNull(requestBody.controllerID);
 
 		final Collection<File> uploadedFiles = request.getUploadedFiles();
 		final Map<String, Path> nameToFile = uploadedFiles.stream().collect(Collectors.toMap(
@@ -84,7 +86,7 @@ public class RegisterStreamManagerControllerHandler
 		return jobStatusFuture.thenCompose(
 			jobStatus -> {
 				if (!jobStatus.isGloballyTerminalState()) {
-					return sendControllerToGateway(gateway, jobId, className, classFileName, nameToFile);
+					return sendControllerToGateway(gateway, jobId, controllerID, className, classFileName, nameToFile);
 				} else {
 					return CompletableFuture.completedFuture(
 						EmptyResponseBody.getInstance());
@@ -97,6 +99,7 @@ public class RegisterStreamManagerControllerHandler
 	private CompletableFuture<EmptyResponseBody> sendControllerToGateway(
 		@Nonnull StreamManagerRestfulGateway gateway,
 		JobID jobId,
+		String controllerID,
 		String className,
 		String classFileName,
 		Map<String, Path> nameToFile) {
@@ -110,7 +113,7 @@ public class RegisterStreamManagerControllerHandler
 		}
 		//todo with null source code
 		return gateway
-			.registerNewController(jobId, "DEFAULT", className, sourceCode, timeout)
+			.registerNewController(jobId, controllerID, className, sourceCode, timeout)
 			.thenApply(r -> EmptyResponseBody.getInstance());
 	}
 
