@@ -16,6 +16,7 @@ public abstract class AbstractController implements ControlPolicy {
 	private final ReconfigurationExecutor reconfigurationExecutor;
 	private final Object lock = new Object();
 
+	protected ControlActionRunner controlActionRunner = new ControlActionRunner();
 
 	@Override
 	public void onChangeStarted() throws InterruptedException {
@@ -86,5 +87,18 @@ public abstract class AbstractController implements ControlPolicy {
 			.assignExecutionLogic(operatorId, function);
 		getReconfigurationExecutor().execute(this, executionPlan);
 		onChangeStarted();
+	}
+
+	protected void defineControlAction () throws Exception{}
+
+	protected class ControlActionRunner extends Thread{
+		@Override
+		public void run() {
+			try {
+				defineControlAction();
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
 	}
 }
