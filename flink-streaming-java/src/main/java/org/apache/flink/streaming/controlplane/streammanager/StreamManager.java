@@ -54,17 +54,10 @@ import org.apache.flink.runtime.util.profiling.ReconfigurationProfiler;
 import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
 import org.apache.flink.streaming.controlplane.jobgraph.DefaultExecutionPlanAndJobGraphUpdaterFactory;
 import org.apache.flink.streaming.controlplane.rescale.StreamJobGraphRescaler;
-import org.apache.flink.streaming.controlplane.streammanager.exceptions.StreamManagerException;
-import org.apache.flink.streaming.controlplane.streammanager.insts.ExecutionPlanWithLock;
-import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationExecutor;
-import org.apache.flink.streaming.controlplane.udm.AbstractController;
-import org.apache.flink.streaming.controlplane.streammanager.abstraction.ReconfigurationExecutor;
 import org.apache.flink.streaming.controlplane.streammanager.abstraction.ExecutionPlanWithLock;
-import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
-import org.apache.flink.streaming.controlplane.udm.FraudDetectionController;
-import org.apache.flink.streaming.controlplane.udm.DummyController;
-import org.apache.flink.streaming.controlplane.udm.PerformanceEvaluator;
-import org.apache.flink.streaming.controlplane.udm.StockController;
+import org.apache.flink.streaming.controlplane.streammanager.abstraction.ReconfigurationExecutor;
+import org.apache.flink.streaming.controlplane.streammanager.exceptions.StreamManagerException;
+import org.apache.flink.streaming.controlplane.udm.*;
 import org.apache.flink.util.OptionalConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -175,13 +168,13 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		String controllerName = streamManagerConfiguration.getConfiguration().getString(CONTROLLER, "DummyController");
 		switch (controllerName) {
 			case "DummyController":
-				this.controlPolicyList.add(new DummyController(this));
+				this.controlPolicyList.put("DummyController", new DummyController(this));
 				break;
 			case "StockController":
-				this.controlPolicyList.add(new StockController(this, streamManagerConfiguration.getConfiguration()));
+				this.controlPolicyList.put("StockController", new StockController(this, streamManagerConfiguration.getConfiguration()));
 				break;
 			case "PerformanceEvaluator":
-				this.controlPolicyList.add(new PerformanceEvaluator(this, streamManagerConfiguration.getConfiguration()));
+				this.controlPolicyList.put("PerformanceEvaluator", new PerformanceEvaluator(this, streamManagerConfiguration.getConfiguration()));
 				break;
 		}
 
