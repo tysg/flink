@@ -37,18 +37,22 @@ public class WorkloadsAssignmentHandler {
 		int newParallelism = executorMapping.keySet().size();
 		OperatorWorkloadsAssignment operatorWorkloadsAssignment;
 		if (newParallelism == heldWorkloadsAssignmentMap.get(operatorId).getNumOpenedSubtask()) {
+			// rebalance and placement
 			operatorWorkloadsAssignment = new OperatorWorkloadsAssignment(
 				executorMapping,
 				heldExecutorMapping.get(operatorId),
 				heldWorkloadsAssignmentMap.get(operatorId),
 				newParallelism);
+
 		} else if (newParallelism > heldWorkloadsAssignmentMap.get(operatorId).getNumOpenedSubtask()) {
+			// scale out
 			operatorWorkloadsAssignment = new OperatorWorkloadsAssignment(
 				executorMapping,
 				heldExecutorMapping.get(operatorId),
 				heldWorkloadsAssignmentMap.get(operatorId),
 				newParallelism);
 		} else {
+			// scale in
 			operatorWorkloadsAssignment = new OperatorWorkloadsAssignment(
 				executorMapping,
 				heldExecutorMapping.get(operatorId),

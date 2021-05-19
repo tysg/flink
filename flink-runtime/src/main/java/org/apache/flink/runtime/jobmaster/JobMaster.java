@@ -33,6 +33,8 @@ import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.controlplane.PrimitiveOperation;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
+import org.apache.flink.runtime.controlplane.abstraction.resource.AbstractSlot;
+import org.apache.flink.runtime.controlplane.abstraction.resource.FlinkSlot;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerId;
 import org.apache.flink.runtime.execution.ExecutionState;
@@ -75,6 +77,7 @@ import org.apache.flink.runtime.rescale.JobRescaleCoordinator;
 import org.apache.flink.runtime.rescale.reconfigure.AbstractCoordinator;
 import org.apache.flink.runtime.resourcemanager.ResourceManagerGateway;
 import org.apache.flink.runtime.resourcemanager.ResourceManagerId;
+import org.apache.flink.runtime.resourcemanager.slotmanager.TaskManagerSlot;
 import org.apache.flink.runtime.rest.handler.legacy.backpressure.BackPressureStatsTracker;
 import org.apache.flink.runtime.rest.handler.legacy.backpressure.OperatorBackPressureStats;
 import org.apache.flink.runtime.rest.handler.legacy.backpressure.OperatorBackPressureStatsResponse;
@@ -590,6 +593,11 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		}
 	}
 
+	@Override
+	public CompletableFuture<Collection<TaskManagerSlot>> getAllSlots() {
+		return slotPool.getAllSlots();
+	}
+
 	private void internalFailAllocation(AllocationID allocationId, Exception cause) {
 		final Optional<ResourceID> resourceIdOptional = slotPool.failAllocation(allocationId, cause);
 		resourceIdOptional.ifPresent(taskManagerId -> {
@@ -964,11 +972,21 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 					AbstractCoordinator abstractCoordinator = schedulerNG.getJobRescaleCoordinator().getOperatorUpdateCoordinator();
 					jobAbstraction = abstractCoordinator.getHeldExecutionPlanCopy();
 				}
-				streamManagerGateway.jobStatusChanged(
-					jobGraph.getJobID(), newJobStatus, timestamp, error, jobAbstraction
-				);
-			}
-		);
+				ExecutionPlan finalJobAbstraction = jobAbstraction;
+				slotPool.getAllSlots().thenAccept(taskManagerSlots -> {
+					// compute
+					Map<String, List<AbstractSlot>> slotMap = new HashMap<>();
+					taskManagerSlots.forEach(taskManagerSlot -> {
+						AbstractSlot slot = FlinkSlot.fromTaskManagerSlot(taskManagerSlot);
+						List<AbstractSlot> slots = slotMap.computeIfAbsent(slot.getLocation(), k -> new ArrayList<>());
+						slots.add(slot);
+					});
+					finalJobAbstraction.setSlotMap(slotMap);
+					streamManagerGateway.jobStatusChanged(
+						jobGraph.getJobID(), newJobStatus, timestamp, error, finalJobAbstraction
+					);
+				});
+			});
 	}
 
 	private void notifyOfNewResourceManagerLeader(final String newResourceManagerAddress, final ResourceManagerId resourceManagerId) {

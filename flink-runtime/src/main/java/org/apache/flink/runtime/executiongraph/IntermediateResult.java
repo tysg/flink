@@ -123,17 +123,9 @@ public class IntermediateResult {
 					// TODO: when decrease the numparallel, remember to remove ejv from executionGraph
 					dropPartition(partitions[i]);
 				}
-//				if (numParallelProducers > i) {
-//					newPartitions[i] = partitions[i];
-//				} else {
-//					// TODO: when decrease the numparallel, remember to remove ejv from executionGraph
-//					dropPartition(partitions[i]);
-//				}
 			}
 			partitions = newPartitions;
-//			throw new IllegalArgumentException("scale down is not supported now");
 		} else {
-
 			this.numParallelProducers = numParallelProducers;
 			IntermediateResultPartition[] newPartitions = new IntermediateResultPartition[numParallelProducers];
 			for (int i = 0; i < partitions.length; i++) {

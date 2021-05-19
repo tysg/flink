@@ -171,7 +171,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 		ExecutionJobVertex tgtJobVertex = executionGraph.getJobVertex(tgtJobVertexID);
 		assert tgtJobVertex != null;
 		if (tgtJobVertex.getParallelism() < oldParallelism) {
-			return cancelTasks(operatorID, 0);
+			return cancelTasks(operatorID);
 		} else if (tgtJobVertex.getParallelism() > oldParallelism) {
 			return deployTasks(operatorID);
 		} else {
@@ -180,18 +180,21 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 	}
 
 	@Override
-	public CompletableFuture<Void> updateTaskResources(Map<Integer, List<Integer>> tasks, boolean isScaleIn) {
+	public CompletableFuture<Void> updateTaskResources(Map<Integer, List<Integer>> tasks) {
 		// TODO: By far we only support horizontal scaling, vertival scaling is not included.
 //		System.out.println("++++++ re-allocate resources for tasks" + operatorID);
 		int operatorID = tasks.keySet().iterator().next();
 		JobVertexID tgtJobVertexID = rawVertexIDToJobVertexID(operatorID);
 		ExecutionJobVertex tgtJobVertex = executionGraph.getJobVertex(tgtJobVertexID);
-		assert tgtJobVertex != null;
-		if (isScaleIn) {
-			return cancelTasks(operatorID, 0);
-		} else {
-			return deployTasks(operatorID);
-		}
+//		assert tgtJobVertex != null;
+//		if (isScaleIn) {
+//			return cancelTasks(operatorID, 0);
+//		} else {
+//			return deployTasks(operatorID);
+//		}
+		return deployTasks(operatorID)
+			.thenCompose(execution -> updateDownstreamGates(operatorID))
+			.thenCompose(execution -> cancelTasks(operatorID));
 	}
 
 	public CompletableFuture<Void> deployTasks(int operatorID) {
@@ -207,6 +210,10 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 		Collection<CompletableFuture<Execution>> allocateSlotFutures =
 			new ArrayList<>(jobVertex.getParallelism());
 
+		if (!createdCandidates.containsKey(operatorID)) {
+			return CompletableFuture.completedFuture(null);
+		}
+
 		for (ExecutionVertex vertex : createdCandidates.get(operatorID)) {
 			Execution executionAttempt = vertex.getCurrentExecutionAttempt();
 			allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(rescaleID));
@@ -218,8 +225,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 						throwable.printStackTrace();
 						throw new CompletionException(throwable);
 					}
-				}
-			).thenCompose(executions -> {
+				}).thenCompose(executions -> {
 					Collection<CompletableFuture<Void>> deployFutures =
 						new ArrayList<>(jobVertex.getParallelism());
 					for (Execution execution : executions) {
@@ -231,19 +237,39 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 							e.printStackTrace();
 						}
 					}
+
+					CheckpointCoordinator checkpointCoordinator = executionGraph.getCheckpointCoordinator();
+					assert checkpointCoordinator != null;
+					checkpointCoordinator.stopCheckpointScheduler();
+					checkNotNull(checkpointCoordinator);
+					checkpointCoordinator.addVertices(createdCandidates.get(operatorID).toArray(new ExecutionVertex[0]), false);
+
+					if (checkpointCoordinator.isPeriodicCheckpointingConfigured()) {
+						checkpointCoordinator.startCheckpointScheduler();
+					}
+
+					// clear all created candidates
+					createdCandidates.get(operatorID).clear();
+
 					return FutureUtils.waitForAll(deployFutures);
-				}
-			).thenCompose(executions -> {
-				CheckpointCoordinator checkpointCoordinator = executionGraph.getCheckpointCoordinator();
-				checkNotNull(checkpointCoordinator);
-				checkpointCoordinator.addVertices(createdCandidates.get(operatorID).toArray(new ExecutionVertex[0]), false);
-
-				// clear all created candidates
-				createdCandidates.get(operatorID).clear();
-
-				// only deploy success that downstream task could start receiving data in its input gates
-				return updateDownstreamGates(operatorID);
-			});
+				});
+//		.thenCompose(executions -> {
+//				CheckpointCoordinator checkpointCoordinator = executionGraph.getCheckpointCoordinator();
+//				assert checkpointCoordinator != null;
+//				checkpointCoordinator.stopCheckpointScheduler();
+//				checkNotNull(checkpointCoordinator);
+//				checkpointCoordinator.addVertices(createdCandidates.get(operatorID).toArray(new ExecutionVertex[0]), false);
+//
+//				if (checkpointCoordinator.isPeriodicCheckpointingConfigured()) {
+//					checkpointCoordinator.startCheckpointScheduler();
+//				}
+//
+//				// clear all created candidates
+//				createdCandidates.get(operatorID).clear();
+//
+//				// only deploy success that downstream task could start receiving data in its input gates
+//				return updateDownstreamGates(operatorID);
+//			});
 	}
 
 	public CompletableFuture<Void> deployTasks(int operatorID, int oldParallelism, List<SlotID> slotIds) {
@@ -278,8 +304,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 						throwable.printStackTrace();
 						throw new CompletionException(throwable);
 					}
-				}
-			).thenCompose(executions -> {
+				}).thenCompose(executions -> {
 					Collection<CompletableFuture<Void>> deployFutures =
 						new ArrayList<>(jobVertex.getParallelism() - oldParallelism);
 					for (Execution execution : executions) {
@@ -291,26 +316,41 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 							e.printStackTrace();
 						}
 					}
+
+					CheckpointCoordinator checkpointCoordinator = executionGraph.getCheckpointCoordinator();
+					assert checkpointCoordinator != null;
+					checkpointCoordinator.stopCheckpointScheduler();
+					checkNotNull(checkpointCoordinator);
+					checkpointCoordinator.addVertices(createdCandidates.get(operatorID).toArray(new ExecutionVertex[0]), false);
+
+					if (checkpointCoordinator.isPeriodicCheckpointingConfigured()) {
+						checkpointCoordinator.startCheckpointScheduler();
+					}
+
 					return FutureUtils.waitForAll(deployFutures);
-				}
-			).thenCompose(executions -> {
-				CheckpointCoordinator checkpointCoordinator = executionGraph.getCheckpointCoordinator();
-				checkNotNull(checkpointCoordinator);
-				checkpointCoordinator.addVertices(createdCandidates.get(operatorID).toArray(new ExecutionVertex[0]), false);
-
-				// clear all created candidates
-				createdCandidates.get(operatorID).clear();
-
-				// only deploy success that downstream task could start receiving data in its input gates
-				return updateDownstreamGates(operatorID);
-			});
+				});
+//			.thenCompose(executions -> {
+//				CheckpointCoordinator checkpointCoordinator = executionGraph.getCheckpointCoordinator();
+//				checkNotNull(checkpointCoordinator);
+//				checkpointCoordinator.addVertices(createdCandidates.get(operatorID).toArray(new ExecutionVertex[0]), false);
+//
+//				// clear all created candidates
+//				createdCandidates.get(operatorID).clear();
+//
+//				// only deploy success that downstream task could start receiving data in its input gates
+//				return updateDownstreamGates(operatorID);
+//			});
 	}
 
-	public CompletableFuture<Void> cancelTasks(int operatorID, int offset) {
+	public CompletableFuture<Void> cancelTasks(int operatorID) {
 		LOG.info("++++++ canceling tasks" + operatorID);
 
-		updateDownstreamGates(operatorID)
-			.thenCompose(executions -> {
+		if (!removedCandidates.containsKey(operatorID)) {
+			return CompletableFuture.completedFuture(null);
+		}
+
+//		updateDownstreamGates(operatorID)
+//			.thenCompose(executions -> {
 				Collection<CompletableFuture<?>> removeFutures =
 					new ArrayList<>(removedCandidates.size());
 
@@ -333,8 +373,8 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 				removedCandidates.get(operatorID).clear();
 
 				return FutureUtils.waitForAll(removeFutures);
-			});
-		return CompletableFuture.completedFuture(null);
+//			});
+//		return CompletableFuture.completedFuture(null);
 	}
 
 	/**
@@ -405,7 +445,10 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 			// TODO: but diffmap is operator-centric, and is unable to check whether the task should be resumed.
 			if (remappingAssignment.isScaling()) {
 				try { // update partition and downstream gates if there are tasks to be scaled out/in
-					updatePartitions(targetOperatorID, rescaleID).thenAccept(o -> syncOp.resumeTasks(notModifiedList));
+					updatePartitions(targetOperatorID, rescaleID)
+						// downstream gates need to find out the upstream partitions, do not update downstream gates before upstream has updated
+//						.thenCompose(o -> updateDownstreamGates(targetOperatorID))
+						.thenAccept(o -> syncOp.resumeTasks(notModifiedList));
 				} catch (ExecutionGraphException e) {
 					e.printStackTrace();
 				}

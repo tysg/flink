@@ -3,7 +3,7 @@ package org.apache.flink.streaming.controlplane.udm;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
-import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationExecutor;
+import org.apache.flink.streaming.controlplane.streammanager.abstraction.ReconfigurationExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -256,6 +256,8 @@ jobmanager.execution.failover-strategy: region
 # Trisk
 #==============================================================================
 
+trisk.controller: DummyController
+
 trisk.reconfig.operator.name: Splitter FlatMap
 trisk.reconfig.interval: 0
 trisk.reconfig.affected_tasks: 2

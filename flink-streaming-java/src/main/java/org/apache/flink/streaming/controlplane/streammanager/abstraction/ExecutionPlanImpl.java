@@ -16,12 +16,14 @@
  * limitations under the License.
  */
 
-package org.apache.flink.streaming.controlplane.streammanager.insts;
+package org.apache.flink.streaming.controlplane.streammanager.abstraction;
 
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.api.common.functions.Function;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
+import org.apache.flink.runtime.controlplane.abstraction.resource.AbstractSlot;
 import org.apache.flink.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,6 +39,8 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 	private final Map<Integer, OperatorDescriptor> jobConfigurations;
 	// node with resources
 	private final List<Node> resourceDistribution;
+	// slots to location map, which record the available slots for streaming job
+	private Map<String, List<AbstractSlot>> slotMap = new HashMap<>();
 
 	// transformation operations -> affected tasks grouped by operators.
 	private final Map<String, Map<Integer, List<Integer>>> transformations = new HashMap<>();
@@ -46,6 +50,14 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 							 List<Node> resourceDistribution) {
 		this.jobConfigurations = jobConfigurations;
 		this.resourceDistribution = resourceDistribution;
+	}
+
+	public ExecutionPlanImpl(Map<Integer, OperatorDescriptor> jobConfigurations,
+							 List<Node> resourceDistribution,
+							 Map<String, List<AbstractSlot>> slotMap) {
+		this.jobConfigurations = jobConfigurations;
+		this.resourceDistribution = resourceDistribution;
+		this.slotMap = slotMap;
 	}
 
 	@Override
@@ -79,16 +91,18 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 	}
 
 	@Override
-	public ExecutionPlan redistribute(Integer operatorID, Map<Integer, List<Integer>> distribution) {
+	public ExecutionPlan assignWorkload(Integer operatorID, Map<Integer, List<Integer>> distribution) {
 		Preconditions.checkNotNull(getKeyStateAllocation(operatorID), "previous key state allocation should not be null");
 		OperatorDescriptor targetDescriptor = getOperatorByID(operatorID);
 		// update the key set
 //		targetDescriptor.updateKeyStateAllocation(distribution);
-		Map<Integer, List<Integer>> remappingTasks = transformations.getOrDefault("remapping", new HashMap<>());
+		Map<Integer, List<Integer>> upstreamTasks = transformations.getOrDefault("upstream", new HashMap<>());
 		for (OperatorDescriptor parent : targetDescriptor.getParents()) {
 			parent.updateKeyMapping(operatorID, distribution);
-			remappingTasks.put(parent.getOperatorID(), parent.getTaskIds());
+			upstreamTasks.put(parent.getOperatorID(), parent.getTaskIds());
 		}
+		transformations.put("upstream", upstreamTasks);
+
 		// update the parallelism if the distribution key size is different
 		if (targetDescriptor.getParallelism() != distribution.size()) {
 			// add the downstream tasks that need to know the members update in the upstream.
@@ -99,17 +113,19 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 				.forEach(c -> downStreamTasks.put(c.getOperatorID(), c.getTaskIds()));
 			transformations.put("downstream", downStreamTasks);
 		}
+
 		// find out affected tasks, add them to transformations
 		Map<Integer, List<Integer>> updateStateTasks = transformations.getOrDefault("redistribute", new HashMap<>());
 		updateStateTasks.put(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
 
 		transformations.put("redistribute", updateStateTasks);
-		transformations.put("remapping", remappingTasks);
+		// TODO: should be upstream to be remapped
+		transformations.put("remapping", updateStateTasks);
 		return this;
 	}
 
 	@Override
-	public ExecutionPlan updateExecutionLogic(Integer operatorID, Object function) {
+	public ExecutionPlan assignExecutionLogic(Integer operatorID, Object function) {
 		Preconditions.checkNotNull(getUserFunction(operatorID), "previous key state allocation should not be null");
 		OperatorDescriptor targetDescriptor = getOperatorByID(operatorID);
 		try {
@@ -125,23 +141,49 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 	}
 
 	@Override
-	public ExecutionPlan redeploy(Integer operatorID, @Nullable Map<Integer, Node> deployment, Boolean isCreate) {
+	/**
+	 * @param deployment : TaskId -> Tuple2<newTaskId, SlotID>
+	 */
+	public ExecutionPlan assignResources(Integer operatorID, @Nullable Map<Integer, Tuple2<Integer, String>> deployment) {
 		// TODO: deployment is null, default deployment, needs to assign tasks to nodes
 		// TODO: deployment is nonnull, assign tasks to target Node with resources
 		OperatorDescriptor targetDescriptor = getOperatorByID(operatorID);
-		if (deployment == null) {
-		} else {
-		}
-		// find out affected tasks, add them to transformations, by far, we only need add all tasks into the set.
-		if (isCreate) {
-			// add to the value
-			Map<Integer, List<Integer>> reDeployingTasks = transformations.getOrDefault("creating", new HashMap<>());
+		// need to find out which task is to be redeployed
+		// because we used cancel and redeploy method, the new deployed task should have a new task id
+		// the actual placement is to migrate entire state from one task to another, and then kill the former.
+		Map<Integer, List<Integer>> keyDistribution = targetDescriptor.getKeyStateAllocation();
+		Map<Integer, List<Integer>> newKeyDistribution = new HashMap<>();
+		if (deployment != null) {
+			if (deployment.size() != keyDistribution.size())
+				throw new RuntimeException("++++++ inconsistent number of tasks in workload allocation and resource allocation.");
+			for (Integer taskId : deployment.keySet()) {
+				// set a new KeyStateAllocation through the new deployment
+				Integer newTaskId = deployment.get(taskId).f0;
+				newKeyDistribution.put(newTaskId, keyDistribution.get(taskId));
+			}
+			// update the key set
+			Map<Integer, List<Integer>> upstreamTasks = transformations.getOrDefault("upstream", new HashMap<>());
+			for (OperatorDescriptor parent : targetDescriptor.getParents()) {
+				parent.updateKeyMapping(operatorID, newKeyDistribution);
+				upstreamTasks.put(parent.getOperatorID(), parent.getTaskIds());
+			}
+			transformations.put("upstream", upstreamTasks);
+
+			// add the downstream tasks that need to know the members update in the upstream.
+			Map<Integer, List<Integer>> downStreamTasks = transformations.getOrDefault("downstream", new HashMap<>());
+			// put tasks in downstream vertex
+			targetDescriptor.getChildren()
+				.forEach(c -> downStreamTasks.put(c.getOperatorID(), c.getTaskIds()));
+			transformations.put("downstream", downStreamTasks);
+
+			Map<Integer, List<Integer>> reDeployingTasks = transformations.getOrDefault("redeploying", new HashMap<>());
 			reDeployingTasks.putIfAbsent(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
-			transformations.put("creating", reDeployingTasks);
+			transformations.put("redeploying", reDeployingTasks);
+			transformations.put("remapping", reDeployingTasks);
 		} else {
-			Map<Integer, List<Integer>> reDeployingTasks = transformations.getOrDefault("canceling", new HashMap<>());
+			Map<Integer, List<Integer>> reDeployingTasks = transformations.getOrDefault("redeploying", new HashMap<>());
 			reDeployingTasks.putIfAbsent(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
-			transformations.put("canceling", reDeployingTasks);
+			transformations.put("redeploying", reDeployingTasks);
 		}
 		return this;
 	}
@@ -177,12 +219,28 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 //		return operatorToTaskMap.get(operatorID).get(taskId);
 	}
 
+	public void setSlotMap(Map<String, List<AbstractSlot>> slotMap) {
+		this.slotMap = slotMap;
+	}
+
 	public ExecutionPlan copy() {
 		List<Node> resourceDistributionCopy = new ArrayList<>();
 		for (Node node : resourceDistribution) {
 			Node nodeCopy = node.copy();
 			resourceDistributionCopy.add(nodeCopy);
 		}
+
+		Map<String, List<AbstractSlot>> slotMapCopy = new HashMap<>();
+		for (String location : slotMap.keySet()) {
+			List<AbstractSlot> slots = slotMap.get(location);
+			List<AbstractSlot> slotsCopy = new ArrayList<>();
+			for (AbstractSlot slot : slots) {
+				AbstractSlot slotCopy = slot.copy();
+				slotsCopy.add(slotCopy);
+			}
+			slotMapCopy.put(location, slotsCopy);
+		}
+
 		Map<Integer, OperatorDescriptor> jobConfigurationsCopy = new HashMap<>();
 		for (Integer operatorID : jobConfigurations.keySet()) {
 			OperatorDescriptor operatorDescriptor = jobConfigurations.get(operatorID);
@@ -204,6 +262,6 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 			}
 		}
 
-		return new ExecutionPlanImpl(jobConfigurationsCopy, resourceDistributionCopy);
+		return new ExecutionPlanImpl(jobConfigurationsCopy, resourceDistributionCopy, slotMapCopy);
 	}
 }

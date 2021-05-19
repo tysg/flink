@@ -104,6 +104,7 @@ import org.apache.flink.runtime.registration.RegistrationResponse;
 import org.apache.flink.runtime.resourcemanager.ResourceManagerGateway;
 import org.apache.flink.runtime.resourcemanager.ResourceManagerId;
 import org.apache.flink.runtime.resourcemanager.SlotRequest;
+import org.apache.flink.runtime.resourcemanager.slotmanager.TaskManagerSlot;
 import org.apache.flink.runtime.resourcemanager.utils.TestingResourceManagerGateway;
 import org.apache.flink.runtime.rpc.RpcService;
 import org.apache.flink.runtime.rpc.RpcUtils;
@@ -613,6 +614,11 @@ public class JobMasterTest extends TestLogger {
 
 		@Override
 		public CompletableFuture<PhysicalSlot> requestAllocatedSlot(@Nonnull SlotRequestId slotRequestId, @Nonnull ResourceProfile resourceProfile, Time timeout, SlotID slotId) {
+			return null;
+		}
+
+		@Override
+		public CompletableFuture<Collection<TaskManagerSlot>> getAllSlots() {
 			return null;
 		}
 

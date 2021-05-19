@@ -2,6 +2,7 @@ package org.apache.flink.runtime.controlplane.abstraction;
 
 
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.runtime.controlplane.abstraction.resource.AbstractSlot;
 
 import javax.annotation.Nullable;
 import java.net.InetAddress;
@@ -134,17 +135,19 @@ public interface ExecutionPlan {
 
 	OperatorDescriptor getOperatorByID(Integer operatorID);
 
-	ExecutionPlan redistribute(Integer operatorID, Map<Integer, List<Integer>> distribution);
+	ExecutionPlan assignWorkload(Integer operatorID, Map<Integer, List<Integer>> distribution);
 
-	ExecutionPlan updateExecutionLogic(Integer operatorID, Object function);
+	ExecutionPlan assignExecutionLogic(Integer operatorID, Object function);
 
-	ExecutionPlan redeploy(Integer operatorID, @Nullable Map<Integer, Node> deployment, Boolean isCreate);
+	ExecutionPlan assignResources(Integer operatorID, @Nullable Map<Integer, Tuple2<Integer, String>> deployment);
 
 	ExecutionPlan update(Function<ExecutionPlan, ExecutionPlan> applier);
 
 	Map<String, Map<Integer, List<Integer>>> getTransformations();
 
 	void clearTransformations();
+
+	void setSlotMap(Map<String, List<AbstractSlot>> slotMap);
 
 	ExecutionPlan copy();
 }

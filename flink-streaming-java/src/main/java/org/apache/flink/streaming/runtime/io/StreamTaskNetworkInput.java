@@ -199,7 +199,7 @@ public final class StreamTaskNetworkInput<T> implements StreamTaskInput<T> {
 			processingDuration += processingDelay;
 			long latency = queuingDelay + processingDelay/1000000;
 			endToEndLatency += latency;
-			metricsManager.groundTruth(record.getKeyGroup(), latency);
+			metricsManager.groundTruth(record.getLatencyTimestamp(), latency);
 		} else if (recordOrMark.isWatermark()) {
 			statusWatermarkValve.inputWatermark(recordOrMark.asWatermark(), lastChannel);
 		} else if (recordOrMark.isLatencyMarker()) {

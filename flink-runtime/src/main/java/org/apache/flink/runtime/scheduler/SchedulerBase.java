@@ -507,6 +507,7 @@ public abstract class SchedulerBase implements SchedulerNG {
 		boolean updateSuccess = executionGraph.updateState(taskExecutionState);
 
 		if (updateSuccess) {
+			log.info("++++++taskExecutionState: " + taskExecutionState);
 			checkState(executionVertexId.isPresent());
 
 			if (isNotifiable(executionVertexId.get(), taskExecutionState)) {

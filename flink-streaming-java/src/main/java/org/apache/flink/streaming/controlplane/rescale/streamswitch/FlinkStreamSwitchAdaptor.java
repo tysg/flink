@@ -9,7 +9,7 @@ import org.apache.flink.runtime.state.KeyGroupRangeAssignment;
 import org.apache.flink.streaming.controlplane.rescale.RescaleActionConsumer;
 import org.apache.flink.streaming.controlplane.rescale.controller.OperatorController;
 import org.apache.flink.streaming.controlplane.rescale.controller.OperatorControllerListener;
-import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationExecutor;
+import org.apache.flink.streaming.controlplane.streammanager.abstraction.ReconfigurationExecutor;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

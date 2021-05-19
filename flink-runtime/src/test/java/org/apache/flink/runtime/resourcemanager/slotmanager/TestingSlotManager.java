@@ -27,6 +27,7 @@ import org.apache.flink.runtime.resourcemanager.exceptions.ResourceManagerExcept
 import org.apache.flink.runtime.resourcemanager.registration.TaskExecutorConnection;
 import org.apache.flink.runtime.taskexecutor.SlotReport;
 
+import java.util.Collection;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 
@@ -69,6 +70,11 @@ public class TestingSlotManager implements SlotManager {
 	@Override
 	public int getNumberPendingSlotRequests() {
 		return 0;
+	}
+
+	@Override
+	public Collection<TaskManagerSlot> getAllSlots() {
+		return null;
 	}
 
 	@Override

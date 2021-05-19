@@ -977,7 +977,7 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 		}
 	}
 
-	private static PartitionInfo createPartitionInfo(ExecutionEdge executionEdge) {
+	private static PartitionInfo  createPartitionInfo(ExecutionEdge executionEdge) {
 		IntermediateDataSetID intermediateDataSetID = executionEdge.getSource().getIntermediateResult().getId();
 		ShuffleDescriptor shuffleDescriptor = getConsumedPartitionShuffleDescriptor(executionEdge, false);
 		return new PartitionInfo(intermediateDataSetID, shuffleDescriptor);

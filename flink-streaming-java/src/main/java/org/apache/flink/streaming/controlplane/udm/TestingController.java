@@ -6,7 +6,7 @@ import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
 import org.apache.flink.streaming.api.windowing.triggers.CountTrigger;
 import org.apache.flink.streaming.api.windowing.triggers.PurgingTrigger;
-import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationExecutor;
+import org.apache.flink.streaming.controlplane.streammanager.abstraction.ReconfigurationExecutor;
 
 import java.util.*;
 import java.util.stream.Collectors;

@@ -1,4 +1,4 @@
-package org.apache.flink.streaming.controlplane.streammanager.insts;
+package org.apache.flink.streaming.controlplane.streammanager.abstraction;
 
 import java.util.List;
 import java.util.Map;

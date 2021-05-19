@@ -58,8 +58,13 @@ import org.apache.flink.streaming.controlplane.streammanager.exceptions.StreamMa
 import org.apache.flink.streaming.controlplane.streammanager.insts.ExecutionPlanWithLock;
 import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationExecutor;
 import org.apache.flink.streaming.controlplane.udm.AbstractController;
+import org.apache.flink.streaming.controlplane.streammanager.abstraction.ReconfigurationExecutor;
+import org.apache.flink.streaming.controlplane.streammanager.abstraction.ExecutionPlanWithLock;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 import org.apache.flink.streaming.controlplane.udm.FraudDetectionController;
+import org.apache.flink.streaming.controlplane.udm.DummyController;
+import org.apache.flink.streaming.controlplane.udm.PerformanceEvaluator;
+import org.apache.flink.streaming.controlplane.udm.StockController;
 import org.apache.flink.util.OptionalConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -133,6 +138,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 	private JobID jobId = null;
 
+	public final static String CONTROLLER = "trisk.controller";
+
 	// ------------------------------------------------------------------------
 
 	public StreamManager(RpcService rpcService,
@@ -164,14 +171,19 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 		this.jobGraphRescaler = new StreamJobGraphRescaler(jobGraph, userCodeLoader);
 
-		/* the policy could be temporary hard coded added, but we also could submit by restful API */
-//		this.controlPolicyList.add(new FlinkStreamSwitchAdaptor(this, jobGraph));
-//		this.controlPolicyList.add(new TestingCFManager(this));
-//		this.controlPolicyList.add(new TestingController(this));
-//		this.controlPolicyList.put(
-//			FraudDetectionController.class.getCanonicalName(),
-//			new FraudDetectionController(this));
-//		this.controlPolicyList.add(new PerformanceEvaluator(this, streamManagerConfiguration.getConfiguration()));
+		/* now the policy is temporary hard coded added */
+		String controllerName = streamManagerConfiguration.getConfiguration().getString(CONTROLLER, "DummyController");
+		switch (controllerName) {
+			case "DummyController":
+				this.controlPolicyList.add(new DummyController(this));
+				break;
+			case "StockController":
+				this.controlPolicyList.add(new StockController(this, streamManagerConfiguration.getConfiguration()));
+				break;
+			case "PerformanceEvaluator":
+				this.controlPolicyList.add(new PerformanceEvaluator(this, streamManagerConfiguration.getConfiguration()));
+				break;
+		}
 
 		reconfigurationProfiler = new ReconfigurationProfiler(streamManagerConfiguration.getConfiguration());
 	}
@@ -413,7 +425,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						return coordinator.updateState(updateStateTasks, o);
 					}));
 					updateFutureList.add(syncFuture.thenCompose(o -> {
-						return coordinator.updateTaskResources(deployingTasks, isScaleIn);
+						return coordinator.updateTaskResources(deployingTasks);
 					}));
 
 					// finish the reconfiguration after all asynchronous update completed
@@ -513,7 +525,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						return coordinator.updateState(updateStateTasks, o);
 					}));
 					updateFutureList.add(syncFuture.thenCompose(o -> {
-						return coordinator.updateTaskResources(deployingTasks, isScaleIn);
+						return coordinator.updateTaskResources(deployingTasks);
 					}));
 
 					// finish the reconfiguration after all asynchronous update completed
@@ -529,6 +541,107 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 								log.info("++++++ finished update");
 								// TODO: extract the deployment overhead
 								reconfigurationProfiler.onOtherEnd(UPDATE_STATE);
+								this.executionPlan.notifyUpdateFinished(failure);
+								reconfigurationProfiler.onReconfigurationEnd();
+							} catch (Exception e) {
+								e.printStackTrace();
+							}
+						});
+				}
+			));
+		} catch (Exception e) {
+			LOG.error("Reconfiguration failed: ", e);
+			e.printStackTrace();
+		}
+	}
+
+	@Override
+	public void placement(int operatorID, Map<Integer, List<Integer>> keyStateAllocation, ControlPolicy waitingController) {
+		try {
+			reconfigurationProfiler.onReconfigurationStart();
+			executionPlan.setStateUpdatingFlag(waitingController);
+
+			// operatorId to TaskIdList mapping, representing affected tasks.
+			Map<Integer, List<Integer>> tasks = new HashMap<>();
+			Map<Integer, List<Integer>> updateKeyMappingTasks = new HashMap<>();
+			Map<Integer, List<Integer>> deployingTasks = new HashMap<>();
+
+			OperatorDescriptor targetDescriptor = executionPlan.getOperatorByID(operatorID);
+			// put tasks in target vertex
+			tasks.put(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
+			deployingTasks.put(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
+			// although we put the update key mapping in the target operator, it will find the upstream tasks and update.
+			updateKeyMappingTasks.put(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
+			// put tasks in upstream vertex
+			targetDescriptor.getParents()
+				.forEach(c -> {
+					int operatorId = c.getOperatorID();
+					List<Integer> curOpTasks = c.getTaskIds();
+					tasks.put(operatorId, curOpTasks);
+//					updateKeyMappingTasks.put(c.getOperatorID(), curOpTasks);
+				});
+			// put tasks in downstream vertex
+			targetDescriptor.getChildren()
+				.forEach(c -> {
+					List<Integer> curOpTasks = c.getTaskIds();
+					tasks.put(c.getOperatorID(), curOpTasks);
+				});
+
+			// update the key set
+			for (OperatorDescriptor parent : targetDescriptor.getParents()) {
+				parent.updateKeyMapping(operatorID, keyStateAllocation);
+			}
+
+
+			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
+			final String PREPARE = "prepare timer";
+			final String SYN = "synchronize timer";
+			final String UPDATE_MAPPING = "updateKeyMapping timer";
+			final String UPDATE_STATE = "updateState timer";
+			log.info("++++++ start update");
+			runAsync(() -> jobMasterGateway.callOperations(
+				coordinator -> {
+					// prepare andsynchronize among affected tasks
+					CompletableFuture<?> syncFuture = FutureUtils.completedVoidFuture()
+						.thenCompose(o -> {
+							reconfigurationProfiler.onOtherStart(PREPARE);
+							return coordinator.prepareExecutionPlan(executionPlan.getExecutionPlan());
+						})
+						.thenCompose(o -> {
+							reconfigurationProfiler.onOtherEnd(PREPARE);
+							reconfigurationProfiler.onOtherStart(SYN);
+							return coordinator.synchronizeTasks(tasks, o);
+						});
+					// run update asynchronously.
+					List<CompletableFuture<?>> updateFutureList = new ArrayList<>();
+					updateFutureList.add(syncFuture.thenCompose(o -> {
+						reconfigurationProfiler.onOtherEnd(SYN);
+						reconfigurationProfiler.onOtherStart(UPDATE_MAPPING);
+						return coordinator.updateKeyMapping(updateKeyMappingTasks, o);
+					}));
+//					updateFutureList.add(syncFuture.thenCompose(o -> {
+//						reconfigurationProfiler.onOtherEnd(UPDATE_MAPPING);
+//						reconfigurationProfiler.onOtherStart(UPDATE_STATE);
+//						return coordinator.updateState(updateStateTasks, o);
+//					}));
+					updateFutureList.add(syncFuture
+						.thenCompose(o -> coordinator.updateTaskResources(deployingTasks)));
+//					updateFutureList.add(syncFuture.thenCompose(o -> {
+//						return coordinator.updateTaskResources(deployingTasks, true);
+//					}));
+
+					// finish the reconfiguration after all asynchronous update completed
+					return FutureUtils.completeAll(updateFutureList)
+						.thenCompose(o -> coordinator.resumeTasks())
+						.whenComplete((o, failure) -> {
+							if (failure != null) {
+								LOG.error("Reconfiguration failed: ", failure);
+								failure.printStackTrace();
+							}
+							try {
+								System.out.println("++++++ finished update");
+								log.info("++++++ finished update");
+								// TODO: extract the deployment overhead
 								this.executionPlan.notifyUpdateFinished(failure);
 								reconfigurationProfiler.onReconfigurationEnd();
 							} catch (Exception e) {
@@ -1005,8 +1118,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	 * @return StreamManagerGateway belonging to this service
 	 */
 	@Override
-	public StreamManagerGateway getGateway() {
-		return getSelfGateway(StreamManagerGateway.class);
+	public StreamManager getGateway() {
+		return getSelfGateway(StreamManager.class);
 	}
 
 	@Override
@@ -1034,27 +1147,26 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			Map<Integer, List<Integer>> tasks = new HashMap<>();
 			Map<Integer, List<Integer>> updateStateTasks = new HashMap<>();
 			Map<Integer, List<Integer>> updateKeyMappingTasks = new HashMap<>();
-			Map<Integer, List<Integer>> deployingTasks = new HashMap<>();
+			Map<Integer, List<Integer>> reDeployingTasks = new HashMap<>();
 			Map<Integer, List<Integer>> updateFunctionTasks = new HashMap<>();
 			for (String operation : transformations.keySet()) {
 				Map<Integer, List<Integer>> transformation = transformations.get(operation);
 				switch (operation) {
 					case "redistribute":
-						// TODO: by far, we find the upstream operators of target operator to do remapp, should update to only use "remapping"
-						updateKeyMappingTasks = transformation;
+						// TODO: by far, we find the upstream operators of target operator to do remap, should update to only use "remapping"
 						updateStateTasks = transformation;
 						break;
-					case "creating":
-						deployingTasks = transformation;
+					case "redeploying":
+						reDeployingTasks = transformation;
 						break;
-					case "canceling":
-						deployingTasks = transformation;
-						isScaleIn = true;
+					case "remapping":
+						updateKeyMappingTasks = transformation;
 						break;
 					case "updateExecutionLogic":
 						updateFunctionTasks = transformation;
 						break;
 				}
+				// tips: downstream tasks can be placed here when doing rescale
 				for (Integer operatorID : transformation.keySet()) {
 					tasks.putIfAbsent(operatorID, transformation.get(operatorID));
 				}
@@ -1064,12 +1176,11 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			log.info("++++++ start update");
 			Map<Integer, List<Integer>> finalUpdateKeyMappingTasks = updateKeyMappingTasks;
 			Map<Integer, List<Integer>> finalUpdateStateTasks = updateStateTasks;
-			Map<Integer, List<Integer>> finalDeployingTasks = deployingTasks;
-			boolean finalIsScaleIn = isScaleIn;
+			Map<Integer, List<Integer>> finalDeployingTasks = reDeployingTasks;
 			Map<Integer, List<Integer>> finalUpdateFunctionTasks = updateFunctionTasks;
 			runAsync(() -> jobMasterGateway.callOperations(
 				coordinator -> {
-					// prepare andsynchronize among affected tasks
+					// prepare and synchronize among affected tasks
 					CompletableFuture<?> syncFuture = FutureUtils.completedVoidFuture()
 						.thenCompose(o -> coordinator.prepareExecutionPlan(executionPlan.getExecutionPlan()))
 						.thenCompose(o -> coordinator.synchronizeTasks(tasks, o));
@@ -1083,7 +1194,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						updateFutureList.add(syncFuture.thenCompose(o -> coordinator.updateState(finalUpdateStateTasks, o)));
 					}
 					if (!finalDeployingTasks.isEmpty()) {
-						updateFutureList.add(syncFuture.thenCompose(o -> coordinator.updateTaskResources(finalDeployingTasks, finalIsScaleIn)));
+						updateFutureList.add(syncFuture.thenCompose(o -> coordinator.updateTaskResources(finalDeployingTasks)));
 					}
 					if (!finalUpdateFunctionTasks.isEmpty()) {
 						updateFutureList.add(syncFuture.thenCompose(o -> coordinator.updateFunction(finalUpdateFunctionTasks, o)));

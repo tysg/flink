@@ -290,6 +290,10 @@ public class SlotManagerImpl implements SlotManager {
 	// Public API
 	// ---------------------------------------------------------------------------------------------
 
+	public Collection<TaskManagerSlot> getAllSlots() {
+		return slots.values();
+	}
+
 	/**
 	 * Requests a slot with the respective resource profile.
 	 *
