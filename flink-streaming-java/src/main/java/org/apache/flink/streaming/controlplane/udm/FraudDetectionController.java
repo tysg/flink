@@ -1,17 +1,21 @@
 package org.apache.flink.streaming.controlplane.udm;
 
 import org.apache.flink.api.common.functions.Function;
+import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.runtime.controlplane.abstraction.resource.AbstractSlot;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.type.TypeReference;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.flink.streaming.controlplane.streammanager.insts.ExecutionPlanWithLock;
-import org.apache.flink.streaming.controlplane.streammanager.insts.ReconfigurationExecutor;
+import org.apache.flink.streaming.controlplane.streammanager.abstraction.ExecutionPlanWithLock;
+import org.apache.flink.streaming.controlplane.streammanager.abstraction.ReconfigurationExecutor;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 
@@ -44,35 +48,90 @@ public class FraudDetectionController extends AbstractController {
 	@Override
 	protected void defineControlAction() throws Exception {
 		super.defineControlAction();
-		ExecutionPlanWithLock planWithLock;
-//		while (true) {
-//			try {
-		// random
-		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
-		updatePreprocessingScaleParameter(planWithLock);
-		updateDecisionTreeParameter(planWithLock);
-		Thread.sleep(2 * 60 * 1000);
-		requestTime += 2 * 60;
-		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
-		updatePreprocessingScaleParameter(planWithLock);
-		updateDecisionTreeParameter(planWithLock);
-
-		Thread.sleep(3 * 60 * 1000);
-		requestTime += 3 * 60;
+//		ExecutionPlanWithLock planWithLock;
+////		while (true) {
+////			try {
+//		// random
 //		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
 //		updatePreprocessingScaleParameter(planWithLock);
 //		updateDecisionTreeParameter(planWithLock);
+//		Thread.sleep(10 * 1000);
 //
-		Thread.sleep(2 * 60 * 1000);
-		requestTime += 2 * 60;
-		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
-		updatePreprocessingScaleParameter(planWithLock);
-		updateDecisionTreeParameter(planWithLock);
+//		Thread.sleep(2 * 60 * 1000);
+//		requestTime += 2 * 60;
+//		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
+//		updatePreprocessingScaleParameter(planWithLock);
+//		updateDecisionTreeParameter(planWithLock);
+
+//		Thread.sleep(105 * 1000);
+//		requestTime += 105;
+//		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
+//		updatePreprocessingScaleParameter(planWithLock);
+//		updateDecisionTreeParameter(planWithLock);
+////
+//		Thread.sleep(2 * 60 * 1000);
+//		requestTime += 2 * 60;
+//		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
+//		updatePreprocessingScaleParameter(planWithLock);
+//		updateDecisionTreeParameter(planWithLock);
 //			} catch (InterruptedException e) {
 //				break;
 //			}
 //		}
+		smartPlacement();
 	}
+
+	private void smartPlacement() throws Exception {
+		ExecutionPlanWithLock planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
+
+		Map<Integer, Tuple2<Integer, String>> deployment = new HashMap<>();
+		int preprocessOpID = findOperatorByName("preprocess");
+
+		Map<String, List<AbstractSlot>> resourceMap = planWithLock.getResourceDistribution();
+		int p = planWithLock.getParallelism(preprocessOpID);
+		List<AbstractSlot> allocatedSlots = allocateResourceUniformly(resourceMap, p);
+		assert allocatedSlots != null;
+		for (int i = 0; i < p; i++) {
+			deployment.put(i, Tuple2.of(i + p, allocatedSlots.get(i).getId()));
+		}
+		placement(preprocessOpID, deployment);
+	}
+
+	private List<AbstractSlot> allocateResourceUniformly(Map<String, List<AbstractSlot>> resourceMap, int numTasks) throws Exception {
+		List<AbstractSlot> res = new ArrayList<>(numTasks);
+		int numNodes = resourceMap.size();
+		// todo, please ensure numTask could be divided by numNodes for experiment
+		if (numTasks % numNodes != 0) {
+			throw new Exception("please ensure numTask could be divided by numNodes for experiment");
+		}
+		int numTasksInOneNode = numTasks / numNodes;
+		// todo, now I will remove the allocated slot from resource map instead of change its state, thus
+		//  placement should only happened once since the resource map is not consistent with real condition due to slot state change
+		for (String nodeID : resourceMap.keySet()) {
+			List<AbstractSlot> slotList = resourceMap.get(nodeID);
+			int allocated = 0;
+			for (AbstractSlot slot : slotList) {
+				if (allocated >= numTasksInOneNode) {
+					break;
+				}
+				if (slot.getState() == AbstractSlot.State.FREE) {
+					System.out.println("++++++ choosing slot: " + slot);
+					res.add(slot);
+					allocated++;
+				}
+			}
+		}
+		if (res.size() == numTasks) {
+			// remove them from source map
+			for (AbstractSlot slot : res) {
+				resourceMap.get(slot.getLocation()).remove(slot);
+			}
+			return res;
+		} else {
+			return null;
+		}
+	}
+
 
 	private void updatePreprocessingScaleParameter(ExecutionPlanWithLock planWithLock) throws Exception {
 		String scalePara = sendGet("http://127.0.0.1:5000/scale/" + requestTime);

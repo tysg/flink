@@ -19,6 +19,7 @@
 package org.apache.flink.runtime.controlplane;
 
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
@@ -84,7 +85,7 @@ public interface PrimitiveOperation<M> {
 
 	CompletableFuture<Void> updateTaskResources(int operatorID, int oldParallelism);
 
-	CompletableFuture<Void> updateTaskResources(Map<Integer, List<Integer>> tasks);
+	CompletableFuture<Void> updateTaskResources(Map<Integer, List<Integer>> tasks, Map<Integer, List<SlotID>> slotIds);
 
 	/**
 	 * Update key mappings between destOp and its parents

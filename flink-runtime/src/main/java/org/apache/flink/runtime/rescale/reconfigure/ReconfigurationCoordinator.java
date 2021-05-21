@@ -163,6 +163,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 		return currentSyncOp.resumeAll().thenAccept(o -> currentSyncOp = null);
 	}
 
+	@Deprecated
 	@Override
 	public CompletableFuture<Void> updateTaskResources(int operatorID, int oldParallelism) {
 		// TODO: By far we only support horizontal scaling, vertival scaling is not included.
@@ -180,7 +181,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 	}
 
 	@Override
-	public CompletableFuture<Void> updateTaskResources(Map<Integer, List<Integer>> tasks) {
+	public CompletableFuture<Void> updateTaskResources(Map<Integer, List<Integer>> tasks, Map<Integer, List<SlotID>> slotIds) {
 		// TODO: By far we only support horizontal scaling, vertival scaling is not included.
 //		System.out.println("++++++ re-allocate resources for tasks" + operatorID);
 		int operatorID = tasks.keySet().iterator().next();
@@ -192,7 +193,15 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 //		} else {
 //			return deployTasks(operatorID);
 //		}
-		return deployTasks(operatorID)
+		CompletableFuture<Void> deployTaskFuture;
+		if(slotIds == null){
+			deployTaskFuture = deployTasks(operatorID);
+		}else {
+			// the parallelism parameter is useless
+			List<SlotID> targetSlotIDs = slotIds.get(operatorID);
+			deployTaskFuture = deployTasks(operatorID, 0, targetSlotIDs);
+		}
+		return deployTaskFuture
 			.thenCompose(execution -> updateDownstreamGates(operatorID))
 			.thenCompose(execution -> cancelTasks(operatorID));
 	}
@@ -272,7 +281,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 //			});
 	}
 
-	public CompletableFuture<Void> deployTasks(int operatorID, int oldParallelism, List<SlotID> slotIds) {
+	private CompletableFuture<Void> deployTasks(int operatorID, int oldParallelism, List<SlotID> slotIds) {
 		// TODO: add the task to the checkpointCoordinator
 		System.out.println("deploying... tasks of " + operatorID);
 		LOG.info("++++++ deploying tasks" + operatorID);

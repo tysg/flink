@@ -49,32 +49,38 @@ public interface ReconfigurationExecutor {
 	@Deprecated
 	void rescaleStreamJob(JobRescaleAction.RescaleParamsWrapper wrapper);
 
+	@Deprecated
 	void rescale(int operatorID, int newParallelism, Map<Integer, List<Integer>> keyStateAllocation, ControlPolicy waitingController);
 
+	@Deprecated
 	void rescale(ExecutionPlan executionPlan, int operatorID, Boolean isScaleIn, ControlPolicy waitingController);
 
+	@Deprecated
 	void placement(int operatorID, Map<Integer, List<Integer>> keyStateAllocation, ControlPolicy waitingController);
 
+	@Deprecated
 	void rebalance(int operatorID, Map<Integer, List<Integer>> keyStateAllocation, boolean stateful, ControlPolicy waitingController);
 
+	@Deprecated
 	void rebalance(ExecutionPlan executionPlan, int operatorID, ControlPolicy waitingController);
 
 	/**
 	 * Use to notify job master that some operator inside job vertex changed,
 	 * Thus the corresponding executor could substitute new operator from the original one.
-	 *
+	 * <p>
 	 * todo stream operator factory belongs to flink, should we decouple it?
 	 *
 	 * @param operatorID the id of changed operator
-	 * @param function the new operator UDF, noted this only suitable for UDFOperator
+	 * @param function   the new operator UDF, noted this only suitable for UDFOperator
 	 */
+	@Deprecated
 	void reconfigureUserFunction(int operatorID, Object function, ControlPolicy waitingController);
 
 	void noOp(int operatorID, ControlPolicy waitingController);
 
 
 	default void callCustomizeOperations(
-		Function<PrimitiveOperation<Map<Integer, Map<Integer, AbstractCoordinator.Diff>>>, CompletableFuture<?>> operationCaller){
+		Function<PrimitiveOperation<Map<Integer, Map<Integer, AbstractCoordinator.Diff>>>, CompletableFuture<?>> operationCaller) {
 
 	}
 }

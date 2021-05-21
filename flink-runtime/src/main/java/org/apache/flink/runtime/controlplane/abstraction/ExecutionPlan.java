@@ -2,6 +2,7 @@ package org.apache.flink.runtime.controlplane.abstraction;
 
 
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.controlplane.abstraction.resource.AbstractSlot;
 
 import javax.annotation.Nullable;
@@ -24,6 +25,8 @@ public interface ExecutionPlan {
 	 * @return
 	 */
 	List<Node> getResourceDistribution();
+
+	Map<String, List<AbstractSlot>> getSlotMap();
 
 	/**
 	 * Get one of the parallel task of one operator.
@@ -144,6 +147,8 @@ public interface ExecutionPlan {
 	ExecutionPlan update(Function<ExecutionPlan, ExecutionPlan> applier);
 
 	Map<String, Map<Integer, List<Integer>>> getTransformations();
+
+	Map<Integer, List<SlotID>> getSlotAllocation();
 
 	void clearTransformations();
 

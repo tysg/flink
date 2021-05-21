@@ -23,6 +23,7 @@ import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
+import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.controlplane.ExecutionPlanAndJobGraphUpdaterFactory;
 import org.apache.flink.runtime.controlplane.PrimitiveOperation;
@@ -165,18 +166,19 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		this.jobGraphRescaler = new StreamJobGraphRescaler(jobGraph, userCodeLoader);
 
 		/* now the policy is temporary hard coded added */
-		String controllerName = streamManagerConfiguration.getConfiguration().getString(CONTROLLER, "DummyController");
-		switch (controllerName) {
-			case "DummyController":
-				this.controlPolicyList.put("DummyController", new DummyController(this));
-				break;
-			case "StockController":
-				this.controlPolicyList.put("StockController", new StockController(this, streamManagerConfiguration.getConfiguration()));
-				break;
-			case "PerformanceEvaluator":
-				this.controlPolicyList.put("PerformanceEvaluator", new PerformanceEvaluator(this, streamManagerConfiguration.getConfiguration()));
-				break;
-		}
+//		String controllerName = streamManagerConfiguration.getConfiguration().getString(CONTROLLER, "DummyController");
+//		switch (controllerName) {
+//			case "DummyController":
+//				this.controlPolicyList.put("DummyController", new DummyController(this));
+//				break;
+//			case "StockController":
+//				this.controlPolicyList.put("StockController", new StockController(this, streamManagerConfiguration.getConfiguration()));
+//				break;
+//			case "PerformanceEvaluator":
+//				this.controlPolicyList.put("PerformanceEvaluator", new PerformanceEvaluator(this, streamManagerConfiguration.getConfiguration()));
+//				break;
+//		}
+		this.controlPolicyList.put("FraudDetectionController", new FraudDetectionController(this));
 
 		reconfigurationProfiler = new ReconfigurationProfiler(streamManagerConfiguration.getConfiguration());
 	}
@@ -418,7 +420,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						return coordinator.updateState(updateStateTasks, o);
 					}));
 					updateFutureList.add(syncFuture.thenCompose(o -> {
-						return coordinator.updateTaskResources(deployingTasks);
+						return coordinator.updateTaskResources(deployingTasks, null);
 					}));
 
 					// finish the reconfiguration after all asynchronous update completed
@@ -518,7 +520,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						return coordinator.updateState(updateStateTasks, o);
 					}));
 					updateFutureList.add(syncFuture.thenCompose(o -> {
-						return coordinator.updateTaskResources(deployingTasks);
+						return coordinator.updateTaskResources(deployingTasks, null);
 					}));
 
 					// finish the reconfiguration after all asynchronous update completed
@@ -618,7 +620,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 //						return coordinator.updateState(updateStateTasks, o);
 //					}));
 					updateFutureList.add(syncFuture
-						.thenCompose(o -> coordinator.updateTaskResources(deployingTasks)));
+						.thenCompose(o -> coordinator.updateTaskResources(deployingTasks, null)));
 //					updateFutureList.add(syncFuture.thenCompose(o -> {
 //						return coordinator.updateTaskResources(deployingTasks, true);
 //					}));
@@ -1142,6 +1144,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			Map<Integer, List<Integer>> updateKeyMappingTasks = new HashMap<>();
 			Map<Integer, List<Integer>> reDeployingTasks = new HashMap<>();
 			Map<Integer, List<Integer>> updateFunctionTasks = new HashMap<>();
+			Map<Integer, List<SlotID>> targetSlotAllocation = null;
 			for (String operation : transformations.keySet()) {
 				Map<Integer, List<Integer>> transformation = transformations.get(operation);
 				switch (operation) {
@@ -1154,6 +1157,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						break;
 					case "remapping":
 						updateKeyMappingTasks = transformation;
+						targetSlotAllocation = executionPlan.getSlotAllocation();
 						break;
 					case "updateExecutionLogic":
 						updateFunctionTasks = transformation;
@@ -1171,6 +1175,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			Map<Integer, List<Integer>> finalUpdateStateTasks = updateStateTasks;
 			Map<Integer, List<Integer>> finalDeployingTasks = reDeployingTasks;
 			Map<Integer, List<Integer>> finalUpdateFunctionTasks = updateFunctionTasks;
+			Map<Integer, List<SlotID>> finalSlotAllocation = targetSlotAllocation;
 			runAsync(() -> jobMasterGateway.callOperations(
 				coordinator -> {
 					// prepare and synchronize among affected tasks
@@ -1187,7 +1192,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						updateFutureList.add(syncFuture.thenCompose(o -> coordinator.updateState(finalUpdateStateTasks, o)));
 					}
 					if (!finalDeployingTasks.isEmpty()) {
-						updateFutureList.add(syncFuture.thenCompose(o -> coordinator.updateTaskResources(finalDeployingTasks)));
+						updateFutureList.add(syncFuture.thenCompose(o -> coordinator.updateTaskResources(finalDeployingTasks, finalSlotAllocation)));
 					}
 					if (!finalUpdateFunctionTasks.isEmpty()) {
 						updateFutureList.add(syncFuture.thenCompose(o -> coordinator.updateFunction(finalUpdateFunctionTasks, o)));

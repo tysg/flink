@@ -20,9 +20,11 @@ package org.apache.flink.streaming.controlplane.streammanager.abstraction;
 
 import org.apache.flink.api.common.functions.Function;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan.*;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
+import org.apache.flink.runtime.controlplane.abstraction.resource.AbstractSlot;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 
 import javax.annotation.Nullable;
@@ -89,8 +91,8 @@ public class ExecutionPlanWithLock {
 
 	// delegate methods
 //	@Override
-	public List<Node> getResourceDistribution() {
-		return executionPlan.getResourceDistribution();
+	public Map<String, List<AbstractSlot>> getResourceDistribution() {
+		return executionPlan.getSlotMap();
 	}
 
 //	@Override
@@ -146,6 +148,10 @@ public class ExecutionPlanWithLock {
 //	@Override
 	public ExecutionPlan update(java.util.function.Function<ExecutionPlan, ExecutionPlan> applier) {
 		return executionPlan.update(applier);
+	}
+
+	public Map<Integer, List<SlotID>> getSlotAllocation() {
+		return executionPlan.getSlotAllocation();
 	}
 
 	public Map<String, Map<Integer, List<Integer>>> getTransformations() {

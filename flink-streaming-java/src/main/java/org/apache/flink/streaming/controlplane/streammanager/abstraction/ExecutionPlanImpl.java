@@ -21,9 +21,11 @@ package org.apache.flink.streaming.controlplane.streammanager.abstraction;
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.api.common.functions.Function;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
 import org.apache.flink.runtime.controlplane.abstraction.resource.AbstractSlot;
+import org.apache.flink.runtime.controlplane.abstraction.resource.FlinkSlot;
 import org.apache.flink.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,11 +41,14 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 	private final Map<Integer, OperatorDescriptor> jobConfigurations;
 	// node with resources
 	private final List<Node> resourceDistribution;
+
 	// slots to location map, which record the available slots for streaming job
 	private Map<String, List<AbstractSlot>> slotMap = new HashMap<>();
 
 	// transformation operations -> affected tasks grouped by operators.
 	private final Map<String, Map<Integer, List<Integer>>> transformations = new HashMap<>();
+
+	private final Map<Integer, List<SlotID>> slotAllocation = new HashMap<>();
 
 	@Internal
 	public ExecutionPlanImpl(Map<Integer, OperatorDescriptor> jobConfigurations,
@@ -156,9 +161,14 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 		if (deployment != null) {
 			if (deployment.size() != keyDistribution.size())
 				throw new RuntimeException("++++++ inconsistent number of tasks in workload allocation and resource allocation.");
+
+			slotAllocation.putIfAbsent(operatorID, new ArrayList<>());
 			for (Integer taskId : deployment.keySet()) {
 				// set a new KeyStateAllocation through the new deployment
-				Integer newTaskId = deployment.get(taskId).f0;
+				Tuple2<Integer, String> idAndSlots = deployment.get(taskId);
+				Integer newTaskId = idAndSlots.f0;
+				// todo, temporary solution for store slot allocation info
+				slotAllocation.get(operatorID).add(FlinkSlot.toSlotId(idAndSlots.f1));
 				newKeyDistribution.put(newTaskId, keyDistribution.get(taskId));
 			}
 			// update the key set
@@ -200,8 +210,14 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 	}
 
 	@Override
+	public Map<Integer, List<SlotID>> getSlotAllocation() {
+		return slotAllocation;
+	}
+
+	@Override
 	public void clearTransformations() {
 		transformations.clear();
+		slotAllocation.clear();
 	}
 
 //	public OperatorDescriptor[] getHeadOperators() {
@@ -211,6 +227,11 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 	@Override
 	public List<Node> getResourceDistribution() {
 		return resourceDistribution;
+	}
+
+	@Override
+	public Map<String, List<AbstractSlot>> getSlotMap() {
+		return Collections.unmodifiableMap(slotMap);
 	}
 
 	@Override
