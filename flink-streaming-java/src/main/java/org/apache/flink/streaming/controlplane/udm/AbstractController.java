@@ -2,6 +2,9 @@ package org.apache.flink.streaming.controlplane.udm;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.type.TypeReference;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.flink.streaming.controlplane.streammanager.abstraction.ExecutionPlanWithLock;
 import org.apache.flink.streaming.controlplane.streammanager.abstraction.ReconfigurationExecutor;
 
@@ -11,6 +14,11 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * If you wish to submit your controller via restful API,
+ * please insure the subclass of AbstractController do not have any inner class (lambda, anonymous inner class etc) !!!
+ *
+ */
 public abstract class AbstractController implements ControlPolicy {
 
 	private final ReconfigurationExecutor reconfigurationExecutor;
@@ -87,6 +95,12 @@ public abstract class AbstractController implements ControlPolicy {
 			.assignExecutionLogic(operatorId, function);
 		getReconfigurationExecutor().execute(this, executionPlan);
 		onChangeStarted();
+	}
+
+	protected Map<String, Object> parseJsonString(String json) throws JsonProcessingException {
+		ObjectMapper objectMapper = new ObjectMapper();
+		return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {
+		});
 	}
 
 	protected void defineControlAction () throws Exception{}

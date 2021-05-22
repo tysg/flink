@@ -3,15 +3,11 @@ package org.apache.flink.streaming.controlplane.udm;
 import org.apache.flink.api.common.functions.Function;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.controlplane.abstraction.resource.AbstractSlot;
-import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
-import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.type.TypeReference;
-import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.flink.streaming.controlplane.streammanager.abstraction.ExecutionPlanWithLock;
 import org.apache.flink.streaming.controlplane.streammanager.abstraction.ReconfigurationExecutor;
 import org.apache.flink.util.FileUtils;
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -44,13 +40,6 @@ public class FraudDetectionController extends AbstractController {
 		super.controlActionRunner.interrupt();
 	}
 
-
-	private Map<String, Object> parseJsonString(String json) throws JsonProcessingException {
-		ObjectMapper objectMapper = new ObjectMapper();
-		return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {
-		});
-	}
-
 	@Override
 	protected void defineControlAction() throws Exception {
 		super.defineControlAction();
@@ -62,11 +51,11 @@ public class FraudDetectionController extends AbstractController {
 		Thread.sleep(10 * 1000);
 //
 //		Thread.sleep(2 * 60 * 1000);
-//		requestTime += 2 * 60;
-//		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
-//		updatePreprocessingScaleParameter(planWithLock);
-//		Thread.sleep(10 * 1000);
-//		updateDecisionTreeParameter(planWithLock);
+		requestTime += 2 * 60;
+		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
+		updatePreprocessingScaleParameter(planWithLock);
+		Thread.sleep(10 * 1000);
+		updateDecisionTreeParameter(planWithLock);
 //
 //		Thread.sleep(105 * 1000);
 //		requestTime += 105;
