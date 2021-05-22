@@ -183,7 +183,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 //				this.controlPolicyList.put("PerformanceEvaluator", new PerformanceEvaluator(this, streamManagerConfiguration.getConfiguration()));
 //				break;
 //		}
-		this.controlPolicyList.put("FraudDetectionController", new FraudDetectionController(this));
+//		this.controlPolicyList.put("FraudDetectionController", new FraudDetectionController(this));
 
 		reconfigurationProfiler = new ReconfigurationProfiler(streamManagerConfiguration.getConfiguration());
 	}
@@ -1118,8 +1118,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	 * @return StreamManagerGateway belonging to this service
 	 */
 	@Override
-	public StreamManager getGateway() {
-		return getSelfGateway(StreamManager.class);
+	public StreamManagerGateway getGateway() {
+		return getSelfGateway(StreamManagerGateway.class);
 	}
 
 	@Override
