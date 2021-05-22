@@ -18,6 +18,8 @@
 
 package org.apache.flink.streaming.controlplane.streammanager.abstraction;
 
+import org.apache.flink.annotation.Internal;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.controlplane.PrimitiveOperation;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.runtime.rescale.JobRescaleAction;
@@ -45,6 +47,9 @@ public interface ReconfigurationExecutor {
 	ExecutionPlanWithLock getExecutionPlanCopy();
 
 	void execute(ControlPolicy controller, ExecutionPlanWithLock executionPlanCopy);
+
+	@Internal
+	Configuration getExperimentConfig();
 
 	@Deprecated
 	void rescaleStreamJob(JobRescaleAction.RescaleParamsWrapper wrapper);

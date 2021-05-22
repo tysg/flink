@@ -568,6 +568,7 @@ public abstract class StreamManagerDispatcher extends PermanentlyFencedRpcEndpoi
 		String sourceCode,
 		@RpcTimeout Time timeout) {
 
+		log.info("register new controller, controllerID:" + controllerID + " class name:" + className + " for job:" + jobId);
 		CompletableFuture<StreamManagerGateway> gatewayFuture = getStreamManagerGatewayFuture(jobId);
 		CompletableFuture<Boolean> registerFuture = gatewayFuture.thenApply(gateway ->
 			gateway.registerNewController(controllerID, className, sourceCode));

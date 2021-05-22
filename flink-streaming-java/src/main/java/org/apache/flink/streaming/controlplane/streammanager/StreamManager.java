@@ -22,6 +22,7 @@ import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
@@ -108,6 +109,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 	private final LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever;
 
+	@Deprecated
 	private final JobGraphRescaler jobGraphRescaler;
 
 	private final Map<String, ControlPolicy> controlPolicyList = new HashMap<>();
@@ -1127,6 +1129,11 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 //		ExecutionPlan executionPlanCopy = new ExecutionPlanImpl();
 //		ExecutionPlanWithLock executionPlanWithLockCopy = new ExecutionPlanWithLock(executionPlan.getExecutionPlan());
 		return executionPlan.copy();
+	}
+
+	@Override
+	public Configuration getExperimentConfig(){
+		return this.streamManagerConfiguration.getConfiguration();
 	}
 
 	@Override
