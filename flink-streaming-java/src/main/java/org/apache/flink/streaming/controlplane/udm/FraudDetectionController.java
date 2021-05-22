@@ -73,20 +73,22 @@ public class FraudDetectionController extends AbstractController {
 		updatePreprocessingScaleParameter(planWithLock);
 		updateDecisionTreeParameter(planWithLock);
 
-		smartPlacement();
+		Thread.sleep(10 * 1000);
+		requestTime += 10;
+		smartPlacement(findOperatorByName("dtree"));
+//		smartPlacement(findOperatorByName("preprocess"));
 
-		Thread.sleep(2 * 60 * 1000);
-		requestTime += 2 * 60;
+		Thread.sleep(110 * 1000);
+		requestTime += 110;
 		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
 		updatePreprocessingScaleParameter(planWithLock);
 		updateDecisionTreeParameter(planWithLock);
 	}
 
-	private void smartPlacement() throws Exception {
+	private void smartPlacement(int preprocessOpID) throws Exception {
 		ExecutionPlanWithLock planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
 
 		Map<Integer, Tuple2<Integer, String>> deployment = new HashMap<>();
-		int preprocessOpID = findOperatorByName("dtree");
 
 		Map<String, List<AbstractSlot>> resourceMap = planWithLock.getResourceDistribution();
 		int p = planWithLock.getParallelism(preprocessOpID);
