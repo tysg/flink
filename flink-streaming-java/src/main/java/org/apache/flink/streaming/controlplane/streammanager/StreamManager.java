@@ -30,6 +30,8 @@ import org.apache.flink.runtime.controlplane.ExecutionPlanAndJobGraphUpdaterFact
 import org.apache.flink.runtime.controlplane.PrimitiveOperation;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
+import org.apache.flink.runtime.controlplane.abstraction.resource.AbstractSlot;
+import org.apache.flink.runtime.controlplane.abstraction.resource.FlinkSlot;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerId;
 import org.apache.flink.runtime.dispatcher.DispatcherGateway;
@@ -47,6 +49,7 @@ import org.apache.flink.runtime.rescale.reconfigure.JobGraphRescaler;
 import org.apache.flink.runtime.resourcemanager.JobLeaderIdActions;
 import org.apache.flink.runtime.resourcemanager.JobLeaderIdService;
 import org.apache.flink.runtime.resourcemanager.registration.JobManagerRegistration;
+import org.apache.flink.runtime.resourcemanager.slotmanager.TaskManagerSlot;
 import org.apache.flink.runtime.rpc.FatalErrorHandler;
 import org.apache.flink.runtime.rpc.FencedRpcEndpoint;
 import org.apache.flink.runtime.rpc.RpcService;
@@ -1206,24 +1209,38 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					}
 
 					// finish the reconfiguration after all asynchronous update completed
-					return FutureUtils.completeAll(updateFutureList)
-						.thenCompose(o -> coordinator.resumeTasks())
-						.whenComplete((o, failure) -> {
-							if (failure != null) {
-								LOG.error("Reconfiguration failed: ", failure);
-								failure.printStackTrace();
-							}
-							try {
-								System.out.println("++++++ finished update");
-								log.info("++++++ finished update");
-								executionPlan.clearTransformations();
-								executionPlan.notifyUpdateFinished(failure);
-							} catch (Exception e) {
-								e.printStackTrace();
-							}
-						});
-				}
-			));
+					CompletableFuture<Void> finishFuture = FutureUtils.completeAll(updateFutureList)
+						.thenCompose(o -> coordinator.resumeTasks());
+					if (finalSlotAllocation != null) {
+						finishFuture = finishFuture
+							.thenCompose(o -> jobMasterGateway.getAllSlots())
+							.thenAccept(taskManagerSlots -> {
+								// compute
+								Map<String, List<AbstractSlot>> slotMap = new HashMap<>();
+								for (TaskManagerSlot taskManagerSlot : taskManagerSlots) {
+									AbstractSlot slot = FlinkSlot.fromTaskManagerSlot(taskManagerSlot);
+									List<AbstractSlot> slots = slotMap.computeIfAbsent(slot.getLocation(), k -> new ArrayList<>());
+									slots.add(slot);
+								}
+								executionPlan.getExecutionPlan().setSlotMap(slotMap);
+							});
+					}
+					return finishFuture.whenComplete((o, failure) -> {
+						if (failure != null) {
+							LOG.error("Reconfiguration failed: ", failure);
+							failure.printStackTrace();
+						}
+						try {
+							System.out.println("++++++ finished update");
+							log.info("++++++ finished update");
+							executionPlan.clearTransformations();
+							executionPlan.notifyUpdateFinished(failure);
+						} catch (Exception e) {
+							e.printStackTrace();
+						}
+					});
+				})
+			);
 		} catch (Exception e) {
 			LOG.error("Reconfiguration failed: ", e);
 			e.printStackTrace();

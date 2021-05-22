@@ -64,6 +64,12 @@ public class ExecutionPlanWithLock {
 		this.executionPlan = executionPlan;
 	}
 
+	private ExecutionPlanWithLock(ExecutionPlan executionPlan, AtomicInteger stateOfUpdate, ControlPolicy currentWaitingController) {
+		this.executionPlan = executionPlan;
+		this.stateOfUpdate.set(stateOfUpdate.get());
+		this.currentWaitingController = currentWaitingController;
+	}
+
 //	@Override
 	public void setStateUpdatingFlag(ControlPolicy waitingController) throws Exception {
 		// some strategy needed here to ensure there is only one update at one time
@@ -163,6 +169,6 @@ public class ExecutionPlanWithLock {
 	}
 
     public ExecutionPlanWithLock copy() {
-		return new ExecutionPlanWithLock(executionPlan.copy());
+		return new ExecutionPlanWithLock(executionPlan.copy(), stateOfUpdate, currentWaitingController);
     }
 }

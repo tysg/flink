@@ -56,33 +56,34 @@ public class FraudDetectionController extends AbstractController {
 		super.defineControlAction();
 		ExecutionPlanWithLock planWithLock;
 
-		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
-		updatePreprocessingScaleParameter(planWithLock);
-		updateDecisionTreeParameter(planWithLock);
+//		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
+//		updatePreprocessingScaleParameter(planWithLock);
+//		updateDecisionTreeParameter(planWithLock);
 		Thread.sleep(10 * 1000);
 //
-		Thread.sleep(2 * 60 * 1000);
+//		Thread.sleep(2 * 60 * 1000);
 		requestTime += 2 * 60;
 		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
 		updatePreprocessingScaleParameter(planWithLock);
-		updateDecisionTreeParameter(planWithLock);
-
-		Thread.sleep(105 * 1000);
-		requestTime += 105;
-		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
-		updatePreprocessingScaleParameter(planWithLock);
-		updateDecisionTreeParameter(planWithLock);
-
 		Thread.sleep(10 * 1000);
-		requestTime += 10;
-		smartPlacement(findOperatorByName("dtree"));
-//		smartPlacement(findOperatorByName("preprocess"));
-
-		Thread.sleep(110 * 1000);
-		requestTime += 110;
-		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
-		updatePreprocessingScaleParameter(planWithLock);
 		updateDecisionTreeParameter(planWithLock);
+//
+//		Thread.sleep(105 * 1000);
+//		requestTime += 105;
+//		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
+//		updatePreprocessingScaleParameter(planWithLock);
+//		updateDecisionTreeParameter(planWithLock);
+//
+		Thread.sleep(10 * 1000);
+		smartPlacement(findOperatorByName("dtree"));
+		Thread.sleep(10 * 1000);
+		smartPlacement(findOperatorByName("preprocess"));
+
+//		Thread.sleep(110 * 1000);
+//		requestTime += 110;
+//		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
+//		updatePreprocessingScaleParameter(planWithLock);
+//		updateDecisionTreeParameter(planWithLock);
 	}
 
 	private void smartPlacement(int preprocessOpID) throws Exception {
