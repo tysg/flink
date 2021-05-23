@@ -69,12 +69,6 @@ public class StockController extends AbstractController {
 		//		int reconfigFreq = Integer.parseInt(experimentConfig.getOrDefault(RECONFIG_FREQUENCY, "5"));
 		int testOpID = findOperatorByName(testOperatorName);
 		latestUnusedSubTaskIdx = getReconfigurationExecutor().getExecutionPlan().getParallelism(testOpID);
-		long start = System.currentTimeMillis();
-		boolean rebalanced = false;
-		boolean rescaled1 = false;
-		boolean rescaled2 = false;
-		boolean rescaled3 = false;
-		boolean rescaled4 = false;
 		// 5s
 		Thread.sleep(5000);
 		loadBalancingAll(testOpID);
@@ -87,34 +81,6 @@ public class StockController extends AbstractController {
 		// 400s
 		Thread.sleep(200000);
 		scaleInOne(testOpID);
-
-//		while (true) {
-//			// load balancing
-//			if (System.currentTimeMillis() - start > 5000 && !rebalanced) {
-//				loadBalancingAll(testOpID);
-//				rebalanced = true;
-//			}
-//			// scale out
-//			if (System.currentTimeMillis() - start > 100000 && !rescaled1) {
-//				scaleOutOne(testOpID);
-//				rescaled1 = true;
-//			}
-////			// scale out
-//			if (System.currentTimeMillis() - start > 200000 && !rescaled2) {
-//				scaleOutOne(testOpID);
-//				rescaled2 = true;
-//			}
-//			// scale in
-//			if (System.currentTimeMillis() - start > 400000 && !rescaled3) {
-//				scaleInOne(testOpID);
-//				rescaled3 = true;
-//			}
-////			// scale in
-////			if (System.currentTimeMillis() - start > 400000 && !rescaled4) {
-////				scaleInOne(testOpID);
-////				rescaled4 = true;
-////			}
-//		}
 	}
 
 	private void waitForCompletion() throws InterruptedException {

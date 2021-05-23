@@ -179,6 +179,9 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			case "StockController":
 				this.controlPolicyList.put("StockController", new StockController(this, streamManagerConfiguration.getConfiguration()));
 				break;
+			case "NexmarkController":
+				this.controlPolicyList.put("NexmarkController", new NexmarkController(this, streamManagerConfiguration.getConfiguration()));
+				break;
 			case "PerformanceEvaluator":
 				this.controlPolicyList.put("PerformanceEvaluator", new PerformanceEvaluator(this, streamManagerConfiguration.getConfiguration()));
 				break;
@@ -1163,11 +1166,11 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						updateStateTasks = transformation;
 						break;
 					case "redeploying":
+						targetSlotAllocation = executionPlan.getSlotAllocation();
 						reDeployingTasks = transformation;
 						break;
 					case "remapping":
 						updateKeyMappingTasks = transformation;
-						targetSlotAllocation = executionPlan.getSlotAllocation();
 						break;
 					case "updateExecutionLogic":
 						updateFunctionTasks = transformation;

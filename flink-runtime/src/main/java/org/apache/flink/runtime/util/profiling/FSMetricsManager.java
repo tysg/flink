@@ -296,8 +296,8 @@ public class FSMetricsManager implements Serializable, MetricsManager {
 
 	@Override
 	public void groundTruth(long arrivalTs, long latency) {
-		outputStreamDecorator.println(String.format("ts: %d endToEnd latency: %d", arrivalTs, latency));
-		System.out.printf("ts: %d endToEnd latency: %d%n", arrivalTs, latency);
+//		outputStreamDecorator.println(String.format("ts: %d endToEnd latency: %d", arrivalTs, latency));
+//		System.out.printf("ts: %d endToEnd latency: %d%n", arrivalTs, latency);
 	}
 
 	/**

@@ -39,7 +39,8 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 	private static final Logger LOG = LoggerFactory.getLogger(ExecutionPlanImpl.class);
 	// operatorId -> operator
 	private final Map<Integer, OperatorDescriptor> jobConfigurations;
-	// node with resources
+	@Deprecated
+	// node with resources, Deprecated, we now use slotMap to represent the resource distribution.
 	private final List<Node> resourceDistribution;
 
 	// slots to location map, which record the available slots for streaming job
