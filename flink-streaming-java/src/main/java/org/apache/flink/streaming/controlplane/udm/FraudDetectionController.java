@@ -98,8 +98,7 @@ public class FraudDetectionController extends AbstractController {
 			throw new Exception("please ensure numTask could be divided by numNodes for experiment");
 		}
 		int numTasksInOneNode = numTasks / numNodes;
-		// todo, now I will remove the allocated slot from resource map instead of change its state, thus
-		//  placement should only happened once since the resource map is not consistent with real condition due to slot state change
+
 		for (String nodeID : resourceMap.keySet()) {
 			List<AbstractSlot> slotList = resourceMap.get(nodeID);
 			int allocated = 0;
