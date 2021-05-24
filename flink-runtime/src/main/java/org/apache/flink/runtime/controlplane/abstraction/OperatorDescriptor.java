@@ -12,8 +12,6 @@ import org.slf4j.LoggerFactory;
 import java.lang.reflect.Field;
 import java.util.*;
 
-import static org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan.*;
-
 /**
  * this class make sure all field is not modifiable for external class
  */
@@ -98,6 +96,10 @@ public class OperatorDescriptor {
 
 	public TaskDescriptor getTask(int taskId) {
 		return taskConfigurations.tasks.get(taskId);
+	}
+
+	public Map<Integer, TaskDescriptor> getTasks() {
+		return taskConfigurations.tasks;
 	}
 
 	@Internal
@@ -253,7 +255,7 @@ public class OperatorDescriptor {
 			", parents:" + parents.size() + ", children:" + children.size() + '}';
 	}
 
-	public OperatorDescriptor copy(List<Node> resourceDistributionCopy) {
+	public OperatorDescriptor copy(List<NodeDescriptor> resourceDistributionCopy) {
 		TaskConfigurations taskConfigurationsCopy = taskConfigurations.copy(resourceDistributionCopy);
 		return new OperatorDescriptor(operatorID, name, stateful, taskConfigurationsCopy);
 	}
@@ -294,11 +296,11 @@ public class OperatorDescriptor {
 			this.tasks = tasks;
 		}
 
-		public TaskConfigurations copy(List<Node> resourceDistributionCopy) {
+		public TaskConfigurations copy(List<NodeDescriptor> resourceDistributionCopy) {
 			ExecutionLogic executionLogicCopy = executionLogic.copy();
 			Map<Integer, TaskDescriptor> tasksCopy = new HashMap<>();
 			for (Integer taskId : tasks.keySet()) {
-				for (Node nodeCopy : resourceDistributionCopy) {
+				for (NodeDescriptor nodeCopy : resourceDistributionCopy) {
 					if (tasks.get(taskId).location.nodeAddress.equals(nodeCopy.nodeAddress)) {
 						TaskDescriptor taskCopy = tasks.get(taskId).copy(nodeCopy);
 						tasksCopy.put(taskId, taskCopy);

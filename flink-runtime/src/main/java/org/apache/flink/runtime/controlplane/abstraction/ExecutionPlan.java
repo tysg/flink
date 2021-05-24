@@ -6,8 +6,6 @@ import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.controlplane.abstraction.resource.AbstractSlot;
 
 import javax.annotation.Nullable;
-import java.net.InetAddress;
-import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -24,7 +22,7 @@ public interface ExecutionPlan {
 	 *
 	 * @return
 	 */
-	List<Node> getResourceDistribution();
+	List<NodeDescriptor> getResourceDistribution();
 
 	Map<String, List<AbstractSlot>> getSlotMap();
 
@@ -36,61 +34,6 @@ public interface ExecutionPlan {
 	 * @return
 	 */
 	TaskDescriptor getTask(Integer operatorID, int taskId);
-
-	class TaskDescriptor {
-		// task own threads
-		int allocatedSlot;
-		Node location;
-		// TODO: add the config here.
-
-		public TaskDescriptor(int allocatedSlot, Node location) {
-			this.allocatedSlot = allocatedSlot;
-			this.location = location;
-			// taskId = <Operator, taskIdx>
-			location.addContainedTask(this);
-		}
-
-		public TaskDescriptor copy(Node nodeCopy) {
-			return new TaskDescriptor(allocatedSlot, nodeCopy);
-		}
-	}
-
-	class Node {
-//		// host network address
-//		InetAddress address;
-//		// host number of cpus
-//		int numCpus;
-//		/* host memory in bytes */
-//		int memory;
-
-		// address id
-		InetAddress nodeAddress;
-		// number of slots
-		int numOfSlots;
-
-		// taskId = <Operator, taskIdx>
-		List<TaskDescriptor> deployedTasks;
-
-		public Node(InetAddress nodeAddress, int numOfSlots) {
-//			this.address = address;
-//			this.numCpus = numCpus;
-//			this.memory = memory;
-			this.nodeAddress = nodeAddress;
-			this.numOfSlots = numOfSlots;
-			deployedTasks = new ArrayList<>();
-		}
-
-		public Node copy() {
-//			this.address = address;
-//			this.numCpus = numCpus;
-//			this.memory = memory;
-			return new Node(this.nodeAddress, this.numOfSlots);
-		}
-
-		void addContainedTask(TaskDescriptor task){
-			deployedTasks.add(task);
-		}
-	}
 
 	/**
 	 * Return UserFunction, StreamOperator, or StreamOperatorFactory?
@@ -143,6 +86,8 @@ public interface ExecutionPlan {
 	ExecutionPlan assignExecutionLogic(Integer operatorID, Object function);
 
 	ExecutionPlan assignResources(Integer operatorID, @Nullable Map<Integer, Tuple2<Integer, String>> deployment);
+
+	ExecutionPlan assignResourcesV2(Integer operatorID, @Nullable Map<Integer, String> deployment);
 
 	ExecutionPlan update(Function<ExecutionPlan, ExecutionPlan> applier);
 

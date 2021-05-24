@@ -23,7 +23,9 @@ import org.apache.flink.api.common.functions.Function;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
+import org.apache.flink.runtime.controlplane.abstraction.NodeDescriptor;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
+import org.apache.flink.runtime.controlplane.abstraction.TaskDescriptor;
 import org.apache.flink.runtime.controlplane.abstraction.resource.AbstractSlot;
 import org.apache.flink.runtime.controlplane.abstraction.resource.FlinkSlot;
 import org.apache.flink.util.Preconditions;
@@ -41,7 +43,7 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 	private final Map<Integer, OperatorDescriptor> jobConfigurations;
 	@Deprecated
 	// node with resources, Deprecated, we now use slotMap to represent the resource distribution.
-	private final List<Node> resourceDistribution;
+	private final List<NodeDescriptor> resourceDistribution;
 
 	// slots to location map, which record the available slots for streaming job
 	private Map<String, List<AbstractSlot>> slotMap = new HashMap<>();
@@ -53,13 +55,13 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 
 	@Internal
 	public ExecutionPlanImpl(Map<Integer, OperatorDescriptor> jobConfigurations,
-							 List<Node> resourceDistribution) {
+							 List<NodeDescriptor> resourceDistribution) {
 		this.jobConfigurations = jobConfigurations;
 		this.resourceDistribution = resourceDistribution;
 	}
 
 	public ExecutionPlanImpl(Map<Integer, OperatorDescriptor> jobConfigurations,
-							 List<Node> resourceDistribution,
+							 List<NodeDescriptor> resourceDistribution,
 							 Map<String, List<AbstractSlot>> slotMap) {
 		this.jobConfigurations = jobConfigurations;
 		this.resourceDistribution = resourceDistribution;
@@ -200,6 +202,71 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 	}
 
 	@Override
+	/**
+	 * @param deployment : TaskId -> Tuple2<newTaskId, SlotID>
+	 */
+	public ExecutionPlan assignResourcesV2(Integer operatorID, @Nullable Map<Integer, String> deployment) {
+		OperatorDescriptor targetDescriptor = getOperatorByID(operatorID);
+		// need to find out which task is to be redeployed
+		// because we used cancel and redeploy method, the new deployed task should have a new task id
+		// the actual placement is to migrate entire state from one task to another, and then kill the former.
+		Map<Integer, List<Integer>> keyDistribution = targetDescriptor.getKeyStateAllocation();
+		Map<Integer, Tuple2<Integer, String>> convertedDeployment = new HashMap<>();
+
+		Map<Integer, List<Integer>> newKeyDistribution = new HashMap<>();
+		if (deployment != null) {
+			int p = keyDistribution.size();
+
+			for (int taskId : deployment.keySet()) {
+				String curSlotId = deployment.get(taskId);
+				// if the current slotId is not equal to the slot id in the existing task
+				if (targetDescriptor.getTask(taskId).resourceSlot.equals(curSlotId)) {
+					convertedDeployment.put(taskId, Tuple2.of(taskId, curSlotId));
+				} else {
+					convertedDeployment.put(taskId, Tuple2.of(taskId + p, curSlotId));
+				}
+			}
+
+			if (convertedDeployment.size() != keyDistribution.size())
+				throw new RuntimeException("++++++ inconsistent number of tasks in workload allocation and resource allocation.");
+
+			slotAllocation.putIfAbsent(operatorID, new ArrayList<>());
+			for (Integer taskId : convertedDeployment.keySet()) {
+				// set a new KeyStateAllocation through the new deployment
+				Tuple2<Integer, String> idAndSlots = convertedDeployment.get(taskId);
+				Integer newTaskId = idAndSlots.f0;
+				// todo, temporary solution for store slot allocation info
+				slotAllocation.get(operatorID).add(FlinkSlot.toSlotId(idAndSlots.f1));
+				newKeyDistribution.put(newTaskId, keyDistribution.get(taskId));
+			}
+			// update the key set
+			Map<Integer, List<Integer>> upstreamTasks = transformations.getOrDefault("upstream", new HashMap<>());
+			for (OperatorDescriptor parent : targetDescriptor.getParents()) {
+				parent.updateKeyMapping(operatorID, newKeyDistribution);
+				upstreamTasks.put(parent.getOperatorID(), parent.getTaskIds());
+			}
+			transformations.put("upstream", upstreamTasks);
+
+			// add the downstream tasks that need to know the members update in the upstream.
+			Map<Integer, List<Integer>> downStreamTasks = transformations.getOrDefault("downstream", new HashMap<>());
+			// put tasks in downstream vertex
+			targetDescriptor.getChildren()
+				.forEach(c -> downStreamTasks.put(c.getOperatorID(), c.getTaskIds()));
+			transformations.put("downstream", downStreamTasks);
+
+			Map<Integer, List<Integer>> reDeployingTasks = transformations.getOrDefault("redeploying", new HashMap<>());
+			reDeployingTasks.putIfAbsent(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
+			transformations.put("redeploying", reDeployingTasks);
+			transformations.put("remapping", reDeployingTasks);
+		} else {
+			Map<Integer, List<Integer>> reDeployingTasks = transformations.getOrDefault("redeploying", new HashMap<>());
+			reDeployingTasks.putIfAbsent(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
+			transformations.put("redeploying", reDeployingTasks);
+		}
+		return this;
+	}
+
+	@Override
 	// users need to implement their own update executionplan + add transformations
 	public ExecutionPlan update(java.util.function.Function<ExecutionPlan, ExecutionPlan> applier) {
 		return applier.apply(this);
@@ -226,7 +293,7 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 //	}
 
 	@Override
-	public List<Node> getResourceDistribution() {
+	public List<NodeDescriptor> getResourceDistribution() {
 		return resourceDistribution;
 	}
 
@@ -246,9 +313,9 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 	}
 
 	public ExecutionPlan copy() {
-		List<Node> resourceDistributionCopy = new ArrayList<>();
-		for (Node node : resourceDistribution) {
-			Node nodeCopy = node.copy();
+		List<NodeDescriptor> resourceDistributionCopy = new ArrayList<>();
+		for (NodeDescriptor node : resourceDistribution) {
+			NodeDescriptor nodeCopy = node.copy();
 			resourceDistributionCopy.add(nodeCopy);
 		}
 

@@ -3,10 +3,8 @@ package org.apache.flink.streaming.controlplane.jobgraph;
 import org.apache.flink.api.common.functions.Function;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
-import org.apache.flink.runtime.controlplane.abstraction.ControlAttribute;
-import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan.*;
-import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
-import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptorVisitor;
+import org.apache.flink.runtime.clusterframework.types.SlotID;
+import org.apache.flink.runtime.controlplane.abstraction.*;
 import org.apache.flink.runtime.execution.ExecutionState;
 import org.apache.flink.runtime.executiongraph.Execution;
 import org.apache.flink.runtime.executiongraph.ExecutionGraph;
@@ -38,7 +36,7 @@ public class ExecutionPlanBuilder {
 	// operatorId -> task
 	private final Map<Integer, Map<Integer, TaskDescriptor>> operatorToTaskMap = new HashMap<>();
 	// node with resources
-	private final List<Node> resourceDistribution;
+	private final List<NodeDescriptor> resourceDistribution;
 
 	public ExecutionPlanBuilder(JobGraph jobGraph, ExecutionGraph executionGraph, ClassLoader userClassLoader) {
 		Map<OperatorID, Integer> operatorIdToVertexId = new HashMap<>();
@@ -61,8 +59,8 @@ public class ExecutionPlanBuilder {
 	}
 
 	// DeployGraphState related
-	private List<Node> initDeploymentGraphState(ExecutionGraph executionGraph, Map<OperatorID, Integer> operatorIdToVertexId) {
-		Map<ResourceID, Node> resources = new HashMap<>();
+	private List<NodeDescriptor> initDeploymentGraphState(ExecutionGraph executionGraph, Map<OperatorID, Integer> operatorIdToVertexId) {
+		Map<ResourceID, NodeDescriptor> resources = new HashMap<>();
 
 		for (ExecutionJobVertex jobVertex : executionGraph.getAllVertices().values()) {
 			// contains all tasks of the same parallel operator instances
@@ -80,13 +78,14 @@ public class ExecutionPlanBuilder {
 					}
 				} while (execution == null || execution.getState() != ExecutionState.RUNNING);
 				LogicalSlot slot = execution.getAssignedResource();
-				Node node = resources.get(slot.getTaskManagerLocation().getResourceID());
+				NodeDescriptor node = resources.get(slot.getTaskManagerLocation().getResourceID());
 				if (node == null) {
-					node = new Node(slot.getTaskManagerLocation().address(), 0);
+					node = new NodeDescriptor(slot.getTaskManagerLocation().address(), 0);
 					resources.put(slot.getTaskManagerLocation().getResourceID(), node);
 				}
 				// todo how to get number of slots?
-				TaskDescriptor task = new TaskDescriptor(slot.getPhysicalSlotNumber(), node);
+				SlotID slotID = new SlotID(slot.getTaskManagerLocation().getResourceID(), slot.getPhysicalSlotNumber());
+				TaskDescriptor task = new TaskDescriptor(slotID.toString(), node);
 				taskMap.put(vertex.getParallelSubtaskIndex(), task);
 			}
 			for (OperatorID operatorID : jobVertex.getOperatorIDs()) {

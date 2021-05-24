@@ -196,7 +196,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 		CompletableFuture<Void> deployTaskFuture;
 		if(slotIds == null){
 			deployTaskFuture = deployTasks(operatorID);
-		}else {
+		} else {
 			// the parallelism parameter is useless
 			List<SlotID> targetSlotIDs = slotIds.get(operatorID);
 			deployTaskFuture = deployTasks(operatorID, 0, targetSlotIDs);
@@ -298,6 +298,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 			List<ExecutionVertex> vertices = createdCandidates.get(operatorID);
 			for (int i = 0; i < vertices.size(); i++) {
 				Execution executionAttempt = vertices.get(i).getCurrentExecutionAttempt();
+				LOG.info("++++++ allocating slots: " + slotIds.get(i));
 				allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(rescaleID, slotIds.get(i)));
 			}
 		} else {

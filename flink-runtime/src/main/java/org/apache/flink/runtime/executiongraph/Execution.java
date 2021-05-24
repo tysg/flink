@@ -53,6 +53,7 @@ import org.apache.flink.runtime.jobmanager.scheduler.ScheduledUnit;
 import org.apache.flink.runtime.jobmanager.scheduler.SlotSharingGroup;
 import org.apache.flink.runtime.jobmanager.slots.TaskManagerGateway;
 import org.apache.flink.runtime.jobmaster.LogicalSlot;
+import org.apache.flink.runtime.jobmaster.SlotContext;
 import org.apache.flink.runtime.jobmaster.SlotRequestId;
 import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.messages.TaskBackPressureResponse;
@@ -611,6 +612,8 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 					}
 
 					if (tryAssignResource(logicalSlot)) {
+						LOG.info("++++++ allocated slots: " +
+							new SlotID(logicalSlot.getTaskManagerLocation().getResourceID(), logicalSlot.getPhysicalSlotNumber()));
 						return logicalSlot;
 					} else {
 						// release the slot

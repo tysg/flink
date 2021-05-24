@@ -72,7 +72,8 @@ public abstract class AbstractController implements ControlPolicy {
 	}
 
 	protected void rescale(int operatorId, Map<Integer, List<Integer>> newKeyDistribution,
-						   @Nullable Map<Integer, Tuple2<Integer, String>> deployment) throws InterruptedException {
+//						   @Nullable Map<Integer, Tuple2<Integer, String>> deployment) throws InterruptedException {
+						@Nullable Map<Integer, Tuple2<Integer, String>> deployment) throws InterruptedException {
 		ExecutionPlanWithLock executionPlan = getReconfigurationExecutor().getExecutionPlanCopy();
 		executionPlan
 			.assignWorkload(operatorId, newKeyDistribution)
@@ -88,6 +89,15 @@ public abstract class AbstractController implements ControlPolicy {
 		getReconfigurationExecutor().execute(this, executionPlan);
 		onChangeStarted();
 	}
+
+	protected void placementV2(Integer operatorId, @Nullable Map<Integer, String> deployment) throws InterruptedException {
+		ExecutionPlanWithLock executionPlan = getReconfigurationExecutor().getExecutionPlanCopy();
+		executionPlan
+				.assignResourcesV2(operatorId, deployment);
+		getReconfigurationExecutor().execute(this, executionPlan);
+		onChangeStarted();
+	}
+
 
 	protected void changeOfLogic(Integer operatorId, Object function) throws InterruptedException {
 		ExecutionPlanWithLock executionPlan = getReconfigurationExecutor().getExecutionPlanCopy();

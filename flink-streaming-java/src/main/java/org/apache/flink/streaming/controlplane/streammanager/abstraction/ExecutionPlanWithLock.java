@@ -22,8 +22,8 @@ import org.apache.flink.api.common.functions.Function;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
-import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan.*;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
+import org.apache.flink.runtime.controlplane.abstraction.TaskDescriptor;
 import org.apache.flink.runtime.controlplane.abstraction.resource.AbstractSlot;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 
@@ -70,7 +70,6 @@ public class ExecutionPlanWithLock {
 		this.currentWaitingController = currentWaitingController;
 	}
 
-//	@Override
 	public void setStateUpdatingFlag(ControlPolicy waitingController) throws Exception {
 		// some strategy needed here to ensure there is only one update at one time
 		if (!stateOfUpdate.compareAndSet(COMMITTED, STAGED)) {
@@ -80,7 +79,6 @@ public class ExecutionPlanWithLock {
 		currentWaitingController = waitingController;
 	}
 
-//	@Override
 	public void notifyUpdateFinished(Throwable throwable) throws Exception {
 		if (stateOfUpdate.compareAndSet(STAGED, COMMITTED)) {
 			if (currentWaitingController != null) {
@@ -96,59 +94,52 @@ public class ExecutionPlanWithLock {
 	}
 
 	// delegate methods
-//	@Override
 	public Map<String, List<AbstractSlot>> getResourceDistribution() {
 		return executionPlan.getSlotMap();
 	}
 
-//	@Override
 	public TaskDescriptor getTask(Integer operatorID, int taskId) {
 		return executionPlan.getTask(operatorID, taskId);
 	}
 
-//	@Override
 	public Function getUserFunction(Integer operatorID) {
 		return executionPlan.getUserFunction(operatorID);
 	}
 
-//	@Override
 	public Map<Integer, List<Integer>> getKeyDistribution(Integer operatorID){
 		return executionPlan.getKeyStateAllocation(operatorID);
 	}
 
-//	@Override
 	public Map<Integer, Map<Integer, List<Integer>>> getKeyMapping(Integer operatorID) {
 		return executionPlan.getKeyMapping(operatorID);
 	}
 
-//	@Override
 	public int getParallelism(Integer operatorID) {
 		return executionPlan.getParallelism(operatorID);
 	}
 
-//	@Override
 	public Iterator<OperatorDescriptor> getAllOperator() {
 		return executionPlan.getAllOperator();
 	}
 
-//	@Override
 	public OperatorDescriptor getOperatorByID(Integer operatorID) {
 		return executionPlan.getOperatorByID(operatorID);
 	}
 
-//	@Override
 	public ExecutionPlan assignWorkload(Integer operatorID, Map<Integer, List<Integer>> distribution) {
 		return executionPlan.assignWorkload(operatorID, distribution);
 	}
-//
-//	@Override
+
 	public ExecutionPlan assignExecutionLogic(Integer operatorID, Object function) {
 		return executionPlan.assignExecutionLogic(operatorID, function);
 	}
 
-//	@Override
 	public ExecutionPlan assignResources(Integer operatorID, @Nullable Map<Integer, Tuple2<Integer, String>> deployment) {
 		return executionPlan.assignResources(operatorID, deployment);
+	}
+
+	public ExecutionPlan assignResourcesV2(Integer operatorID, @Nullable Map<Integer, String> deployment) {
+		return executionPlan.assignResourcesV2(operatorID, deployment);
 	}
 
 //	@Override
