@@ -56,8 +56,8 @@ public class FraudDetectionController extends AbstractController {
 //		Thread.sleep(2 * 60 * 1000);
 		requestTime += 2 * 60;
 		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
-		updatePreprocessingScaleParameter(planWithLock);
-		Thread.sleep(10 * 1000);
+//		updatePreprocessingScaleParameter(planWithLock);
+//		Thread.sleep(10 * 1000);
 		updateDecisionTreeParameter(planWithLock);
 //
 //		Thread.sleep(105 * 1000);

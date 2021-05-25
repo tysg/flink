@@ -171,22 +171,22 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		this.jobGraphRescaler = new StreamJobGraphRescaler(jobGraph, userCodeLoader);
 
 		/* now the policy is temporary hard coded added */
-		String controllerName = streamManagerConfiguration.getConfiguration().getString(CONTROLLER, "DummyController");
-		switch (controllerName) {
-			case "DummyController":
-				this.controlPolicyList.put("DummyController", new DummyController(this));
-				break;
-			case "StockController":
-				this.controlPolicyList.put("StockController", new StockController(this, streamManagerConfiguration.getConfiguration()));
-				break;
-			case "NexmarkController":
-				this.controlPolicyList.put("NexmarkController", new NexmarkController(this, streamManagerConfiguration.getConfiguration()));
-				break;
-			case "PerformanceEvaluator":
-				this.controlPolicyList.put("PerformanceEvaluator", new PerformanceEvaluator(this, streamManagerConfiguration.getConfiguration()));
-				break;
-		}
-//		this.controlPolicyList.put("FraudDetectionController", new FraudDetectionController(this));
+//		String controllerName = streamManagerConfiguration.getConfiguration().getString(CONTROLLER, "DummyController");
+//		switch (controllerName) {
+//			case "DummyController":
+//				this.controlPolicyList.put("DummyController", new DummyController(this));
+//				break;
+//			case "StockController":
+//				this.controlPolicyList.put("StockController", new StockController(this, streamManagerConfiguration.getConfiguration()));
+//				break;
+//			case "NexmarkController":
+//				this.controlPolicyList.put("NexmarkController", new NexmarkController(this, streamManagerConfiguration.getConfiguration()));
+//				break;
+//			case "PerformanceEvaluator":
+//				this.controlPolicyList.put("PerformanceEvaluator", new PerformanceEvaluator(this, streamManagerConfiguration.getConfiguration()));
+//				break;
+//		}
+		this.controlPolicyList.put("FraudDetectionController", new FraudDetectionController(this));
 
 		reconfigurationProfiler = new ReconfigurationProfiler(streamManagerConfiguration.getConfiguration());
 	}
