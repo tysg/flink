@@ -216,7 +216,8 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 		Map<Integer, List<Integer>> newKeyDistribution = new HashMap<>();
 		if (deployment != null) {
 			int p = keyDistribution.size();
-
+			// todo, temporary solution for store slot allocation info
+			slotAllocation.computeIfAbsent(operatorID, k -> new ArrayList<>());
 			for (int taskId : deployment.keySet()) {
 				String curSlotId = deployment.get(taskId);
 				// if the current slotId is not equal to the slot id in the existing task
@@ -224,19 +225,18 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 					convertedDeployment.put(taskId, Tuple2.of(taskId, curSlotId));
 				} else {
 					convertedDeployment.put(taskId, Tuple2.of(taskId + p, curSlotId));
+					slotAllocation.get(operatorID).add(FlinkSlot.toSlotId(curSlotId));
 				}
 			}
 
 			if (convertedDeployment.size() != keyDistribution.size())
 				throw new RuntimeException("++++++ inconsistent number of tasks in workload allocation and resource allocation.");
 
-			slotAllocation.putIfAbsent(operatorID, new ArrayList<>());
 			for (Integer taskId : convertedDeployment.keySet()) {
 				// set a new KeyStateAllocation through the new deployment
 				Tuple2<Integer, String> idAndSlots = convertedDeployment.get(taskId);
 				Integer newTaskId = idAndSlots.f0;
-				// todo, temporary solution for store slot allocation info
-				slotAllocation.get(operatorID).add(FlinkSlot.toSlotId(idAndSlots.f1));
+//				slotAllocation.get(operatorID).add(FlinkSlot.toSlotId(idAndSlots.f1));
 				newKeyDistribution.put(newTaskId, keyDistribution.get(taskId));
 			}
 			// update the key set
