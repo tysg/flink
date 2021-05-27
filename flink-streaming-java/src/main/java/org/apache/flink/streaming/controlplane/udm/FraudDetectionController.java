@@ -48,34 +48,30 @@ public class FraudDetectionController extends AbstractController {
 		super.defineControlAction();
 		ExecutionPlanWithLock planWithLock;
 
-//		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
-//		updatePreprocessingScaleParameter(planWithLock);
-//		updateDecisionTreeParameter(planWithLock);
+		requestTime = 0;
+		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
+		updateDecisionTreeParameter(planWithLock);
 		Thread.sleep(10 * 1000);
 //
-//		Thread.sleep(2 * 60 * 1000);
-		requestTime += 2 * 60;
+		Thread.sleep(2 * 60 * 1000);
+		requestTime = 120;
 		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
-//		updatePreprocessingScaleParameter(planWithLock);
-//		Thread.sleep(10 * 1000);
 		updateDecisionTreeParameter(planWithLock);
 //
-//		Thread.sleep(105 * 1000);
-//		requestTime += 105;
-//		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
-//		updatePreprocessingScaleParameter(planWithLock);
-//		updateDecisionTreeParameter(planWithLock);
+		Thread.sleep(105 * 1000);
+		requestTime = 225;
+		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
+		updateDecisionTreeParameter(planWithLock);
 //
-		Thread.sleep(10 * 1000);
-		smartPlacementV2(findOperatorByName("dtree"));
-		Thread.sleep(10 * 1000);
-		smartPlacementV2(findOperatorByName("preprocess"));
+		// Thread.sleep(40 * 1000);
+		// smartPlacementV2(findOperatorByName("dtree"));
+		// Thread.sleep(10 * 1000);
+		// smartPlacementV2(findOperatorByName("preprocess"));
 
-//		Thread.sleep(110 * 1000);
-//		requestTime += 110;
-//		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
-//		updatePreprocessingScaleParameter(planWithLock);
-//		updateDecisionTreeParameter(planWithLock);
+		Thread.sleep(120 * 1000);
+		requestTime = 345;
+		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
+		updateDecisionTreeParameter(planWithLock);
 	}
 
 	private void smartPlacement(int preprocessOpID) throws Exception {
@@ -280,6 +276,14 @@ public class FraudDetectionController extends AbstractController {
 	}
 
 	private void updateDecisionTreeParameter(ExecutionPlanWithLock planWithLock) throws Exception {
+		// preprocessing
+		String scalePara = sendGet("http://127.0.0.1:5000/scale/", requestTime);
+		Map<String, Object> scaleRes = parseJsonString(scalePara);
+		ArrayList<Double> center = (ArrayList<Double>) scaleRes.get("center");
+		ArrayList<Double> scale = (ArrayList<Double>) scaleRes.get("scale");
+		float[] centerArray = doubleListToArray(center);
+		float[] scaleArray = doubleListToArray(scale);
+		// processing
 		String treePara = sendGet("http://127.0.0.1:5000/dtree/", requestTime);
 		Map<String, Object> res = parseJsonString(treePara);
 		ArrayList<Integer> feature = (ArrayList<Integer>) res.get("feature");
@@ -305,8 +309,8 @@ public class FraudDetectionController extends AbstractController {
 			.getConstructor(int[].class, float[].class, int[].class, int[].class, float[][].class)
 			.newInstance(featureArr, thresholdArr, leftArr, rightArr, valueArr);
 		Function newProcessFunc = processFunc.getClass()
-			.getConstructor(decisionTreeRuleClass.getSuperclass())
-			.newInstance(newRule);
+			.getConstructor(decisionTreeRuleClass.getSuperclass(), float[].class, float[].class)
+			.newInstance(newRule, centerArray, scaleArray);
 		changeOfLogic(processOpID, newProcessFunc);
 	}
 
