@@ -185,8 +185,10 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			case "PerformanceEvaluator":
 				this.controlPolicyList.put("PerformanceEvaluator", new PerformanceEvaluator(this, streamManagerConfiguration.getConfiguration()));
 				break;
+			case "FraudDetectionController":
+				this.controlPolicyList.put("FraudDetectionController", new FraudDetectionController(this));
+				break;
 		}
-//		this.controlPolicyList.put("FraudDetectionController", new FraudDetectionController(this));
 
 		reconfigurationProfiler = new ReconfigurationProfiler(streamManagerConfiguration.getConfiguration());
 	}

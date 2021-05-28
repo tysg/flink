@@ -48,34 +48,30 @@ public class FraudDetectionController extends AbstractController {
 		super.defineControlAction();
 		ExecutionPlanWithLock planWithLock;
 
-//		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
-//		updatePreprocessingScaleParameter(planWithLock);
-//		updateDecisionTreeParameter(planWithLock);
-		Thread.sleep(10 * 1000);
-//
-//		Thread.sleep(2 * 60 * 1000);
-		requestTime += 2 * 60;
+		requestTime = 0;
 		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
-		updatePreprocessingScaleParameter(planWithLock);
-		Thread.sleep(10 * 1000);
 		updateDecisionTreeParameter(planWithLock);
-//
-//		Thread.sleep(105 * 1000);
-//		requestTime += 105;
-//		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
-//		updatePreprocessingScaleParameter(planWithLock);
-//		updateDecisionTreeParameter(planWithLock);
-//
 		Thread.sleep(10 * 1000);
-		smartPlacementV2(findOperatorByName("dtree"));
-		Thread.sleep(10 * 1000);
-		smartPlacementV2(findOperatorByName("preprocess"));
 
-//		Thread.sleep(110 * 1000);
-//		requestTime += 110;
-//		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
-//		updatePreprocessingScaleParameter(planWithLock);
-//		updateDecisionTreeParameter(planWithLock);
+		Thread.sleep(2 * 60 * 1000);
+		requestTime = 120;
+		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
+		updateDecisionTreeParameter(planWithLock);
+
+		Thread.sleep(10 * 1000);
+		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
+		int dtreeOpID = findOperatorByName("dtree");
+		smartPlacementV2(dtreeOpID, planWithLock.getParallelism(dtreeOpID) - 4);
+
+		Thread.sleep(55 * 1000);
+		requestTime = 225;
+		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
+		updateDecisionTreeParameter(planWithLock);
+
+		Thread.sleep(120 * 1000);
+		requestTime = 345;
+		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
+		updateDecisionTreeParameter(planWithLock);
 	}
 
 	private void smartPlacement(int preprocessOpID) throws Exception {
@@ -127,7 +123,7 @@ public class FraudDetectionController extends AbstractController {
 		}
 	}
 
-	private void smartPlacementV2(int testOpID) throws Exception {
+	private void smartPlacementV2(int testOpID, int maxTaskOneNode) throws Exception {
 		ExecutionPlanWithLock planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
 
 		Map<Integer, String> deployment = new HashMap<>();
@@ -137,7 +133,7 @@ public class FraudDetectionController extends AbstractController {
 		OperatorDescriptor operatorDescriptor = planWithLock.getOperatorByID(testOpID);
 
 		int p = planWithLock.getParallelism(testOpID);
-		Map<String, AbstractSlot> allocatedSlots = allocateResourceUniformlyV2(resourceMap, p);
+		Map<String, AbstractSlot> allocatedSlots = allocateResourceUniformlyV2(resourceMap, p, maxTaskOneNode);
 		Preconditions.checkNotNull(allocatedSlots, "no more slots can be allocated");
 		// place half of tasks with new slots
 		List<Integer> modifiedTasks = new ArrayList<>();
@@ -157,7 +153,7 @@ public class FraudDetectionController extends AbstractController {
 
 		List<AbstractSlot> allocatedSlotsList = new ArrayList<>(allocatedSlots.values());
 
-		for (int i=0; i<modifiedTasks.size(); i++) {
+		for (int i = 0; i < modifiedTasks.size(); i++) {
 			int taskId = modifiedTasks.get(i);
 			int newTaskId = taskId + p;
 			deployment.put(taskId, allocatedSlotsList.get(i).getId());
@@ -170,7 +166,7 @@ public class FraudDetectionController extends AbstractController {
 	}
 
 
-	private Map<String, AbstractSlot> allocateResourceUniformlyV2(Map<String, List<AbstractSlot>> resourceMap, int numTasks) throws Exception {
+	private Map<String, AbstractSlot> allocateResourceUniformlyV2(Map<String, List<AbstractSlot>> resourceMap, int numTasks, int maxTaskOneNode) throws Exception {
 		// slotId to slot mapping
 		Map<String, AbstractSlot> res = new HashMap<>(numTasks);
 		int numNodes = resourceMap.size();
@@ -178,7 +174,7 @@ public class FraudDetectionController extends AbstractController {
 		if (numTasks % numNodes != 0) {
 			throw new Exception("please ensure numTask could be divided by numNodes for experiment");
 		}
-		int numTasksInOneNode = numTasks / numNodes;
+		int numTasksInOneNode = maxTaskOneNode;
 		System.out.println("++++++ number of tasks on each nodes: " + numTasksInOneNode);
 
 		HashMap<String, Integer> loadMap = new HashMap<>();
@@ -203,7 +199,7 @@ public class FraudDetectionController extends AbstractController {
 			if (loadMap.getOrDefault(nodeID, 0) > numTasksInOneNode) {
 				int nReleasingSlots = loadMap.getOrDefault(nodeID, 0) - numTasksInOneNode;
 				releasingStots.put(nodeID, releasingStots.getOrDefault(nodeID, 0) + nReleasingSlots);
-				for (int i=0; i < nReleasingSlots; i++) {
+				for (int i = 0; i < nReleasingSlots; i++) {
 					findUnusedSlot(numTasksInOneNode, loadMap, pendingStots, nodeID, resourceMap);
 				}
 			}
@@ -249,7 +245,7 @@ public class FraudDetectionController extends AbstractController {
 			if (loadMap.getOrDefault(otherNodeID, 0) < numTasksInOneNode) {
 				System.out.println("++++++ exceeded number of tasks on node: " + nodeID
 					+ " allocate exceeded one to another node: " + otherNodeID);
-				pendingStots.put(otherNodeID, pendingStots.getOrDefault(otherNodeID, 0)+1);
+				pendingStots.put(otherNodeID, pendingStots.getOrDefault(otherNodeID, 0) + 1);
 				loadMap.put(otherNodeID, loadMap.getOrDefault(otherNodeID, 0) + 1);
 				break;
 			}
@@ -282,6 +278,14 @@ public class FraudDetectionController extends AbstractController {
 	}
 
 	private void updateDecisionTreeParameter(ExecutionPlanWithLock planWithLock) throws Exception {
+		// preprocessing
+		String scalePara = sendGet("http://127.0.0.1:5000/scale/", requestTime);
+		Map<String, Object> scaleRes = parseJsonString(scalePara);
+		ArrayList<Double> center = (ArrayList<Double>) scaleRes.get("center");
+		ArrayList<Double> scale = (ArrayList<Double>) scaleRes.get("scale");
+		float[] centerArray = doubleListToArray(center);
+		float[] scaleArray = doubleListToArray(scale);
+		// processing
 		String treePara = sendGet("http://127.0.0.1:5000/dtree/", requestTime);
 		Map<String, Object> res = parseJsonString(treePara);
 		ArrayList<Integer> feature = (ArrayList<Integer>) res.get("feature");
@@ -307,8 +311,8 @@ public class FraudDetectionController extends AbstractController {
 			.getConstructor(int[].class, float[].class, int[].class, int[].class, float[][].class)
 			.newInstance(featureArr, thresholdArr, leftArr, rightArr, valueArr);
 		Function newProcessFunc = processFunc.getClass()
-			.getConstructor(decisionTreeRuleClass.getSuperclass())
-			.newInstance(newRule);
+			.getConstructor(decisionTreeRuleClass.getSuperclass(), float[].class, float[].class)
+			.newInstance(newRule, centerArray, scaleArray);
 		changeOfLogic(processOpID, newProcessFunc);
 	}
 

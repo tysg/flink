@@ -296,6 +296,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 
 		if (slotIds != null) {
 			List<ExecutionVertex> vertices = createdCandidates.get(operatorID);
+			Preconditions.checkState(vertices.size() == slotIds.size(),  "number of given slot is not equal with createdCandidates");
 			for (int i = 0; i < vertices.size(); i++) {
 				Execution executionAttempt = vertices.get(i).getCurrentExecutionAttempt();
 				LOG.info("++++++ allocating slots: " + slotIds.get(i));
