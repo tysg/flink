@@ -4,34 +4,18 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
 import org.apache.flink.streaming.controlplane.streammanager.abstraction.ReconfigurationExecutor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
 import static org.apache.flink.util.Preconditions.checkState;
 
 public class StockController extends AbstractController {
-	private static final Logger LOG = LoggerFactory.getLogger(StockController.class);
-
 	private final Object lock = new Object();
 	private final Profiler profiler;
 	private final Map<String, String> experimentConfig;
 
-	public final static String AFFECTED_TASK = "trisk.reconfig.affected_tasks";
 	public final static String TEST_OPERATOR_NAME = "trisk.reconfig.operator.name";
-	public final static String RECONFIG_FREQUENCY = "trisk.reconfig.frequency";
-	public final static String RECONFIG_INTERVAL = "trisk.reconfig.interval";
-	public final static String TEST_TYPE = "trisk.reconfig.type";
 
-	private final static String REMAP = "remap";
-	private final static String RESCALE = "rescale";
-	private final static String NOOP = "noop";
-	private final static String EXECUTION_LOGIC = "logic";
-
-	private boolean finished = false;
-
-	private int latestUnusedSubTaskIdx = 0;
 
 	public StockController(ReconfigurationExecutor reconfigurationExecutor, Configuration configuration) {
 		super(reconfigurationExecutor);
@@ -49,26 +33,12 @@ public class StockController extends AbstractController {
 	@Override
 	public void stopControllers() {
 		System.out.println("PerformanceMeasure is stopping...");
-		finished = true;
 		profiler.interrupt();
-	}
-
-	@Override
-	public synchronized void onChangeCompleted(Throwable throwable) {
-		if (throwable != null) {
-			profiler.interrupt();
-			return;
-		}
-		synchronized (lock) {
-			lock.notify();
-		}
 	}
 
 	protected void generateTest() throws InterruptedException {
 		String testOperatorName = experimentConfig.getOrDefault(TEST_OPERATOR_NAME, "filter");
-		//		int reconfigFreq = Integer.parseInt(experimentConfig.getOrDefault(RECONFIG_FREQUENCY, "5"));
 		int testOpID = findOperatorByName(testOperatorName);
-		latestUnusedSubTaskIdx = getReconfigurationExecutor().getExecutionPlan().getParallelism(testOpID);
 		// 5s
 		Thread.sleep(5000);
 		loadBalancingAll(testOpID);
@@ -83,68 +53,54 @@ public class StockController extends AbstractController {
 		scaleInOne(testOpID);
 	}
 
-	private void waitForCompletion() throws InterruptedException {
-		// wait for operation completed
-		synchronized (lock) {
-			lock.wait();
-		}
-	}
-
 	private void loadBalancingAll(int testingOpID) throws InterruptedException {
 		ExecutionPlan executionPlan = getReconfigurationExecutor().getExecutionPlan();
-		scaling(testingOpID, executionPlan.getParallelism(testingOpID));
+		scalingByParallelism(testingOpID, executionPlan.getParallelism(testingOpID));
 	}
 
 	private void scaleOutOne(int testingOpID) throws InterruptedException {
 		ExecutionPlan executionPlan = getReconfigurationExecutor().getExecutionPlan();
-		scaling(testingOpID, executionPlan.getParallelism(testingOpID) + 1);
+		scalingByParallelism(testingOpID, executionPlan.getParallelism(testingOpID) + 1);
 	}
 
 	private void scaleInOne(int testingOpID) throws InterruptedException {
 		ExecutionPlan executionPlan = getReconfigurationExecutor().getExecutionPlan();
-		scaling(testingOpID, executionPlan.getParallelism(testingOpID) - 1);
+		scalingByParallelism(testingOpID, executionPlan.getParallelism(testingOpID) - 1);
 	}
 
-	private void scaling(int testingOpID, int newParallelism) throws InterruptedException {
+	private void scalingByParallelism(int testingOpID, int newParallelism) throws InterruptedException {
 		System.out.println("++++++ start scaling");
 		ExecutionPlan executionPlan = getReconfigurationExecutor().getExecutionPlan();
 		OperatorDescriptor targetDescriptor = executionPlan.getOperatorByID(testingOpID);
 
 
-		Map<Integer, List<Integer>> curKeyStateAllocation = targetDescriptor.getKeyStateAllocation();
+		Map<Integer, List<Integer>> curKeyStateDistribution = targetDescriptor.getKeyStateDistribution();
 		int oldParallelism = targetDescriptor.getParallelism();
-		assert oldParallelism == curKeyStateAllocation.size() : "old parallelism does not match the key set";
+		assert oldParallelism == curKeyStateDistribution.size() : "old parallelism does not match the key set";
 
-		Map<Integer, List<Integer>> newKeyStateAllocation = preparePartitionAssignment(newParallelism);
+		Map<Integer, List<Integer>> keyStateDistribution = preparePartitionAssignment(newParallelism);
 
 		int maxParallelism = 128;
-
 		for (int i = 0; i < maxParallelism; i++) {
-			newKeyStateAllocation.get(i%newParallelism).add(i);
+			keyStateDistribution.get(i%newParallelism).add(i);
 		}
-
-		System.out.println(newKeyStateAllocation);
 
 		// update the parallelism
 		targetDescriptor.setParallelism(newParallelism);
-		boolean isScaleIn = oldParallelism > newParallelism;
+//		boolean isScaleIn = oldParallelism > newParallelism;
 
 		// update the key set
 		for (OperatorDescriptor parent : targetDescriptor.getParents()) {
-			parent.updateKeyMapping(testingOpID, newKeyStateAllocation);
+			parent.updateKeyMapping(testingOpID, keyStateDistribution);
 		}
-
-		System.out.println(newKeyStateAllocation);
 
 		if (oldParallelism == newParallelism) {
-//			getReconfigurationExecutor().rebalance(testingOpID, newKeyStateAllocation, true, this);
-			getReconfigurationExecutor().rebalance(executionPlan, testingOpID, this);
+//			getReconfigurationExecutor().rebalance(executionPlan, testingOpID, this);
+			loadBalancing(testingOpID, keyStateDistribution);
 		} else {
-//			getReconfigurationExecutor().rescale(testingOpID, newParallelism, newKeyStateAllocation, this);
-			getReconfigurationExecutor().rescale(executionPlan, testingOpID, isScaleIn, this);
+//			getReconfigurationExecutor().rescale(executionPlan, testingOpID, isScaleIn, this);
+			scaling(testingOpID, keyStateDistribution, null);
 		}
-
-		waitForCompletion();
 	}
 
 	private Map<Integer, List<Integer>> preparePartitionAssignment(int parallleism) {

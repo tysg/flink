@@ -303,9 +303,9 @@ public class DummyController extends AbstractController {
 //
 //		onChangeStarted();
 		if (newParallelism != oldParallelism) {
-			rescale(operatorId, newKeyDistribution, null);
+			scaling(operatorId, newKeyDistribution, null);
 		} else {
-			remap(operatorId, newKeyDistribution);
+			loadBalancing(operatorId, newKeyDistribution);
 		}
 	}
 

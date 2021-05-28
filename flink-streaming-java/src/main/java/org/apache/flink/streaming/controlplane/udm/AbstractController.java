@@ -63,7 +63,7 @@ public abstract class AbstractController implements ControlPolicy {
 		return -1;
 	}
 
-	protected void remap(int operatorId, Map<Integer, List<Integer>> newKeyDistribution) throws InterruptedException {
+	protected void loadBalancing(int operatorId, Map<Integer, List<Integer>> newKeyDistribution) throws InterruptedException {
 		ExecutionPlanWithLock executionPlan = getReconfigurationExecutor().getExecutionPlanCopy();
 		executionPlan
 			.assignWorkload(operatorId, newKeyDistribution);
@@ -71,9 +71,9 @@ public abstract class AbstractController implements ControlPolicy {
 		onChangeStarted();
 	}
 
-	protected void rescale(int operatorId, Map<Integer, List<Integer>> newKeyDistribution,
+	protected void scaling(int operatorId, Map<Integer, List<Integer>> newKeyDistribution,
 //						   @Nullable Map<Integer, Tuple2<Integer, String>> deployment) throws InterruptedException {
-						@Nullable Map<Integer, Tuple2<Integer, String>> deployment) throws InterruptedException {
+						   @Nullable Map<Integer, Tuple2<Integer, String>> deployment) throws InterruptedException {
 		ExecutionPlanWithLock executionPlan = getReconfigurationExecutor().getExecutionPlanCopy();
 		executionPlan
 			.assignWorkload(operatorId, newKeyDistribution)

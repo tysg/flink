@@ -25,7 +25,7 @@ public class WorkloadsAssignmentHandler {
 			OperatorDescriptor descriptor = it.next();
 			int operatorID = descriptor.getOperatorID();
 			int parallelism = descriptor.getParallelism();
-			Map<Integer, List<Integer>> keyStateAllocation = descriptor.getKeyStateAllocation();
+			Map<Integer, List<Integer>> keyStateAllocation = descriptor.getKeyStateDistribution();
 			OperatorWorkloadsAssignment operatorWorkloadsAssignment = new OperatorWorkloadsAssignment(keyStateAllocation, parallelism);
 			heldWorkloadsAssignmentMap.put(operatorID, operatorWorkloadsAssignment);
 			heldExecutorMapping.put(operatorID, keyStateAllocation);

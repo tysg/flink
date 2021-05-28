@@ -130,7 +130,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 						case KEY_STATE_ALLOCATION: // rebalance, rescale, placement
 							// convert the logical key mapping to Flink version partition assignment
 							OperatorWorkloadsAssignment operatorWorkloadsAssignment =
-								workloadsAssignmentHandler.handleWorkloadsReallocate(operatorID, descriptor.getKeyStateAllocation());
+								workloadsAssignmentHandler.handleWorkloadsReallocate(operatorID, descriptor.getKeyStateDistribution());
 							difference.put(KEY_STATE_ALLOCATION, operatorWorkloadsAssignment);
 							boolean isRescale = false;
 							// if new tasks are deployed under current operator
@@ -144,7 +144,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 								vertex.setParallelism(heldDescriptor.getParallelism());
 								rescaleExecutionGraph(heldDescriptor.getOperatorID(), oldParallelism, operatorWorkloadsAssignment);
 							}
-							heldDescriptor.updateKeyStateAllocation(descriptor.getKeyStateAllocation());
+							heldDescriptor.updateKeyStateAllocation(descriptor.getKeyStateDistribution());
 							// update the partition assignment of Flink JobGrpah
 							updatePartitionAssignment(heldDescriptor, operatorWorkloadsAssignment, isRescale);
 							break;
@@ -286,7 +286,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 		if (self.getParallelism() != modified.getParallelism()) {
 			results.add(PARALLELISM);
 		}
-		if (compareKeyStateAllocation(self.getKeyStateAllocation(), modified.getKeyStateAllocation())) {
+		if (compareKeyStateAllocation(self.getKeyStateDistribution(), modified.getKeyStateDistribution())) {
 			results.add(KEY_STATE_ALLOCATION);
 		}
 		if (compareOutputKeyMapping(self.getKeyMapping(), modified.getKeyMapping())) {

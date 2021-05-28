@@ -185,7 +185,7 @@ public class PerformanceEvaluator extends AbstractController {
 		OperatorDescriptor targetDescriptor = executionPlan.getOperatorByID(testingOpID);
 
 
-		Map<Integer, List<Integer>> curKeyStateAllocation = targetDescriptor.getKeyStateAllocation();
+		Map<Integer, List<Integer>> curKeyStateAllocation = targetDescriptor.getKeyStateDistribution();
 		int oldParallelism = targetDescriptor.getParallelism();
 		assert oldParallelism == curKeyStateAllocation.size() : "old parallelism does not match the key set";
 

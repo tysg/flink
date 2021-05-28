@@ -70,7 +70,7 @@ public class OperatorDescriptor {
 	}
 
 
-	public Map<Integer, List<Integer>> getKeyStateAllocation() {
+	public Map<Integer, List<Integer>> getKeyStateDistribution() {
 		return taskConfigurations.keyStateAllocation;
 	}
 

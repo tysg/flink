@@ -80,7 +80,7 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 
 	@Override
 	public Map<Integer, List<Integer>> getKeyStateAllocation(Integer operatorID) {
-		return jobConfigurations.get(operatorID).getKeyStateAllocation();
+		return jobConfigurations.get(operatorID).getKeyStateDistribution();
 	}
 
 	@Override
@@ -159,7 +159,7 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 		// need to find out which task is to be redeployed
 		// because we used cancel and redeploy method, the new deployed task should have a new task id
 		// the actual placement is to migrate entire state from one task to another, and then kill the former.
-		Map<Integer, List<Integer>> keyDistribution = targetDescriptor.getKeyStateAllocation();
+		Map<Integer, List<Integer>> keyDistribution = targetDescriptor.getKeyStateDistribution();
 		Map<Integer, List<Integer>> newKeyDistribution = new HashMap<>();
 		if (deployment != null) {
 			if (deployment.size() != keyDistribution.size())
@@ -210,7 +210,7 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 		// need to find out which task is to be redeployed
 		// because we used cancel and redeploy method, the new deployed task should have a new task id
 		// the actual placement is to migrate entire state from one task to another, and then kill the former.
-		Map<Integer, List<Integer>> keyDistribution = targetDescriptor.getKeyStateAllocation();
+		Map<Integer, List<Integer>> keyDistribution = targetDescriptor.getKeyStateDistribution();
 		Map<Integer, Tuple2<Integer, String>> convertedDeployment = new HashMap<>();
 
 		Map<Integer, List<Integer>> newKeyDistribution = new HashMap<>();

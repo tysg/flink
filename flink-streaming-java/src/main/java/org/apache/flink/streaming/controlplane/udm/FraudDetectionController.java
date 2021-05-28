@@ -164,6 +164,8 @@ public class FraudDetectionController extends AbstractController {
 		}
 
 //		placement(testOpID, deployment);
+
+
 		placementV2(testOpID, deployment);
 	}
 
