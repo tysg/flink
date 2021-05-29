@@ -23,7 +23,7 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
-import org.apache.flink.runtime.controlplane.abstraction.TaskDescriptor;
+import org.apache.flink.runtime.controlplane.abstraction.TaskResourceDescriptor;
 import org.apache.flink.runtime.controlplane.abstraction.resource.AbstractSlot;
 import org.apache.flink.streaming.controlplane.udm.ControlPolicy;
 
@@ -49,8 +49,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  * H represents the hosts in the cluster, each host has a certain number of CPU and memory resources.
  * T is the set of tasks, the main information in T is: number of threads owned by each task and task location.
  */
-public class ExecutionPlanWithLock {
-//	implements ExecutionPlanWithLock {
+public class TriskWithLock {
+//	implements TriskWithLock {
 
 	private final static int COMMITTED = 1;
 	private final static int STAGED = 0;
@@ -60,11 +60,11 @@ public class ExecutionPlanWithLock {
 
 	private final ExecutionPlan executionPlan;
 
-	public ExecutionPlanWithLock(ExecutionPlan executionPlan) {
+	public TriskWithLock(ExecutionPlan executionPlan) {
 		this.executionPlan = executionPlan;
 	}
 
-	private ExecutionPlanWithLock(ExecutionPlan executionPlan, AtomicInteger stateOfUpdate, ControlPolicy currentWaitingController) {
+	private TriskWithLock(ExecutionPlan executionPlan, AtomicInteger stateOfUpdate, ControlPolicy currentWaitingController) {
 		this.executionPlan = executionPlan;
 		this.stateOfUpdate.set(stateOfUpdate.get());
 		this.currentWaitingController = currentWaitingController;
@@ -98,8 +98,8 @@ public class ExecutionPlanWithLock {
 		return executionPlan.getSlotMap();
 	}
 
-	public TaskDescriptor getTask(Integer operatorID, int taskId) {
-		return executionPlan.getTask(operatorID, taskId);
+	public TaskResourceDescriptor getTask(Integer operatorID, int taskId) {
+		return executionPlan.getTaskResource(operatorID, taskId);
 	}
 
 	public Function getUserFunction(Integer operatorID) {
@@ -159,7 +159,8 @@ public class ExecutionPlanWithLock {
 		executionPlan.clearTransformations();
 	}
 
-    public ExecutionPlanWithLock copy() {
-		return new ExecutionPlanWithLock(executionPlan.copy(), stateOfUpdate, currentWaitingController);
+    public TriskWithLock copy() {
+		return new TriskWithLock(executionPlan.copy(), stateOfUpdate, currentWaitingController);
     }
+
 }

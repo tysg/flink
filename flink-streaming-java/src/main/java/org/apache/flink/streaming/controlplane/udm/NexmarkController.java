@@ -3,13 +3,11 @@ package org.apache.flink.streaming.controlplane.udm;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
-import org.apache.flink.runtime.controlplane.abstraction.TaskDescriptor;
+import org.apache.flink.runtime.controlplane.abstraction.TaskResourceDescriptor;
 import org.apache.flink.runtime.controlplane.abstraction.resource.AbstractSlot;
-import org.apache.flink.streaming.controlplane.streammanager.abstraction.ExecutionPlanWithLock;
+import org.apache.flink.streaming.controlplane.streammanager.abstraction.TriskWithLock;
 import org.apache.flink.streaming.controlplane.streammanager.abstraction.ReconfigurationExecutor;
 import org.apache.flink.util.Preconditions;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -17,26 +15,11 @@ import java.util.List;
 import java.util.Map;
 
 public class NexmarkController extends AbstractController {
-	private static final Logger LOG = LoggerFactory.getLogger(NexmarkController.class);
-
 	private final Object lock = new Object();
 	private final Profiler profiler;
 	private final Map<String, String> experimentConfig;
 
-	public final static String AFFECTED_TASK = "trisk.reconfig.affected_tasks";
 	public final static String TEST_OPERATOR_NAME = "trisk.reconfig.operator.name";
-	public final static String RECONFIG_FREQUENCY = "trisk.reconfig.frequency";
-	public final static String RECONFIG_INTERVAL = "trisk.reconfig.interval";
-	public final static String TEST_TYPE = "trisk.reconfig.type";
-
-	private final static String REMAP = "remap";
-	private final static String RESCALE = "rescale";
-	private final static String NOOP = "noop";
-	private final static String EXECUTION_LOGIC = "logic";
-
-	private boolean finished = false;
-
-	private int latestUnusedSubTaskIdx = 0;
 
 	public NexmarkController(ReconfigurationExecutor reconfigurationExecutor, Configuration configuration) {
 		super(reconfigurationExecutor);
@@ -54,7 +37,6 @@ public class NexmarkController extends AbstractController {
 	@Override
 	public void stopControllers() {
 		System.out.println("PerformanceMeasure is stopping...");
-		finished = true;
 		profiler.interrupt();
 	}
 
@@ -71,9 +53,7 @@ public class NexmarkController extends AbstractController {
 
 	protected void generateTest() throws Exception {
 		String testOperatorName = experimentConfig.getOrDefault(TEST_OPERATOR_NAME, "filter");
-		//		int reconfigFreq = Integer.parseInt(experimentConfig.getOrDefault(RECONFIG_FREQUENCY, "5"));
 		int testOpID = findOperatorByName(testOperatorName);
-		latestUnusedSubTaskIdx = getReconfigurationExecutor().getExecutionPlan().getParallelism(testOpID);
 
 		// 10s
 		Thread.sleep(5000);
@@ -81,21 +61,12 @@ public class NexmarkController extends AbstractController {
 		smartPlacementV2(testOpID);
 	}
 
-	private void waitForCompletion() throws InterruptedException {
-		// wait for operation completed
-		synchronized (lock) {
-			lock.wait();
-		}
-	}
-
 	private void smartPlacement(int testOpID) throws Exception {
-		ExecutionPlanWithLock planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
+		TriskWithLock planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
 
 		Map<Integer, Tuple2<Integer, String>> deployment = new HashMap<>();
 
 		Map<String, List<AbstractSlot>> resourceMap = planWithLock.getResourceDistribution();
-
-		OperatorDescriptor operatorDescriptor = planWithLock.getOperatorByID(testOpID);
 
 		int p = planWithLock.getParallelism(testOpID);
 		Map<String, AbstractSlot> allocatedSlots = allocateResourceUniformly(resourceMap, p);
@@ -103,7 +74,7 @@ public class NexmarkController extends AbstractController {
 		// place half of tasks with new slots
 		List<Integer> modifiedTasks = new ArrayList<>();
 		for (int taskId = 0; taskId < p; taskId++) {
-			TaskDescriptor task = operatorDescriptor.getTask(taskId);
+			TaskResourceDescriptor task = planWithLock.getExecutionPlan().getTaskResource(testOpID, taskId);
 			// if the task slot is in the allocated slot, this task is unmodified
 			if (allocatedSlots.containsKey(task.resourceSlot)) {
 				deployment.put(taskId, Tuple2.of(taskId, task.resourceSlot));
@@ -128,13 +99,11 @@ public class NexmarkController extends AbstractController {
 	}
 
 	private void smartPlacementV2(int testOpID) throws Exception {
-		ExecutionPlanWithLock planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
+		TriskWithLock planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
 
 		Map<Integer, String> deployment = new HashMap<>();
 
 		Map<String, List<AbstractSlot>> resourceMap = planWithLock.getResourceDistribution();
-
-		OperatorDescriptor operatorDescriptor = planWithLock.getOperatorByID(testOpID);
 
 		int p = planWithLock.getParallelism(testOpID);
 		Map<String, AbstractSlot> allocatedSlots = allocateResourceUniformly(resourceMap, p);
@@ -142,7 +111,7 @@ public class NexmarkController extends AbstractController {
 		// place half of tasks with new slots
 		List<Integer> modifiedTasks = new ArrayList<>();
 		for (int taskId = 0; taskId < p; taskId++) {
-			TaskDescriptor task = operatorDescriptor.getTask(taskId);
+			TaskResourceDescriptor task = planWithLock.getExecutionPlan().getTaskResource(testOpID, taskId);
 			// if the task slot is in the allocated slot, this task is unmodified
 			if (allocatedSlots.containsKey(task.resourceSlot)) {
 				deployment.put(taskId, task.resourceSlot);

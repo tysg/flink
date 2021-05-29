@@ -59,7 +59,7 @@ import org.apache.flink.runtime.util.profiling.ReconfigurationProfiler;
 import org.apache.flink.runtime.webmonitor.retriever.LeaderGatewayRetriever;
 import org.apache.flink.streaming.controlplane.jobgraph.DefaultExecutionPlanAndJobGraphUpdaterFactory;
 import org.apache.flink.streaming.controlplane.rescale.StreamJobGraphRescaler;
-import org.apache.flink.streaming.controlplane.streammanager.abstraction.ExecutionPlanWithLock;
+import org.apache.flink.streaming.controlplane.streammanager.abstraction.TriskWithLock;
 import org.apache.flink.streaming.controlplane.streammanager.abstraction.ReconfigurationExecutor;
 import org.apache.flink.streaming.controlplane.streammanager.exceptions.StreamManagerException;
 import org.apache.flink.streaming.controlplane.udm.*;
@@ -117,7 +117,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 	private final Map<String, ControlPolicy> controlPolicyList = new HashMap<>();
 
-	private ExecutionPlanWithLock executionPlan;
+	private TriskWithLock trisk;
 
 	private CompletableFuture<Acknowledge> rescalePartitionFuture;
 
@@ -357,7 +357,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			// scale in is not support now
 			checkState(keyStateAllocation.size() == newParallelism,
 				"new parallelism not match key state allocation");
-			this.executionPlan.setStateUpdatingFlag(waitingController);
+			this.trisk.setStateUpdatingFlag(waitingController);
 
 			// operatorId to TaskIdList mapping, representing affected tasks.
 			Map<Integer, List<Integer>> tasks = new HashMap<>();
@@ -365,7 +365,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			Map<Integer, List<Integer>> updateKeyMappingTasks = new HashMap<>();
 			Map<Integer, List<Integer>> deployingTasks = new HashMap<>();
 
-			OperatorDescriptor targetDescriptor = executionPlan.getOperatorByID(operatorID);
+			OperatorDescriptor targetDescriptor = trisk.getOperatorByID(operatorID);
 			// put tasks in target vertex
 			tasks.put(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
 			updateStateTasks.put(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
@@ -410,7 +410,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					CompletableFuture<?> syncFuture = FutureUtils.completedVoidFuture()
 						.thenCompose(o -> {
 							reconfigurationProfiler.onOtherStart(PREPARE);
-							return coordinator.prepareExecutionPlan(executionPlan.getExecutionPlan());
+							return coordinator.prepareExecutionPlan(trisk.getExecutionPlan());
 						})
 						.thenCompose(o -> {
 							reconfigurationProfiler.onOtherEnd(PREPARE);
@@ -446,7 +446,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 								log.info("++++++ finished update");
 								// TODO: extract the deployment overhead
 								reconfigurationProfiler.onOtherEnd(UPDATE_STATE);
-								this.executionPlan.notifyUpdateFinished(failure);
+								this.trisk.notifyUpdateFinished(failure);
 								reconfigurationProfiler.onReconfigurationEnd();
 							} catch (Exception e) {
 								e.printStackTrace();
@@ -468,7 +468,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 //			checkState(keyStateAllocation.size() == newParallelism,
 //				"new parallelism not match key state allocation");
 			executionPlan.getParallelism(operatorID);
-			this.executionPlan.setStateUpdatingFlag(waitingController);
+			this.trisk.setStateUpdatingFlag(waitingController);
 
 			// operatorId to TaskIdList mapping, representing affected tasks.
 			Map<Integer, List<Integer>> tasks = new HashMap<>();
@@ -476,7 +476,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			Map<Integer, List<Integer>> updateKeyMappingTasks = new HashMap<>();
 			Map<Integer, List<Integer>> deployingTasks = new HashMap<>();
 
-			OperatorDescriptor targetDescriptor = this.executionPlan.getOperatorByID(operatorID);
+			OperatorDescriptor targetDescriptor = this.trisk.getOperatorByID(operatorID);
 			// put tasks in target vertex
 			tasks.put(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
 			updateStateTasks.put(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
@@ -510,7 +510,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					CompletableFuture<?> syncFuture = FutureUtils.completedVoidFuture()
 						.thenCompose(o -> {
 							reconfigurationProfiler.onOtherStart(PREPARE);
-							return coordinator.prepareExecutionPlan(this.executionPlan.getExecutionPlan());
+							return coordinator.prepareExecutionPlan(this.trisk.getExecutionPlan());
 						})
 						.thenCompose(o -> {
 							reconfigurationProfiler.onOtherEnd(PREPARE);
@@ -546,7 +546,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 								log.info("++++++ finished update");
 								// TODO: extract the deployment overhead
 								reconfigurationProfiler.onOtherEnd(UPDATE_STATE);
-								this.executionPlan.notifyUpdateFinished(failure);
+								this.trisk.notifyUpdateFinished(failure);
 								reconfigurationProfiler.onReconfigurationEnd();
 							} catch (Exception e) {
 								e.printStackTrace();
@@ -564,14 +564,14 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	public void placement(int operatorID, Map<Integer, List<Integer>> keyStateAllocation, ControlPolicy waitingController) {
 		try {
 			reconfigurationProfiler.onReconfigurationStart();
-			executionPlan.setStateUpdatingFlag(waitingController);
+			trisk.setStateUpdatingFlag(waitingController);
 
 			// operatorId to TaskIdList mapping, representing affected tasks.
 			Map<Integer, List<Integer>> tasks = new HashMap<>();
 			Map<Integer, List<Integer>> updateKeyMappingTasks = new HashMap<>();
 			Map<Integer, List<Integer>> deployingTasks = new HashMap<>();
 
-			OperatorDescriptor targetDescriptor = executionPlan.getOperatorByID(operatorID);
+			OperatorDescriptor targetDescriptor = trisk.getOperatorByID(operatorID);
 			// put tasks in target vertex
 			tasks.put(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
 			deployingTasks.put(targetDescriptor.getOperatorID(), targetDescriptor.getTaskIds());
@@ -610,7 +610,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					CompletableFuture<?> syncFuture = FutureUtils.completedVoidFuture()
 						.thenCompose(o -> {
 							reconfigurationProfiler.onOtherStart(PREPARE);
-							return coordinator.prepareExecutionPlan(executionPlan.getExecutionPlan());
+							return coordinator.prepareExecutionPlan(trisk.getExecutionPlan());
 						})
 						.thenCompose(o -> {
 							reconfigurationProfiler.onOtherEnd(PREPARE);
@@ -647,7 +647,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 								System.out.println("++++++ finished update");
 								log.info("++++++ finished update");
 								// TODO: extract the deployment overhead
-								this.executionPlan.notifyUpdateFinished(failure);
+								this.trisk.notifyUpdateFinished(failure);
 								reconfigurationProfiler.onReconfigurationEnd();
 							} catch (Exception e) {
 								e.printStackTrace();
@@ -667,9 +667,9 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			reconfigurationProfiler.onReconfigurationStart();
 			// typically, the target operator should contain key state,
 			// todo if keyStateAllocation is null, means it is stateless operator, but not support now
-			this.executionPlan.setStateUpdatingFlag(waitingController);
+			this.trisk.setStateUpdatingFlag(waitingController);
 
-			OperatorDescriptor targetDescriptor = executionPlan.getOperatorByID(operatorID);
+			OperatorDescriptor targetDescriptor = trisk.getOperatorByID(operatorID);
 
 			for (OperatorDescriptor parent : targetDescriptor.getParents()) {
 				parent.updateKeyMapping(operatorID, keyStateAllocation);
@@ -706,7 +706,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					CompletableFuture<?> syncFuture = FutureUtils.completedVoidFuture()
 						.thenCompose(o -> {
 							reconfigurationProfiler.onOtherStart(PREPARE);
-							return coordinator.prepareExecutionPlan(executionPlan.getExecutionPlan());
+							return coordinator.prepareExecutionPlan(trisk.getExecutionPlan());
 						})
 						.thenCompose(o -> {
 							reconfigurationProfiler.onOtherEnd(PREPARE);
@@ -743,7 +743,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 							System.out.println("++++++ finished update");
 							LOG.info("++++++ finished update");
 							reconfigurationProfiler.onReconfigurationEnd();
-							this.executionPlan.notifyUpdateFinished(failure);
+							this.trisk.notifyUpdateFinished(failure);
 						} catch (Exception e) {
 							e.printStackTrace();
 						}
@@ -752,7 +752,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			} else {
 				runAsync(() -> jobMasterGateway.callOperations(
 					coordinator -> FutureUtils.completedVoidFuture()
-						.thenCompose(o -> coordinator.prepareExecutionPlan(executionPlan.getExecutionPlan()))
+						.thenCompose(o -> coordinator.prepareExecutionPlan(trisk.getExecutionPlan()))
 						.thenCompose(o -> coordinator.updateKeyMapping(operatorID, o))
 						.whenComplete((o, failure) -> {
 							if (failure != null) {
@@ -760,7 +760,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 							}
 							try {
 								reconfigurationProfiler.onReconfigurationEnd();
-								this.executionPlan.notifyUpdateFinished(failure);
+								this.trisk.notifyUpdateFinished(failure);
 							} catch (Exception e) {
 								e.printStackTrace();
 							}
@@ -778,7 +778,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			reconfigurationProfiler.onReconfigurationStart();
 			// typically, the target operator should contain key state,
 			// todo if keyStateAllocation is null, means it is stateless operator, but not support now
-			this.executionPlan.setStateUpdatingFlag(waitingController);
+			this.trisk.setStateUpdatingFlag(waitingController);
 
 			OperatorDescriptor targetDescriptor = executionPlan.getOperatorByID(operatorID);
 			Map<Integer, List<Integer>> keyStateAllocation = executionPlan.getKeyStateAllocation(operatorID);
@@ -817,7 +817,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					CompletableFuture<?> syncFuture = FutureUtils.completedVoidFuture()
 						.thenCompose(o -> {
 							reconfigurationProfiler.onOtherStart(PREPARE);
-							return coordinator.prepareExecutionPlan(this.executionPlan.getExecutionPlan());
+							return coordinator.prepareExecutionPlan(this.trisk.getExecutionPlan());
 						})
 						.thenCompose(o -> {
 							reconfigurationProfiler.onOtherEnd(PREPARE);
@@ -854,7 +854,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 								System.out.println("++++++ finished update");
 								LOG.info("++++++ finished update");
 								reconfigurationProfiler.onReconfigurationEnd();
-								this.executionPlan.notifyUpdateFinished(failure);
+								this.trisk.notifyUpdateFinished(failure);
 							} catch (Exception e) {
 								e.printStackTrace();
 							}
@@ -869,8 +869,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	public void reconfigureUserFunction(int operatorID, Object function, ControlPolicy waitingController) {
 		try {
 			// very similar to acquire a positive spin write lock
-			this.executionPlan.setStateUpdatingFlag(waitingController);
-			OperatorDescriptor target = executionPlan.getOperatorByID(operatorID);
+			this.trisk.setStateUpdatingFlag(waitingController);
+			OperatorDescriptor target = trisk.getOperatorByID(operatorID);
 			target.setControlAttribute(UDF, function);
 			final String PREPARE = "prepare timer";
 			final String SYN = "synchronize timer";
@@ -881,7 +881,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					.thenCompose(o -> {
 						reconfigurationProfiler.onReconfigurationStart();
 						reconfigurationProfiler.onOtherStart(PREPARE);
-						return coordinator.prepareExecutionPlan(executionPlan.getExecutionPlan());
+						return coordinator.prepareExecutionPlan(trisk.getExecutionPlan());
 					})
 					.thenCompose(o -> {
 						reconfigurationProfiler.onOtherEnd(PREPARE);
@@ -900,7 +900,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						try {
 							reconfigurationProfiler.onOtherEnd(UPDATE_FUNCTION);
 							reconfigurationProfiler.onReconfigurationEnd();
-							this.executionPlan.notifyUpdateFinished(failure);
+							this.trisk.notifyUpdateFinished(failure);
 						} catch (Exception e) {
 							e.printStackTrace();
 						}
@@ -915,7 +915,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	public void noOp(int operatorID, ControlPolicy waitingController) {
 		try {
 			// very similar to acquire a positive spin write lock
-			this.executionPlan.setStateUpdatingFlag(waitingController);
+			this.trisk.setStateUpdatingFlag(waitingController);
 			JobMasterGateway jobMasterGateway = this.jobManagerRegistration.getJobManagerGateway();
 			final String SYN = "synchronize timer";
 			runAsync(() -> jobMasterGateway.callOperations(
@@ -933,7 +933,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 							failure.printStackTrace();
 						}
 						try {
-							this.executionPlan.notifyUpdateFinished(failure);
+							this.trisk.notifyUpdateFinished(failure);
 						} catch (Exception e) {
 							e.printStackTrace();
 						}
@@ -969,7 +969,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		runAsync(
 			() -> {
 				if (jobAbstraction != null) {
-					this.executionPlan = new ExecutionPlanWithLock(jobAbstraction);
+					this.trisk = new TriskWithLock(jobAbstraction);
 				}
 				if (newJobStatus == JobStatus.RUNNING) {
 					for (ControlPolicy policy : controlPolicyList.values()) {
@@ -1128,15 +1128,15 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	}
 
 	@Override
-	public ExecutionPlan getExecutionPlan() {
-		return checkNotNull(executionPlan.getExecutionPlan(), "stream job abstraction (execution plan) have not been initialized");
+	public ExecutionPlan getTrisk() {
+		return checkNotNull(trisk.getExecutionPlan(), "stream job abstraction (execution plan) have not been initialized");
 	}
 
 	@Override
-	public ExecutionPlanWithLock getExecutionPlanCopy() {
-//		ExecutionPlan executionPlanCopy = new ExecutionPlanImpl();
-//		ExecutionPlanWithLock executionPlanWithLockCopy = new ExecutionPlanWithLock(executionPlan.getExecutionPlan());
-		return executionPlan.copy();
+	public TriskWithLock getExecutionPlanCopy() {
+//		ExecutionPlan executionPlanCopy = new TriskImpl();
+//		TriskWithLock executionPlanWithLockCopy = new TriskWithLock(executionPlan.getExecutionPlan());
+		return trisk.copy();
 	}
 
 	@Override
@@ -1145,12 +1145,12 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	}
 
 	@Override
-	public void execute(ControlPolicy controller, ExecutionPlanWithLock executionPlanCopy) {
+	public void execute(ControlPolicy controller, TriskWithLock executionPlanCopy) {
 		try {
-			executionPlan = executionPlanCopy;
-			executionPlan.setStateUpdatingFlag(controller);
+			trisk = executionPlanCopy;
+			trisk.setStateUpdatingFlag(controller);
 
-			Map<String, Map<Integer, List<Integer>>> transformations = executionPlan.getTransformations();
+			Map<String, Map<Integer, List<Integer>>> transformations = trisk.getTransformations();
 
 			// operatorId to TaskIdList mapping, representing affected tasks.
 			boolean isScaleIn = false;
@@ -1168,7 +1168,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						updateStateTasks = transformation;
 						break;
 					case "redeploying":
-						targetSlotAllocation = executionPlan.getSlotAllocation();
+						targetSlotAllocation = trisk.getSlotAllocation();
 						reDeployingTasks = transformation;
 						break;
 					case "remapping":
@@ -1195,7 +1195,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 				coordinator -> {
 					// prepare and synchronize among affected tasks
 					CompletableFuture<?> syncFuture = FutureUtils.completedVoidFuture()
-						.thenCompose(o -> coordinator.prepareExecutionPlan(executionPlan.getExecutionPlan()))
+						.thenCompose(o -> coordinator.prepareExecutionPlan(trisk.getExecutionPlan()))
 						.thenCompose(o -> coordinator.synchronizeTasks(tasks, o));
 					// run update asynchronously.
 					List<CompletableFuture<?>> updateFutureList = new ArrayList<>();
@@ -1227,7 +1227,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 									List<AbstractSlot> slots = slotMap.computeIfAbsent(slot.getLocation(), k -> new ArrayList<>());
 									slots.add(slot);
 								}
-								executionPlan.getExecutionPlan().setSlotMap(slotMap);
+								trisk.getExecutionPlan().setSlotMap(slotMap);
 							});
 					}
 					return finishFuture.whenComplete((o, failure) -> {
@@ -1238,8 +1238,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						try {
 							System.out.println("++++++ finished update");
 							log.info("++++++ finished update");
-							executionPlan.clearTransformations();
-							executionPlan.notifyUpdateFinished(failure);
+							trisk.clearTransformations();
+							trisk.notifyUpdateFinished(failure);
 						} catch (Exception e) {
 							e.printStackTrace();
 						}

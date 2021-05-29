@@ -3,9 +3,9 @@ package org.apache.flink.streaming.controlplane.udm;
 import org.apache.flink.api.common.functions.Function;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
-import org.apache.flink.runtime.controlplane.abstraction.TaskDescriptor;
+import org.apache.flink.runtime.controlplane.abstraction.TaskResourceDescriptor;
 import org.apache.flink.runtime.controlplane.abstraction.resource.AbstractSlot;
-import org.apache.flink.streaming.controlplane.streammanager.abstraction.ExecutionPlanWithLock;
+import org.apache.flink.streaming.controlplane.streammanager.abstraction.TriskWithLock;
 import org.apache.flink.streaming.controlplane.streammanager.abstraction.ReconfigurationExecutor;
 import org.apache.flink.util.FileUtils;
 import org.apache.flink.util.Preconditions;
@@ -46,7 +46,7 @@ public class FraudDetectionController extends AbstractController {
 	@Override
 	protected void defineControlAction() throws Exception {
 		super.defineControlAction();
-		ExecutionPlanWithLock planWithLock;
+		TriskWithLock planWithLock;
 
 		requestTime = 0;
 		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
@@ -75,7 +75,7 @@ public class FraudDetectionController extends AbstractController {
 	}
 
 	private void smartPlacement(int preprocessOpID) throws Exception {
-		ExecutionPlanWithLock planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
+		TriskWithLock planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
 
 		Map<Integer, Tuple2<Integer, String>> deployment = new HashMap<>();
 
@@ -124,7 +124,7 @@ public class FraudDetectionController extends AbstractController {
 	}
 
 	private void smartPlacementV2(int testOpID, int maxTaskOneNode) throws Exception {
-		ExecutionPlanWithLock planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
+		TriskWithLock planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
 
 		Map<Integer, String> deployment = new HashMap<>();
 
@@ -138,7 +138,7 @@ public class FraudDetectionController extends AbstractController {
 		// place half of tasks with new slots
 		List<Integer> modifiedTasks = new ArrayList<>();
 		for (int taskId = 0; taskId < p; taskId++) {
-			TaskDescriptor task = operatorDescriptor.getTask(taskId);
+			TaskResourceDescriptor task = operatorDescriptor.getTaskResource(taskId);
 			// if the task slot is in the allocated slot, this task is unmodified
 			if (allocatedSlots.containsKey(task.resourceSlot)) {
 				deployment.put(taskId, task.resourceSlot);
@@ -253,7 +253,7 @@ public class FraudDetectionController extends AbstractController {
 	}
 
 
-	private void updatePreprocessingScaleParameter(ExecutionPlanWithLock planWithLock) throws Exception {
+	private void updatePreprocessingScaleParameter(TriskWithLock planWithLock) throws Exception {
 		String scalePara = sendGet("http://127.0.0.1:5000/scale/", requestTime);
 		Map<String, Object> res = parseJsonString(scalePara);
 		ArrayList<Double> center = (ArrayList<Double>) res.get("center");
@@ -277,7 +277,7 @@ public class FraudDetectionController extends AbstractController {
 		return floats;
 	}
 
-	private void updateDecisionTreeParameter(ExecutionPlanWithLock planWithLock) throws Exception {
+	private void updateDecisionTreeParameter(TriskWithLock planWithLock) throws Exception {
 		// preprocessing
 		String scalePara = sendGet("http://127.0.0.1:5000/scale/", requestTime);
 		Map<String, Object> scaleRes = parseJsonString(scalePara);

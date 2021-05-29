@@ -25,7 +25,7 @@ import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.controlplane.abstraction.ExecutionPlan;
 import org.apache.flink.runtime.controlplane.abstraction.NodeDescriptor;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
-import org.apache.flink.runtime.controlplane.abstraction.TaskDescriptor;
+import org.apache.flink.runtime.controlplane.abstraction.TaskResourceDescriptor;
 import org.apache.flink.runtime.controlplane.abstraction.resource.AbstractSlot;
 import org.apache.flink.runtime.controlplane.abstraction.resource.FlinkSlot;
 import org.apache.flink.util.Preconditions;
@@ -37,8 +37,8 @@ import java.util.*;
 
 import static org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor.ExecutionLogic.UDF;
 
-public final class ExecutionPlanImpl implements ExecutionPlan {
-	private static final Logger LOG = LoggerFactory.getLogger(ExecutionPlanImpl.class);
+public final class TriskImpl implements ExecutionPlan {
+	private static final Logger LOG = LoggerFactory.getLogger(TriskImpl.class);
 	// operatorId -> operator
 	private final Map<Integer, OperatorDescriptor> jobConfigurations;
 	@Deprecated
@@ -54,15 +54,15 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 	private final Map<Integer, List<SlotID>> slotAllocation = new HashMap<>();
 
 	@Internal
-	public ExecutionPlanImpl(Map<Integer, OperatorDescriptor> jobConfigurations,
-							 List<NodeDescriptor> resourceDistribution) {
+	public TriskImpl(Map<Integer, OperatorDescriptor> jobConfigurations,
+					 List<NodeDescriptor> resourceDistribution) {
 		this.jobConfigurations = jobConfigurations;
 		this.resourceDistribution = resourceDistribution;
 	}
 
-	public ExecutionPlanImpl(Map<Integer, OperatorDescriptor> jobConfigurations,
-							 List<NodeDescriptor> resourceDistribution,
-							 Map<String, List<AbstractSlot>> slotMap) {
+	public TriskImpl(Map<Integer, OperatorDescriptor> jobConfigurations,
+					 List<NodeDescriptor> resourceDistribution,
+					 Map<String, List<AbstractSlot>> slotMap) {
 		this.jobConfigurations = jobConfigurations;
 		this.resourceDistribution = resourceDistribution;
 		this.slotMap = slotMap;
@@ -96,6 +96,25 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 	@Override
 	public OperatorDescriptor getOperatorByID(Integer operatorID) {
 		return jobConfigurations.get(operatorID);
+	}
+
+	@Override
+	public Map<Integer, List<Integer>> getKeyStateDistribution(Integer operatorID) {
+		OperatorDescriptor targetDescriptor = getOperatorByID(operatorID);
+		return targetDescriptor.getKeyStateDistribution();
+	}
+
+	@Override
+	public Map<Integer, TaskResourceDescriptor> getResourceAllocation(Integer operatorID) {
+		OperatorDescriptor targetDescriptor = getOperatorByID(operatorID);
+		return targetDescriptor.getTasksResource();
+	}
+
+	@Override
+	// TODO: add the classloader logic here?
+	public OperatorDescriptor getFunctionClassLoader(Integer operatorID) {
+		OperatorDescriptor targetDescriptor = getOperatorByID(operatorID);
+		return null;
 	}
 
 	@Override
@@ -221,7 +240,7 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 			for (int taskId : deployment.keySet()) {
 				String curSlotId = deployment.get(taskId);
 				// if the current slotId is not equal to the slot id in the existing task
-				if (targetDescriptor.getTask(taskId).resourceSlot.equals(curSlotId)) {
+				if (targetDescriptor.getTaskResource(taskId).resourceSlot.equals(curSlotId)) {
 					convertedDeployment.put(taskId, Tuple2.of(taskId, curSlotId));
 				} else {
 					convertedDeployment.put(taskId, Tuple2.of(taskId + p, curSlotId));
@@ -303,8 +322,8 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 	}
 
 	@Override
-	public TaskDescriptor getTask(Integer operatorID, int taskId) {
-		return jobConfigurations.get(operatorID).getTask(taskId);
+	public TaskResourceDescriptor getTaskResource(Integer operatorID, int taskId) {
+		return jobConfigurations.get(operatorID).getTaskResource(taskId);
 //		return operatorToTaskMap.get(operatorID).get(taskId);
 	}
 
@@ -351,6 +370,12 @@ public final class ExecutionPlanImpl implements ExecutionPlan {
 			}
 		}
 
-		return new ExecutionPlanImpl(jobConfigurationsCopy, resourceDistributionCopy, slotMapCopy);
+		return new TriskImpl(jobConfigurationsCopy, resourceDistributionCopy, slotMapCopy);
+	}
+
+	@Override
+	public void setParallelism(int operatorID, int newParallelism) {
+		OperatorDescriptor targetDescriptor = getOperatorByID(operatorID);
+		targetDescriptor.setParallelism(newParallelism);
 	}
 }

@@ -54,45 +54,35 @@ public class StockController extends AbstractController {
 	}
 
 	private void loadBalancingAll(int testingOpID) throws InterruptedException {
-		ExecutionPlan executionPlan = getReconfigurationExecutor().getExecutionPlan();
+		ExecutionPlan executionPlan = getReconfigurationExecutor().getTrisk();
 		scalingByParallelism(testingOpID, executionPlan.getParallelism(testingOpID));
 	}
 
 	private void scaleOutOne(int testingOpID) throws InterruptedException {
-		ExecutionPlan executionPlan = getReconfigurationExecutor().getExecutionPlan();
+		ExecutionPlan executionPlan = getReconfigurationExecutor().getTrisk();
 		scalingByParallelism(testingOpID, executionPlan.getParallelism(testingOpID) + 1);
 	}
 
 	private void scaleInOne(int testingOpID) throws InterruptedException {
-		ExecutionPlan executionPlan = getReconfigurationExecutor().getExecutionPlan();
+		ExecutionPlan executionPlan = getReconfigurationExecutor().getTrisk();
 		scalingByParallelism(testingOpID, executionPlan.getParallelism(testingOpID) - 1);
 	}
 
 	private void scalingByParallelism(int testingOpID, int newParallelism) throws InterruptedException {
 		System.out.println("++++++ start scaling");
-		ExecutionPlan executionPlan = getReconfigurationExecutor().getExecutionPlan();
-		OperatorDescriptor targetDescriptor = executionPlan.getOperatorByID(testingOpID);
+		ExecutionPlan executionPlan = getReconfigurationExecutor().getTrisk();
 
-
-		Map<Integer, List<Integer>> curKeyStateDistribution = targetDescriptor.getKeyStateDistribution();
-		int oldParallelism = targetDescriptor.getParallelism();
+		Map<Integer, List<Integer>> curKeyStateDistribution = executionPlan.getKeyStateDistribution(testingOpID);
+		int oldParallelism = executionPlan.getParallelism(testingOpID);
 		assert oldParallelism == curKeyStateDistribution.size() : "old parallelism does not match the key set";
 
 		Map<Integer, List<Integer>> keyStateDistribution = preparePartitionAssignment(newParallelism);
-
 		int maxParallelism = 128;
 		for (int i = 0; i < maxParallelism; i++) {
 			keyStateDistribution.get(i%newParallelism).add(i);
 		}
-
 		// update the parallelism
-		targetDescriptor.setParallelism(newParallelism);
-//		boolean isScaleIn = oldParallelism > newParallelism;
-
-		// update the key set
-		for (OperatorDescriptor parent : targetDescriptor.getParents()) {
-			parent.updateKeyMapping(testingOpID, keyStateDistribution);
-		}
+		executionPlan.setParallelism(testingOpID, newParallelism);
 
 		if (oldParallelism == newParallelism) {
 //			getReconfigurationExecutor().rebalance(executionPlan, testingOpID, this);

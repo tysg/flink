@@ -1,20 +1,12 @@
 package org.apache.flink.streaming.controlplane.udm;
 
-import org.apache.flink.api.common.functions.Function;
 import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
-import org.apache.flink.runtime.controlplane.abstraction.TaskDescriptor;
+import org.apache.flink.runtime.controlplane.abstraction.TaskResourceDescriptor;
 import org.apache.flink.runtime.controlplane.abstraction.resource.AbstractSlot;
-import org.apache.flink.streaming.controlplane.streammanager.abstraction.ExecutionPlanWithLock;
+import org.apache.flink.streaming.controlplane.streammanager.abstraction.TriskWithLock;
 import org.apache.flink.streaming.controlplane.streammanager.abstraction.ReconfigurationExecutor;
-import org.apache.flink.util.FileUtils;
 import org.apache.flink.util.Preconditions;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -50,7 +42,7 @@ public class PlacementController extends AbstractController {
 	}
 
 	private void smartPlacementV2(int testOpID) throws Exception {
-		ExecutionPlanWithLock planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
+		TriskWithLock planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
 		Map<Integer, String> deployment = new HashMap<>();
 		Map<String, List<AbstractSlot>> resourceMap = planWithLock.getResourceDistribution();
 		OperatorDescriptor operatorDescriptor = planWithLock.getOperatorByID(testOpID);
@@ -60,7 +52,7 @@ public class PlacementController extends AbstractController {
 		// place half of tasks with new slots
 		List<Integer> modifiedTasks = new ArrayList<>();
 		for (int taskId = 0; taskId < p; taskId++) {
-			TaskDescriptor task = operatorDescriptor.getTask(taskId);
+			TaskResourceDescriptor task = operatorDescriptor.getTaskResource(taskId);
 			// if the task slot is in the allocated slot, this task is unmodified
 			if (allocatedSlots.containsKey(task.resourceSlot)) {
 				deployment.put(taskId, task.resourceSlot);

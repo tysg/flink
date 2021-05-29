@@ -5,7 +5,7 @@ import org.apache.flink.runtime.controlplane.abstraction.OperatorDescriptor;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.type.TypeReference;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.flink.streaming.controlplane.streammanager.abstraction.ExecutionPlanWithLock;
+import org.apache.flink.streaming.controlplane.streammanager.abstraction.TriskWithLock;
 import org.apache.flink.streaming.controlplane.streammanager.abstraction.ReconfigurationExecutor;
 
 import javax.annotation.Nonnull;
@@ -54,7 +54,7 @@ public abstract class AbstractController implements ControlPolicy {
 	}
 
 	protected int findOperatorByName(@Nonnull String name) {
-		for (Iterator<OperatorDescriptor> it = reconfigurationExecutor.getExecutionPlan().getAllOperator(); it.hasNext(); ) {
+		for (Iterator<OperatorDescriptor> it = reconfigurationExecutor.getTrisk().getAllOperator(); it.hasNext(); ) {
 			OperatorDescriptor descriptor = it.next();
 			if(descriptor.getName().equals(name)){
 				return descriptor.getOperatorID();
@@ -64,7 +64,7 @@ public abstract class AbstractController implements ControlPolicy {
 	}
 
 	protected void loadBalancing(int operatorId, Map<Integer, List<Integer>> newKeyDistribution) throws InterruptedException {
-		ExecutionPlanWithLock executionPlan = getReconfigurationExecutor().getExecutionPlanCopy();
+		TriskWithLock executionPlan = getReconfigurationExecutor().getExecutionPlanCopy();
 		executionPlan
 			.assignWorkload(operatorId, newKeyDistribution);
 		getReconfigurationExecutor().execute(this, executionPlan);
@@ -74,7 +74,7 @@ public abstract class AbstractController implements ControlPolicy {
 	protected void scaling(int operatorId, Map<Integer, List<Integer>> newKeyDistribution,
 //						   @Nullable Map<Integer, Tuple2<Integer, String>> deployment) throws InterruptedException {
 						   @Nullable Map<Integer, Tuple2<Integer, String>> deployment) throws InterruptedException {
-		ExecutionPlanWithLock executionPlan = getReconfigurationExecutor().getExecutionPlanCopy();
+		TriskWithLock executionPlan = getReconfigurationExecutor().getExecutionPlanCopy();
 		executionPlan
 			.assignWorkload(operatorId, newKeyDistribution)
 			.assignResources(operatorId, deployment);
@@ -83,7 +83,7 @@ public abstract class AbstractController implements ControlPolicy {
 	}
 
 	protected void placement(Integer operatorId, @Nullable Map<Integer, Tuple2<Integer, String>> deployment) throws InterruptedException {
-		ExecutionPlanWithLock executionPlan = getReconfigurationExecutor().getExecutionPlanCopy();
+		TriskWithLock executionPlan = getReconfigurationExecutor().getExecutionPlanCopy();
 		executionPlan
 			.assignResources(operatorId, deployment);
 		getReconfigurationExecutor().execute(this, executionPlan);
@@ -91,7 +91,7 @@ public abstract class AbstractController implements ControlPolicy {
 	}
 
 	protected void placementV2(Integer operatorId, @Nullable Map<Integer, String> deployment) throws InterruptedException {
-		ExecutionPlanWithLock executionPlan = getReconfigurationExecutor().getExecutionPlanCopy();
+		TriskWithLock executionPlan = getReconfigurationExecutor().getExecutionPlanCopy();
 		executionPlan
 				.assignResourcesV2(operatorId, deployment);
 		getReconfigurationExecutor().execute(this, executionPlan);
@@ -100,7 +100,7 @@ public abstract class AbstractController implements ControlPolicy {
 
 
 	protected void changeOfLogic(Integer operatorId, Object function) throws InterruptedException {
-		ExecutionPlanWithLock executionPlan = getReconfigurationExecutor().getExecutionPlanCopy();
+		TriskWithLock executionPlan = getReconfigurationExecutor().getExecutionPlanCopy();
 		executionPlan
 			.assignExecutionLogic(operatorId, function);
 		getReconfigurationExecutor().execute(this, executionPlan);

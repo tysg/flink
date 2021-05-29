@@ -1,19 +1,19 @@
 package org.apache.flink.runtime.controlplane.abstraction;
 
-public class TaskDescriptor {
+public class TaskResourceDescriptor {
 	// task own threads
 	public String resourceSlot;
 	NodeDescriptor location;
 	// TODO: add the config here.
 
-	public TaskDescriptor(String resourceSlot, NodeDescriptor location) {
+	public TaskResourceDescriptor(String resourceSlot, NodeDescriptor location) {
 		this.resourceSlot = resourceSlot;
 		this.location = location;
 		// taskId = <Operator, taskIdx>
 		location.addContainedTask(this);
 	}
 
-	public TaskDescriptor copy(NodeDescriptor nodeCopy) {
-		return new TaskDescriptor(resourceSlot, nodeCopy);
+	public TaskResourceDescriptor copy(NodeDescriptor nodeCopy) {
+		return new TaskResourceDescriptor(resourceSlot, nodeCopy);
 	}
 }
