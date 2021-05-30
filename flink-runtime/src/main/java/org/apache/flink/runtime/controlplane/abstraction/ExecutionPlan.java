@@ -85,7 +85,7 @@ public interface ExecutionPlan {
 
 	Map<Integer, TaskResourceDescriptor> getResourceAllocation(Integer operatorID);
 
-	OperatorDescriptor getFunctionClassLoader(Integer operatorID);
+	ClassLoader getFunctionClassLoader();
 
 
 

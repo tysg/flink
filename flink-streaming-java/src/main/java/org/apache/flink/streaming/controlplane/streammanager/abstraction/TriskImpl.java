@@ -112,9 +112,17 @@ public final class TriskImpl implements ExecutionPlan {
 
 	@Override
 	// TODO: add the classloader logic here?
-	public OperatorDescriptor getFunctionClassLoader(Integer operatorID) {
-		OperatorDescriptor targetDescriptor = getOperatorByID(operatorID);
-		return null;
+	public ClassLoader getFunctionClassLoader() {
+		Function funcObject = null;
+		for(OperatorDescriptor descriptor: jobConfigurations.values()){
+			funcObject = descriptor.getUdf();
+			// just need to find the first onc, since all function class should be loaded in one classloader
+			break;
+		}
+		if(funcObject == null){
+			return null;
+		}
+		return funcObject.getClass().getClassLoader();
 	}
 
 	@Override

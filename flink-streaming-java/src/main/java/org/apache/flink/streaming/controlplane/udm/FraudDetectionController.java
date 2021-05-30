@@ -110,14 +110,14 @@ public class FraudDetectionController extends AbstractController {
 	}
 
 	private void updateDecisionTreeParameter(TriskWithLock planWithLock) throws Exception {
-		// preprocessing
+		// preprocessing parameter
 		String scalePara = sendGet("http://127.0.0.1:5000/scale/", requestTime);
 		Map<String, Object> scaleRes = parseJsonString(scalePara);
 		ArrayList<Double> center = (ArrayList<Double>) scaleRes.get("center");
 		ArrayList<Double> scale = (ArrayList<Double>) scaleRes.get("scale");
 		float[] centerArray = doubleListToArray(center);
 		float[] scaleArray = doubleListToArray(scale);
-		// processing
+		// processing parameter
 		String treePara = sendGet("http://127.0.0.1:5000/dtree/", requestTime);
 		Map<String, Object> res = parseJsonString(treePara);
 		ArrayList<Integer> feature = (ArrayList<Integer>) res.get("feature");
@@ -136,15 +136,17 @@ public class FraudDetectionController extends AbstractController {
 			valueArr[i][1] = (possibility.get(1)).floatValue();
 		}
 		int processOpID = findOperatorByName("dtree");
-		// processing
+		// update processing operator
 		Function processFunc = planWithLock.getOperatorByID(processOpID).getUdf();
-		Class<?> decisionTreeRuleClass = processFunc.getClass().getClassLoader().loadClass("flinkapp.frauddetection.rule.DecisionTreeRule");
-		Object newRule = decisionTreeRuleClass        // reflection related
-			.getConstructor(int[].class, float[].class, int[].class, int[].class, float[][].class)
-			.newInstance(featureArr, thresholdArr, leftArr, rightArr, valueArr);
-		Function newProcessFunc = processFunc.getClass()
-			.getConstructor(decisionTreeRuleClass.getSuperclass(), float[].class, float[].class)
-			.newInstance(newRule, centerArray, scaleArray);
+		Object newRule = updateToNewClass(
+			"flinkapp.frauddetection.rule.DecisionTreeRule",
+			new Class[]{int[].class, float[].class, int[].class, int[].class, float[][].class},
+			featureArr, thresholdArr, leftArr, rightArr, valueArr);
+		Function newProcessFunc = updateConstructorParameter(
+			processFunc.getClass(),
+			new Class[]{newRule.getClass().getSuperclass(), float[].class, float[].class},
+			newRule, centerArray, scaleArray
+		);
 		changeOfLogic(processOpID, newProcessFunc);
 	}
 

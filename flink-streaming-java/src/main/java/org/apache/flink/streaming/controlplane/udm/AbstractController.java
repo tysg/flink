@@ -11,10 +11,8 @@ import org.apache.flink.streaming.controlplane.streammanager.abstraction.Reconfi
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.lang.reflect.InvocationTargetException;
+import java.util.*;
 
 /**
  * If you wish to submit your controller via restful API,
@@ -131,6 +129,8 @@ public abstract class AbstractController implements ControlPolicy {
 	 */
 	protected void defineControlAction () throws Exception{}
 
+	/* ===================== Placement utility method ========================== */
+
 	/**
 	 * return allocatable slots in this resource map by giving the limit of maxTask in one node
 	 *
@@ -196,7 +196,7 @@ public abstract class AbstractController implements ControlPolicy {
 		}
 	}
 
-	void allocateSlotsOnOneNode(Map<String, List<AbstractSlot>> resourceMap, Map<String, AbstractSlot> res, HashMap<String, Integer> pendingStots, String nodeID) {
+	private void allocateSlotsOnOneNode(Map<String, List<AbstractSlot>> resourceMap, Map<String, AbstractSlot> res, HashMap<String, Integer> pendingStots, String nodeID) {
 		List<AbstractSlot> slotList = resourceMap.get(nodeID);
 		int allocated = 0;
 		for (AbstractSlot slot : slotList) {
@@ -211,7 +211,7 @@ public abstract class AbstractController implements ControlPolicy {
 		}
 	}
 
-	void findUnusedSlot(int numTasksInOneNode, HashMap<String, Integer> loadMap,
+	private void findUnusedSlot(int numTasksInOneNode, HashMap<String, Integer> loadMap,
 						HashMap<String, Integer> pendingStots, String nodeID,
 						Map<String, List<AbstractSlot>> resourceMap) {
 		for (String otherNodeID : resourceMap.keySet()) {
@@ -223,6 +223,35 @@ public abstract class AbstractController implements ControlPolicy {
 				break;
 			}
 		}
+	}
+
+	/* ===================== changeOfLogic utility method ========================== */
+	protected <T> T updateConstructorParameter(Class<T> funcClass, @Nullable Class<?>[] argsClass, Object... args) {
+		try {
+			if (argsClass == null){
+				argsClass = Arrays.stream(args).map(o -> args.getClass()).toArray(Class[]::new);
+			}
+			return funcClass.getConstructor(argsClass).newInstance(args);
+		} catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+
+	protected <T> T updateToNewClass(String funcClassName, @Nullable Class<?>[] argsClass, Object... args) {
+		ClassLoader userLoader = getReconfigurationExecutor().getTrisk().getFunctionClassLoader();
+		try {
+			Class<T> funcClass = (Class<T>) userLoader.loadClass(funcClassName);
+			return updateConstructorParameter(funcClass, argsClass, args);
+		} catch (ClassNotFoundException e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+
+	protected <T> T defineNewClass(String funcClass, String funcClassCode,
+								   @Nullable Class<?>[] argsClass, Object... args) {
+		return null;
 	}
 
 	private class ControlActionRunner extends Thread{
