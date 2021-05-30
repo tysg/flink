@@ -15,8 +15,6 @@ import static org.apache.flink.util.Preconditions.checkState;
 public class PerformanceEvaluator extends AbstractController {
 	private static final Logger LOG = LoggerFactory.getLogger(PerformanceEvaluator.class);
 
-	private final Object lock = new Object();
-	private final Profiler profiler;
 	private final Map<String, String> experimentConfig;
 
 	public final static String AFFECTED_TASK = "trisk.reconfig.affected_tasks";
@@ -36,22 +34,7 @@ public class PerformanceEvaluator extends AbstractController {
 
 	public PerformanceEvaluator(ReconfigurationExecutor reconfigurationExecutor, Configuration configuration) {
 		super(reconfigurationExecutor);
-		profiler = new Profiler();
 		experimentConfig = configuration.toMap();
-	}
-
-	@Override
-	public synchronized void startControllers() {
-		System.out.println("PerformanceMeasure is starting...");
-		profiler.setName("reconfiguration performance measure");
-		profiler.start();
-	}
-
-	@Override
-	public void stopControllers() {
-		System.out.println("PerformanceMeasure is stopping...");
-		finished = true;
-		profiler.interrupt();
 	}
 
 	protected void generateTest() throws InterruptedException {
@@ -390,23 +373,20 @@ public class PerformanceEvaluator extends AbstractController {
 		);
 	}
 
-	private class Profiler extends Thread {
-
-		@Override
-		public void run() {
-			// the testing jobGraph (workload) is in TestingWorkload.java, see that file to know how to use it.
-			try {
-				Thread.sleep(30000);
-				generateTest();
-				Thread.sleep(3000);
-			} catch (InterruptedException e) {
-				if (finished) {
-					System.err.println("PerformanceEvaluator stopped");
-					return;
-				}
-				e.printStackTrace();
-				System.err.println("interrupted, thread exit");
+	@Override
+	public void defineControlAction() {
+		// the testing jobGraph (workload) is in TestingWorkload.java, see that file to know how to use it.
+		try {
+			Thread.sleep(30000);
+			generateTest();
+			Thread.sleep(3000);
+		} catch (InterruptedException e) {
+			if (finished) {
+				System.err.println("PerformanceEvaluator stopped");
+				return;
 			}
+			e.printStackTrace();
+			System.err.println("interrupted, thread exit");
 		}
 	}
 
