@@ -987,6 +987,7 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			PermanentBlobKey blobKey = blobWriter.putPermanent(jobGraph.getJobID(), jarByte);
 			jobGraph.addUserJarBlobKey(blobKey);
 			libraryCacheManager.updateClasspath(jobGraph.getJobID(), jobGraph.getUserJarBlobKeys(), jobGraph.getClasspaths());
+			log.info("register new function class: " + funcClassName + " store with blob key: " + blobKey);
 			return userCodeLoader.loadClass(funcClassName);
 		} catch (IOException | ClassNotFoundException e) {
 			e.printStackTrace();
@@ -1046,9 +1047,10 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			return false;
 		}
 		ControlPolicy oldControlPolicy = this.controlPolicyList.put(controllerID, newController);
-		if(this.trisk != null){
+		if (this.trisk != null) {
 			newController.startControllers();
-			if(oldControlPolicy != null){
+			log.info("new registered controller started: " + controllerID + ", type: " + newController);
+			if (oldControlPolicy != null) {
 				oldControlPolicy.stopControllers();
 				return true;
 			}

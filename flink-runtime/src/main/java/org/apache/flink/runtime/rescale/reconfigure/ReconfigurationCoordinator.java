@@ -787,6 +787,8 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 
 		ExecutionJobVertex executionJobVertex = executionGraph.getJobVertex(jobVertexID);
 		Preconditions.checkNotNull(executionJobVertex, "Execution job vertex not found: " + jobVertexID);
+		executionGraph.updateClasspath(jobGraph);
+		executionJobVertex.cleanBeforeRescale();
 
 		final List<CompletableFuture<?>> resultFutures =
 			Arrays.stream(executionJobVertex.getTaskVertices())
@@ -836,6 +838,8 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 
 		ExecutionJobVertex executionJobVertex = executionGraph.getJobVertex(jobVertexID);
 		Preconditions.checkNotNull(executionJobVertex, "Execution job vertex not found: " + jobVertexID);
+		executionGraph.updateClasspath(jobGraph);
+		executionJobVertex.cleanBeforeRescale();
 
 		final List<CompletableFuture<?>> resultFutures =
 			Arrays.stream(executionJobVertex.getTaskVertices())
