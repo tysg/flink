@@ -23,6 +23,8 @@ import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.runtime.blob.BlobWriter;
+import org.apache.flink.runtime.blob.PermanentBlobKey;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.clusterframework.types.SlotID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
@@ -35,6 +37,7 @@ import org.apache.flink.runtime.controlplane.abstraction.resource.FlinkSlot;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerGateway;
 import org.apache.flink.runtime.controlplane.streammanager.StreamManagerId;
 import org.apache.flink.runtime.dispatcher.DispatcherGateway;
+import org.apache.flink.runtime.execution.librarycache.LibraryCacheManager;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
@@ -63,13 +66,17 @@ import org.apache.flink.streaming.controlplane.streammanager.abstraction.TriskWi
 import org.apache.flink.streaming.controlplane.streammanager.abstraction.ReconfigurationExecutor;
 import org.apache.flink.streaming.controlplane.streammanager.exceptions.StreamManagerException;
 import org.apache.flink.streaming.controlplane.udm.*;
+import org.apache.flink.util.ChildFirstClassLoader;
 import org.apache.flink.util.OptionalConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
@@ -112,12 +119,18 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 
 	private final LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever;
 
+	private final BlobWriter blobWriter;
+
+	private final LibraryCacheManager libraryCacheManager;
+
 	@Deprecated
 	private final JobGraphRescaler jobGraphRescaler;
 
 	private final Map<String, ControlPolicy> controlPolicyList = new HashMap<>();
 
 	private TriskWithLock trisk;
+
+	private ByteClassLoader byteClassLoader = ByteClassLoader.create();
 
 	private CompletableFuture<Acknowledge> rescalePartitionFuture;
 
@@ -149,6 +162,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 						 HighAvailabilityServices highAvailabilityService,
 						 JobLeaderIdService jobLeaderIdService,
 						 LeaderGatewayRetriever<DispatcherGateway> dispatcherGatewayRetriever,
+						 LibraryCacheManager libraryCacheManager,
+						 BlobWriter blobWriter,
 						 FatalErrorHandler fatalErrorHandler) throws Exception {
 		super(rpcService, AkkaRpcServiceUtils.createRandomName(Stream_Manager_NAME), null);
 
@@ -161,6 +176,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		this.fatalErrorHandler = checkNotNull(fatalErrorHandler);
 		this.jobLeaderIdService = checkNotNull(jobLeaderIdService);
 		this.dispatcherGatewayRetriever = checkNotNull(dispatcherGatewayRetriever);
+		this.blobWriter = blobWriter;
+		this.libraryCacheManager = libraryCacheManager;
 
 		final String jobName = jobGraph.getName();
 		final JobID jid = jobGraph.getJobID();
@@ -953,6 +970,30 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 		}
 	}
 
+	public Class<?> registerFunctionClass(String funcClassName, String sourceCode){
+		try {
+			StringBuilder classpath = new StringBuilder();
+			if (userCodeLoader instanceof URLClassLoader) {
+				URLClassLoader urlClassLoader = (URLClassLoader) userCodeLoader;
+				for (URL url : urlClassLoader.getURLs()) {
+					classpath.append(url.getFile());
+					classpath.append(File.pathSeparator);
+				}
+			}
+			List<String> options = Arrays.asList("-classpath", classpath.toString());
+			byte[] byteCodeArray = ByteClassLoader.compileJavaClass(funcClassName, sourceCode, options);
+			byte[] jarByte = ByteClassLoader.createJar(
+				funcClassName.replace(".", File.separator)+".class", byteCodeArray);
+			PermanentBlobKey blobKey = blobWriter.putPermanent(jobGraph.getJobID(), jarByte);
+			jobGraph.addUserJarBlobKey(blobKey);
+			libraryCacheManager.updateClasspath(jobGraph.getJobID(), jobGraph.getUserJarBlobKeys(), jobGraph.getClasspaths());
+			return userCodeLoader.loadClass(funcClassName);
+		} catch (IOException | ClassNotFoundException e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+
 	//----------------------------------------------------------------------------------------------
 	// Internal methods
 	//----------------------------------------------------------------------------------------------
@@ -975,10 +1016,13 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 					for (ControlPolicy policy : controlPolicyList.values()) {
 						policy.startControllers();
 					}
-				} else {
+				} else if(newJobStatus == JobStatus.FAILED ||
+					newJobStatus == JobStatus.CANCELED ||
+					newJobStatus == JobStatus.FINISHED){
 					for (ControlPolicy policy : controlPolicyList.values()) {
 						policy.stopControllers();
 					}
+					this.byteClassLoader = null;
 				}
 			}
 		);
@@ -992,8 +1036,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 	public boolean registerNewController(String controllerID, String className, String sourceCode){
 		ControlPolicy newController = null;
 		try {
-			byte[] classMetaData = ByteClassLoader.compileJavaClass(className, sourceCode);
-			Class<? extends AbstractController> controllerClass = ByteClassLoader.loadClassFromByteArray(classMetaData, className);
+			byte[] classMetaData = ByteClassLoader.compileJavaClass(className, sourceCode, null);
+			Class<? extends AbstractController> controllerClass = this.byteClassLoader.loadClassFromByteArray(classMetaData, className);
 			Constructor<? extends AbstractController> constructor= controllerClass.getConstructor(ReconfigurationExecutor.class);
 			newController = constructor.newInstance(this);
 		} catch (IOException | ClassNotFoundException | NoSuchMethodException
@@ -1002,10 +1046,12 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			return false;
 		}
 		ControlPolicy oldControlPolicy = this.controlPolicyList.put(controllerID, newController);
-		newController.startControllers();
-		if(oldControlPolicy != null){
-			oldControlPolicy.stopControllers();
-			return true;
+		if(this.trisk != null){
+			newController.startControllers();
+			if(oldControlPolicy != null){
+				oldControlPolicy.stopControllers();
+				return true;
+			}
 		}
 		return false;
 	}

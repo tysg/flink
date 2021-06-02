@@ -88,4 +88,6 @@ public interface ReconfigurationExecutor {
 		Function<PrimitiveOperation<Map<Integer, Map<Integer, AbstractCoordinator.Diff>>>, CompletableFuture<?>> operationCaller) {
 
 	}
+
+	Class<?> registerFunctionClass(String funcClassName, String sourceCode);
 }

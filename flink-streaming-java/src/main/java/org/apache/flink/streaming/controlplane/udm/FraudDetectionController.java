@@ -38,29 +38,31 @@ public class FraudDetectionController extends AbstractController {
 		TriskWithLock planWithLock;
 
 		requestTime = 0;
-		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
-		updateDecisionTreeParameter(planWithLock);
-		Thread.sleep(10 * 1000);
+		submitNewFunction();
 
-		Thread.sleep(2 * 60 * 1000);
-		requestTime = 120;
-		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
-		updateDecisionTreeParameter(planWithLock);
-
-		Thread.sleep(10 * 1000);
-		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
-		int dtreeOpID = findOperatorByName("dtree");
-		smartPlacementV2(dtreeOpID, planWithLock.getParallelism(dtreeOpID) - 4);
-
-		Thread.sleep(55 * 1000);
-		requestTime = 225;
-		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
-		updateDecisionTreeParameter(planWithLock);
-
-		Thread.sleep(120 * 1000);
-		requestTime = 345;
-		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
-		updateDecisionTreeParameter(planWithLock);
+//		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
+//		updateDecisionTreeParameter(planWithLock);
+//		Thread.sleep(10 * 1000);
+//
+//		Thread.sleep(2 * 60 * 1000);
+//		requestTime = 120;
+//		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
+//		updateDecisionTreeParameter(planWithLock);
+//
+//		Thread.sleep(10 * 1000);
+//		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
+//		int dtreeOpID = findOperatorByName("dtree");
+//		smartPlacementV2(dtreeOpID, planWithLock.getParallelism(dtreeOpID) - 4);
+//
+//		Thread.sleep(55 * 1000);
+//		requestTime = 225;
+//		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
+//		updateDecisionTreeParameter(planWithLock);
+//
+//		Thread.sleep(120 * 1000);
+//		requestTime = 345;
+//		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
+//		updateDecisionTreeParameter(planWithLock);
 	}
 
 	private void smartPlacementV2(int testOpID, int maxTaskOneNode) throws Exception {
@@ -148,6 +150,43 @@ public class FraudDetectionController extends AbstractController {
 			newRule, centerArray, scaleArray
 		);
 		changeOfLogic(processOpID, newProcessFunc);
+	}
+
+	private void submitNewFunction() throws InterruptedException {
+		String sourceCode = "package flinkapp.frauddetection.function;\n" +
+			"\n" +
+			"import flinkapp.frauddetection.rule.FraudOrNot;\n" +
+			"import flinkapp.frauddetection.rule.NoRule;\n" +
+			"import flinkapp.frauddetection.rule.Rule;\n" +
+			"import flinkapp.frauddetection.transaction.PrecessedTransaction;\n" +
+			"import flinkapp.frauddetection.transaction.Transaction;\n" +
+			"import org.apache.flink.streaming.api.functions.KeyedProcessFunction;\n" +
+			"import org.apache.flink.util.Collector;" +
+			"public class ProcessingFunctionV2 extends KeyedProcessFunction<String, Transaction, FraudOrNot> {\n" +
+			"        \n" +
+			"        float[] center;\n" +
+			"        float[] scale;\n" +
+			"\n" +
+			"        public ProcessingFunctionV2() {\n" +
+			"        }\n" +
+			"\n" +
+			"        public ProcessingFunctionV2(float[] center, float[] scale) {\n" +
+			"            this.center = center;\n" +
+			"            this.scale = scale;\n" +
+			"        }\n" +
+			"        \n" +
+			"        @Override\n" +
+			"        public void processElement(Transaction value, Context ctx, Collector<FraudOrNot> out) throws Exception {\n" +
+			"            PrecessedTransaction precessedTransaction = new PrecessedTransaction(value, center, scale);\n" +
+			"            System.out.println(\"use default rule: no rule\");\n" +
+			"            out.collect(NoRule.getINSTANCE().isFraud(precessedTransaction));\n" +
+			"        }\n" +
+			"\n" +
+			"    }";
+		String className = "flinkapp.frauddetection.function.ProcessingFunctionV2";
+		Function newFuncObj = (Function) defineNewClass(className, sourceCode, null);
+		int processOpID = findOperatorByName("dtree");
+		changeOfLogic(processOpID, newFuncObj);
 	}
 
 	private String sendGet(String url) throws Exception {

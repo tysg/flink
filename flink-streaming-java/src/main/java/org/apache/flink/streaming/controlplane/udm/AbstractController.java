@@ -6,11 +6,13 @@ import org.apache.flink.runtime.controlplane.abstraction.resource.AbstractSlot;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.type.TypeReference;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.flink.streaming.controlplane.streammanager.ByteClassLoader;
 import org.apache.flink.streaming.controlplane.streammanager.abstraction.TriskWithLock;
 import org.apache.flink.streaming.controlplane.streammanager.abstraction.ReconfigurationExecutor;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 
@@ -249,9 +251,10 @@ public abstract class AbstractController implements ControlPolicy {
 		return null;
 	}
 
-	protected <T> T defineNewClass(String funcClass, String funcClassCode,
+	protected Object defineNewClass(String funcClassName, String funcClassCode,
 								   @Nullable Class<?>[] argsClass, Object... args) {
-		return null;
+		Class<?> funcClass = reconfigurationExecutor.registerFunctionClass(funcClassName, funcClassCode);
+		return updateConstructorParameter(funcClass, argsClass, args);
 	}
 
 	private class ControlActionRunner extends Thread{
