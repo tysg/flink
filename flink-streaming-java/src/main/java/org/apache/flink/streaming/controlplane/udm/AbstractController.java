@@ -101,6 +101,7 @@ public abstract class AbstractController implements ControlPolicy {
 		onChangeStarted();
 	}
 
+	// this is the placement API we are actually using
 	protected void placementV2(Integer operatorId, @Nullable Map<Integer, String> deployment) throws InterruptedException {
 		TriskWithLock executionPlan = getReconfigurationExecutor().getExecutionPlanCopy();
 		executionPlan
@@ -129,7 +130,7 @@ public abstract class AbstractController implements ControlPolicy {
 	 *
 	 * @throws Exception
 	 */
-	protected void defineControlAction () throws Exception{}
+	protected void defineControlAction() throws Exception{}
 
 	/* ===================== Placement utility method ========================== */
 
