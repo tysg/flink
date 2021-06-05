@@ -377,7 +377,7 @@ public class PerformanceEvaluator extends AbstractController {
 	public void defineControlAction() {
 		// the testing jobGraph (workload) is in TestingWorkload.java, see that file to know how to use it.
 		try {
-			Thread.sleep(30000);
+			Thread.sleep(10000);
 			generateTest();
 			Thread.sleep(3000);
 		} catch (InterruptedException e) {

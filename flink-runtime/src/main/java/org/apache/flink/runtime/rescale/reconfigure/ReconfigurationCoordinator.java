@@ -195,6 +195,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 //		}
 		CompletableFuture<Void> deployTaskFuture;
 		if(slotIds == null){
+			// allocate slot id that specified
 			deployTaskFuture = deployTasks(operatorID);
 		} else {
 			// the parallelism parameter is useless
@@ -337,6 +338,9 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 					if (checkpointCoordinator.isPeriodicCheckpointingConfigured()) {
 						checkpointCoordinator.startCheckpointScheduler();
 					}
+
+					// clear all created candidates
+					createdCandidates.get(operatorID).clear();
 
 					return FutureUtils.waitForAll(deployFutures);
 				});
