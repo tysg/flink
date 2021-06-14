@@ -296,7 +296,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 			new ArrayList<>(jobVertex.getParallelism() - oldParallelism);
 
 		if (slotIds != null) {
-			List<ExecutionVertex> vertices = createdCandidates.get(operatorID);
+			List<ExecutionVertex> vertices = createdCandidates.getOrDefault(operatorID, Collections.emptyList());
 			Preconditions.checkState(vertices.size() == slotIds.size(),  "number of given slot is not equal with createdCandidates");
 			for (int i = 0; i < vertices.size(); i++) {
 				Execution executionAttempt = vertices.get(i).getCurrentExecutionAttempt();

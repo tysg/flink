@@ -15,10 +15,8 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 
 public class FraudDetectionController extends AbstractController {
@@ -37,32 +35,31 @@ public class FraudDetectionController extends AbstractController {
 		super.defineControlAction();
 		TriskWithLock planWithLock;
 
-		requestTime = 0;
-		submitNewFunction();
+//		submitNewFunction();
 
-//		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
-//		updateDecisionTreeParameter(planWithLock);
+		requestTime = 0;
+		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
+		updateDecisionTreeParameter(planWithLock);
 //		Thread.sleep(10 * 1000);
-//
-//		Thread.sleep(2 * 60 * 1000);
-//		requestTime = 120;
-//		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
-//		updateDecisionTreeParameter(planWithLock);
-//
-//		Thread.sleep(10 * 1000);
-//		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
-//		int dtreeOpID = findOperatorByName("dtree");
-//		smartPlacementV2(dtreeOpID, planWithLock.getParallelism(dtreeOpID) - 4);
-//
-//		Thread.sleep(55 * 1000);
-//		requestTime = 225;
-//		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
-//		updateDecisionTreeParameter(planWithLock);
-//
-//		Thread.sleep(120 * 1000);
-//		requestTime = 345;
-//		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
-//		updateDecisionTreeParameter(planWithLock);
+
+		Thread.sleep(2 * 60 * 1000);
+		requestTime = 120;
+		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
+		updateDecisionTreeParameter(planWithLock);
+
+		Thread.sleep(50 * 1000);
+		int ppID = findOperatorByName("preprocess");
+		moveToAnotherNode(ppID);
+
+		Thread.sleep(55 * 1000);
+		requestTime = 225;
+		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
+		updateDecisionTreeParameter(planWithLock);
+
+		Thread.sleep(120 * 1000);
+		requestTime = 345;
+		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
+		updateDecisionTreeParameter(planWithLock);
 	}
 
 	private void smartPlacementV2(int testOpID, int maxTaskOneNode) throws Exception {
@@ -103,6 +100,54 @@ public class FraudDetectionController extends AbstractController {
 		placementV2(testOpID, deployment);
 	}
 
+	private void moveToAnotherNode(int testOpID) throws Exception {
+		TriskWithLock planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
+		Map<String, List<AbstractSlot>> resourceMap = planWithLock.getResourceDistribution();
+
+		Map<Integer, String> deployment = new HashMap<>();
+
+		int p = planWithLock.getParallelism(testOpID);
+		OperatorDescriptor operatorDescriptor = planWithLock.getOperatorByID(testOpID);
+		TaskResourceDescriptor task1 = operatorDescriptor.getTaskResource(0);
+		List<String> nodes = new ArrayList<>(resourceMap.keySet());
+		resourceMap.forEach(
+			(k, v) -> {
+				for (AbstractSlot slot : v) {
+					if (slot.getId().equals(task1.resourceSlot)) {
+						nodes.remove(k);
+						break;
+					}
+				}
+			}
+		);
+		Map<String, AbstractSlot> allocatedSlots = new HashMap<>();
+		for (AbstractSlot slot : resourceMap.get(nodes.get(0))) {
+			allocatedSlots.put(slot.getId(), slot);
+		}
+		Preconditions.checkNotNull(allocatedSlots.size() == p, "no more slots can be allocated");
+		// place half of tasks with new slots
+		List<Integer> modifiedTasks = new ArrayList<>();
+		for (int taskId = 0; taskId < p; taskId++) {
+			TaskResourceDescriptor task = operatorDescriptor.getTaskResource(taskId);
+			// if the task slot is in the allocated slot, this task is unmodified
+			if (allocatedSlots.containsKey(task.resourceSlot)) {
+				deployment.put(taskId, task.resourceSlot);
+				allocatedSlots.remove(task.resourceSlot);
+			} else {
+				modifiedTasks.add(taskId);
+			}
+		}
+		List<AbstractSlot> allocatedSlotsList = new ArrayList<>(allocatedSlots.values());
+		for (int i = 0; i < modifiedTasks.size(); i++) {
+			int taskId = modifiedTasks.get(i);
+			int newTaskId = taskId + p;
+			String slotID = allocatedSlotsList.get(i).getId();
+			deployment.put(taskId, slotID);
+			System.out.println("allocate: " + slotID);
+		}
+		placementV2(testOpID, deployment);
+	}
+
 	private float[] doubleListToArray(ArrayList<Double> doubles) {
 		float[] floats = new float[doubles.size()];
 		for (int i = 0; i < doubles.size(); i++) {
@@ -138,17 +183,26 @@ public class FraudDetectionController extends AbstractController {
 			valueArr[i][1] = (possibility.get(1)).floatValue();
 		}
 		int processOpID = findOperatorByName("dtree");
+		int ppID = findOperatorByName("preprocess");
 		// update processing operator
 		Function processFunc = planWithLock.getOperatorByID(processOpID).getUdf();
+		Function ppFunc = planWithLock.getOperatorByID(ppID).getUdf();
+		Function newPPFunc = updateConstructorParameter(
+			ppFunc.getClass(),
+			new Class[]{float[].class, float[].class},
+			centerArray, scaleArray
+		);
 		Object newRule = updateToNewClass(
 			"flinkapp.frauddetection.rule.DecisionTreeRule",
 			new Class[]{int[].class, float[].class, int[].class, int[].class, float[][].class},
 			featureArr, thresholdArr, leftArr, rightArr, valueArr);
 		Function newProcessFunc = updateConstructorParameter(
 			processFunc.getClass(),
-			new Class[]{newRule.getClass().getSuperclass(), float[].class, float[].class},
-			newRule, centerArray, scaleArray
+			new Class[]{newRule.getClass().getSuperclass()},
+			newRule
 		);
+		changeOfLogic(ppID, newPPFunc);
+//		Thread.sleep(10000);
 		changeOfLogic(processOpID, newProcessFunc);
 	}
 
