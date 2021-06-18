@@ -35,6 +35,7 @@ import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobgraph.tasks.CheckpointCoordinatorConfiguration;
 import org.apache.flink.runtime.messages.checkpoint.AcknowledgeCheckpoint;
 import org.apache.flink.runtime.messages.checkpoint.DeclineCheckpoint;
+import org.apache.flink.runtime.rescale.ReconfigID;
 import org.apache.flink.runtime.rescale.RescalepointAcknowledgeListener;
 import org.apache.flink.runtime.state.CheckpointStorageCoordinatorView;
 import org.apache.flink.runtime.state.CheckpointStorageLocation;
@@ -556,8 +557,28 @@ public class CheckpointCoordinator {
 		}
 	}
 
+	@Deprecated
 	public CompletableFuture<CompletedCheckpoint> triggerRescalePoint(long timestamp) {
 		CheckpointProperties props = CheckpointProperties.forRescalePoint();
+
+		final CompletableFuture<CompletedCheckpoint> resultFuture = new CompletableFuture<>();
+		try {
+			return triggerCheckpoint(
+				timestamp,
+				props,
+				null,
+				false,
+				false);
+		} catch (CheckpointException e) {
+			Throwable cause = new CheckpointException("Failed to trigger savepoint.", e.getCheckpointFailureReason());
+			resultFuture.completeExceptionally(cause);
+		}
+		// return the generated checkpointID
+		return null;
+	}
+
+	public CompletableFuture<CompletedCheckpoint> triggerRescalePoint(long timestamp, ReconfigID reconfigID) {
+		CheckpointProperties props = CheckpointProperties.forRescalePoint(reconfigID);
 
 		final CompletableFuture<CompletedCheckpoint> resultFuture = new CompletableFuture<>();
 		try {
@@ -643,11 +664,6 @@ public class CheckpointCoordinator {
 			checkpointStorageLocation = props.isSavepoint() ?
 					checkpointStorage.initializeLocationForSavepoint(checkpointID, externalSavepointLocation) :
 					checkpointStorage.initializeLocationForCheckpoint(checkpointID);
-
-			// set checkpointId for rescale ack listener
-			if (props.isRescalepoint()) {
-				rescalepointAcknowledgeListener.setCheckpointId(checkpointID);
-			}
 		}
 		catch (Throwable t) {
 			int numUnsuccessful = numUnsuccessfulCheckpointsTriggers.incrementAndGet();
@@ -726,6 +742,12 @@ public class CheckpointCoordinator {
 			final CheckpointOptions checkpointOptions = new CheckpointOptions(
 					props.getCheckpointType(),
 					checkpointStorageLocation.getLocationReference());
+
+			// set checkpointId for rescale ack listener
+			if (props.isRescalepoint()) {
+				rescalepointAcknowledgeListener.setCheckpointId(checkpointID);
+				checkpointOptions.setReconfigID(props.getReconfigID());
+			}
 
 			// send the messages to the tasks that trigger their checkpoint
 			for (Execution execution: executions) {
@@ -875,6 +897,9 @@ public class CheckpointCoordinator {
 
 						if (checkpoint.areTasksFullyAcknowledged()) {
 							completePendingCheckpoint(checkpoint);
+							if (rescalepointAcknowledgeListener != null) {
+								rescalepointAcknowledgeListener.onFullyAcknowledged(checkpoint);
+							}
 						}
 						break;
 					case DUPLICATE:

@@ -1245,7 +1245,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 		getMetricsManager().updateMetrics();
 
 		TaskOperatorManager operatorManager = ((RuntimeEnvironment) getEnvironment()).taskOperatorManager;
-		if(operatorManager.acknowledgeSyncRequest(checkpointMetaData.getCheckpointId())){
+		if(operatorManager.acknowledgeSyncRequest(checkpointMetaData.getCheckpointId(), checkpointOptions.getReconfigID())){
 			// we could now pause the current processing
 			try {
 				System.out.println(this.getName() + ": pause the current data processing");

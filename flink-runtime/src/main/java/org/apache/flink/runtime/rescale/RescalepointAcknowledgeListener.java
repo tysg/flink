@@ -24,5 +24,7 @@ import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
 public interface RescalepointAcknowledgeListener {
 	void onReceiveRescalepointAcknowledge(ExecutionAttemptID attemptID, PendingCheckpoint checkpoint);
 
+	void onFullyAcknowledged(PendingCheckpoint checkpoint);
+
 	void setCheckpointId(long checkpointId);
 }

@@ -23,7 +23,6 @@ import org.apache.flink.api.common.Archiveable;
 import org.apache.flink.api.common.InputDependencyConstraint;
 import org.apache.flink.api.common.accumulators.Accumulator;
 import org.apache.flink.api.common.time.Time;
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.io.InputSplit;
 import org.apache.flink.runtime.JobException;
 import org.apache.flink.runtime.accumulators.StringifiedAccumulatorResult;
@@ -53,11 +52,10 @@ import org.apache.flink.runtime.jobmanager.scheduler.ScheduledUnit;
 import org.apache.flink.runtime.jobmanager.scheduler.SlotSharingGroup;
 import org.apache.flink.runtime.jobmanager.slots.TaskManagerGateway;
 import org.apache.flink.runtime.jobmaster.LogicalSlot;
-import org.apache.flink.runtime.jobmaster.SlotContext;
 import org.apache.flink.runtime.jobmaster.SlotRequestId;
 import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.messages.TaskBackPressureResponse;
-import org.apache.flink.runtime.rescale.RescaleID;
+import org.apache.flink.runtime.rescale.ReconfigID;
 import org.apache.flink.runtime.rescale.RescaleOptions;
 import org.apache.flink.runtime.shuffle.NettyShuffleMaster;
 import org.apache.flink.runtime.shuffle.PartitionDescriptor;
@@ -498,9 +496,9 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 			.thenCompose(slot -> registerProducedPartitions(slot.getTaskManagerLocation()));
 	}
 
-	public CompletableFuture<Execution> allocateAndAssignSlotForExecution(RescaleID rescaleId) {
+	public CompletableFuture<Execution> allocateAndAssignSlotForExecution(ReconfigID reconfigId) {
 		final ExecutionGraph executionGraph = getVertex().getExecutionGraph();
-		getVertex().updateRescaleId(rescaleId);
+		getVertex().updateRescaleId(reconfigId);
 
 		return allocateAndAssignSlotForExecution(
 			executionGraph.getSlotProviderStrategy(),
@@ -509,9 +507,9 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 			.thenCompose(slot -> registerProducedPartitions(slot.getTaskManagerLocation(), false));
 	}
 
-	public CompletableFuture<Execution> allocateAndAssignSlotForExecution(RescaleID rescaleId, SlotID slotId) {
+	public CompletableFuture<Execution> allocateAndAssignSlotForExecution(ReconfigID reconfigId, SlotID slotId) {
 		final ExecutionGraph executionGraph = getVertex().getExecutionGraph();
-		getVertex().updateRescaleId(rescaleId);
+		getVertex().updateRescaleId(reconfigId);
 		return allocateAndAssignSlotForExecution(
 			executionGraph.getSlotProviderStrategy(),
 			LocationPreferenceConstraint.ANY,
@@ -997,9 +995,9 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 		processFail(t, false);
 	}
 
-	public void updateProducedPartitions(RescaleID rescaleId) {
+	public void updateProducedPartitions(ReconfigID reconfigId) {
 		// update produced partitions for sync.
-		getVertex().updateRescaleId(rescaleId);
+		getVertex().updateRescaleId(reconfigId);
 		for (Map.Entry<IntermediateResultPartitionID, ResultPartitionDeploymentDescriptor> entry : producedPartitions.entrySet()) {
 			IntermediateResultPartitionID key = entry.getKey();
 			ResultPartitionDeploymentDescriptor resultPartitionDeploymentDescriptor = entry.getValue();
@@ -1012,7 +1010,7 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 		}
 	}
 
-	public CompletableFuture<Void> scheduleForInterTaskSync(int syncFlag) {
+	public CompletableFuture<Void> scheduleForInterTaskSync(int syncFlag, ReconfigID reconfigID) {
 
 		assertRunningInJobMasterMainThread();
 
@@ -1032,7 +1030,7 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 				vertex.getExecutionGraph().getJobMasterMainThreadExecutor();
 
 			return CompletableFuture
-				.supplyAsync(() -> taskManagerGateway.scheduleSync(attemptId, syncFlag, rpcTimeout), executor)
+				.supplyAsync(() -> taskManagerGateway.scheduleSync(attemptId, syncFlag, reconfigID, rpcTimeout), executor)
 				.thenCompose(Function.identity())
 				.handleAsync((ack, failure) -> {
 					if (failure != null) {
@@ -1099,7 +1097,7 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 	}
 
 	public CompletableFuture<Void> scheduleRescale(
-		RescaleID rescaleId,
+		ReconfigID reconfigId,
 		RescaleOptions rescaleOptions,
 		@Nullable KeyGroupRange keyGroupRange) throws ExecutionGraphException {
 
@@ -1169,14 +1167,14 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 	}
 
 	public CompletableFuture<Void> scheduleRescale(
-		RescaleID rescaleId,
+		ReconfigID reconfigId,
 		RescaleOptions rescaleOptions,
 		@Nullable KeyGroupRange keyGroupRange,
 		int idInModel) throws ExecutionGraphException {
 
 		getVertex().setIdInModel(idInModel);
 
-		return scheduleRescale(rescaleId, rescaleOptions, keyGroupRange);
+		return scheduleRescale(reconfigId, rescaleOptions, keyGroupRange);
 	}
 
 	public CompletableFuture<Void> deploy(KeyGroupRange keyGroupRange, int idInModel) throws JobException {

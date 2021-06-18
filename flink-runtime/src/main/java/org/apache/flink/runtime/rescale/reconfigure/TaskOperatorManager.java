@@ -2,6 +2,7 @@ package org.apache.flink.runtime.rescale.reconfigure;
 
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.runtime.messages.Acknowledge;
+import org.apache.flink.runtime.rescale.ReconfigID;
 import org.apache.flink.runtime.taskmanager.Task;
 
 import javax.annotation.concurrent.ThreadSafe;
@@ -17,6 +18,7 @@ public class TaskOperatorManager {
 	private final PauseActionController pauseActionController;
 	private final Task containedTask;
 	private final AtomicLong hasSyncRequest = new AtomicLong(0L);
+	private ReconfigID currentConfiguration;
 
 	public TaskOperatorManager(Task task) {
 		this.containedTask = task;
@@ -27,14 +29,16 @@ public class TaskOperatorManager {
 		return pauseActionController;
 	}
 
-	public void setSyncRequestFlag(int syncFlag) throws Exception {
+	public void setSyncRequestFlag(int syncFlag, ReconfigID reconfigID) throws Exception {
 		switch (syncFlag){
 			case NEED_SYNC_REQUEST:
 				System.out.println(containedTask.getTaskInfo().getTaskNameWithSubtasks() + ": prepare to synchronize");
+				this.currentConfiguration = reconfigID;
 				break;
 			case NEED_RESUME_REQUEST:
 				System.out.println(containedTask.getTaskInfo().getTaskNameWithSubtasks() + ": task resuming...");
 				this.getPauseActionController().resume();
+				this.currentConfiguration = null;
 				break;
 			default:
 				throw new Exception(containedTask.getTaskInfo().getTaskNameWithSubtasks() + ": unknown flag");
@@ -42,8 +46,15 @@ public class TaskOperatorManager {
 		hasSyncRequest.set(syncFlag);
 	}
 
-	public boolean acknowledgeSyncRequest(long finishedSyncRequestID){
-		return hasSyncRequest.compareAndSet(NEED_SYNC_REQUEST, finishedSyncRequestID);
+	public boolean acknowledgeSyncRequest(long finishedSyncRequestID, ReconfigID reconfigID){
+		if(currentConfiguration != null && currentConfiguration.equals(reconfigID)) {
+			return hasSyncRequest.compareAndSet(NEED_SYNC_REQUEST, finishedSyncRequestID);
+		}
+		if(currentConfiguration != null){
+			System.err.println(containedTask.getTaskInfo().getTaskNameWithSubtasks() + " decline previous configuration: "+reconfigID);
+		}
+		return false;
+//		return hasSyncRequest.compareAndSet(NEED_SYNC_REQUEST, finishedSyncRequestID);
 	}
 
 	@ThreadSafe

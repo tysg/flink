@@ -39,7 +39,7 @@ import org.apache.flink.runtime.jobmanager.scheduler.CoLocationConstraint;
 import org.apache.flink.runtime.jobmanager.scheduler.CoLocationGroup;
 import org.apache.flink.runtime.jobmanager.scheduler.LocationPreferenceConstraint;
 import org.apache.flink.runtime.jobmaster.LogicalSlot;
-import org.apache.flink.runtime.rescale.RescaleID;
+import org.apache.flink.runtime.rescale.ReconfigID;
 import org.apache.flink.runtime.scheduler.strategy.ExecutionVertexID;
 import org.apache.flink.runtime.state.KeyGroupRange;
 import org.apache.flink.runtime.taskmanager.TaskManagerLocation;
@@ -102,7 +102,7 @@ public class ExecutionVertex implements AccessExecutionVertex, Archiveable<Archi
 
 	private final ArrayList<InputSplit> inputSplits;
 
-	private volatile RescaleID rescaleId;
+	private volatile ReconfigID reconfigId;
 
 	private volatile KeyGroupRange keyGroupRange;
 
@@ -193,7 +193,7 @@ public class ExecutionVertex implements AccessExecutionVertex, Archiveable<Archi
 		this.timeout = timeout;
 		this.inputSplits = new ArrayList<>();
 
-		this.rescaleId = RescaleID.DEFAULT;
+		this.reconfigId = ReconfigID.DEFAULT;
 		this.idInModel = subTaskIndex;
 	}
 
@@ -325,8 +325,8 @@ public class ExecutionVertex implements AccessExecutionVertex, Archiveable<Archi
 		return currentExecution.getStateTimestamp(state);
 	}
 
-	public void updateRescaleId(RescaleID rescaleId) {
-		this.rescaleId = rescaleId;
+	public void updateRescaleId(ReconfigID reconfigId) {
+		this.reconfigId = reconfigId;
 	}
 
 	public void assignKeyGroupRange(KeyGroupRange keyGroupRange) {
@@ -342,8 +342,8 @@ public class ExecutionVertex implements AccessExecutionVertex, Archiveable<Archi
 	}
 
 
-	public RescaleID getRescaleId() {
-		return rescaleId;
+	public ReconfigID getRescaleId() {
+		return reconfigId;
 	}
 
 	public void setIdInModel(int idInModel) {

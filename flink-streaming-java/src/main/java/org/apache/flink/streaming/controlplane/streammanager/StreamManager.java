@@ -459,7 +459,6 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 								failure.printStackTrace();
 							}
 							try {
-								System.out.println("++++++ finished update");
 								log.info("++++++ finished update");
 								// TODO: extract the deployment overhead
 								reconfigurationProfiler.onOtherEnd(UPDATE_STATE);
@@ -559,7 +558,6 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 								failure.printStackTrace();
 							}
 							try {
-								System.out.println("++++++ finished update");
 								log.info("++++++ finished update");
 								// TODO: extract the deployment overhead
 								reconfigurationProfiler.onOtherEnd(UPDATE_STATE);
@@ -661,7 +659,6 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 								failure.printStackTrace();
 							}
 							try {
-								System.out.println("++++++ finished update");
 								log.info("++++++ finished update");
 								// TODO: extract the deployment overhead
 								this.trisk.notifyUpdateFinished(failure);
@@ -757,7 +754,6 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 							failure.printStackTrace();
 						}
 						try {
-							System.out.println("++++++ finished update");
 							LOG.info("++++++ finished update");
 							reconfigurationProfiler.onReconfigurationEnd();
 							this.trisk.notifyUpdateFinished(failure);
@@ -868,7 +864,6 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 								failure.printStackTrace();
 							}
 							try {
-								System.out.println("++++++ finished update");
 								LOG.info("++++++ finished update");
 								reconfigurationProfiler.onReconfigurationEnd();
 								this.trisk.notifyUpdateFinished(failure);
@@ -1043,7 +1038,8 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 			newController = constructor.newInstance(this);
 		} catch (IOException | ClassNotFoundException | NoSuchMethodException
 			| InstantiationException | IllegalAccessException | InvocationTargetException e) {
-			e.printStackTrace();
+			log.info("compile fail" + controllerID + ", classname: " + className);
+			log.info(e.getLocalizedMessage());
 			return false;
 		}
 		ControlPolicy oldControlPolicy = this.controlPolicyList.put(controllerID, newController);
@@ -1284,7 +1280,6 @@ public class StreamManager extends FencedRpcEndpoint<StreamManagerId> implements
 							failure.printStackTrace();
 						}
 						try {
-							System.out.println("++++++ finished update");
 							log.info("++++++ finished update");
 							trisk.clearTransformations();
 							trisk.notifyUpdateFinished(failure);

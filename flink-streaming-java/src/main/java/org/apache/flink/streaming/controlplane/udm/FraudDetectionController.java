@@ -40,23 +40,26 @@ public class FraudDetectionController extends AbstractController {
 		requestTime = 0;
 		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
 		updateDecisionTreeParameter(planWithLock);
-//		Thread.sleep(10 * 1000);
 
-		Thread.sleep(2 * 60 * 1000);
+//		Thread.sleep(2 * 60 * 1000);
+		Thread.sleep(10000);
 		requestTime = 120;
 		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
 		updateDecisionTreeParameter(planWithLock);
 
-		Thread.sleep(50 * 1000);
+//		Thread.sleep(50 * 1000);
+		Thread.sleep(10000);
 		int ppID = findOperatorByName("preprocess");
 		moveToAnotherNode(ppID);
 
-		Thread.sleep(55 * 1000);
+//		Thread.sleep(55 * 1000);
+		Thread.sleep(10000);
 		requestTime = 225;
 		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
 		updateDecisionTreeParameter(planWithLock);
 
-		Thread.sleep(120 * 1000);
+//		Thread.sleep(120 * 1000);
+		Thread.sleep(10000);
 		requestTime = 345;
 		planWithLock = getReconfigurationExecutor().getExecutionPlanCopy();
 		updateDecisionTreeParameter(planWithLock);

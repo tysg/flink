@@ -55,7 +55,7 @@ taskmanager.memory.process.size: 10240m
 
 # The number of task slots that each TaskManager offers. Each slot runs one parallel pipeline.
 
-taskmanager.numberOfTaskSlots: 20
+taskmanager.numberOfTaskSlots: 8
 
 # The parallelism used for programs that did not specify and other parallelism.
 
@@ -256,7 +256,7 @@ jobmanager.execution.failover-strategy: region
 # Trisk
 #==============================================================================
 
-trisk.controller: DummyController
+trisk.controller: DummyController_
 
 trisk.reconfig.operator.name: Splitter FlatMap
 trisk.reconfig.interval: 0
@@ -273,8 +273,8 @@ web.backpressure.refresh-interval: 600000000
 web.backpressure.num-samples: 10000000
 web.backpressure.delay-between-samples: 100000000
 #taskmanager.network.numberOfBuffers: 102400
-taskmanager.network.memory.buffers-per-channel: 10000000
-taskmanager.network.memory.floating-buffers-per-gate: 10000000
+#taskmanager.network.memory.buffers-per-channel: 10000000
+#taskmanager.network.memory.floating-buffers-per-gate: 10000000
 taskmanager.network.memory.max: 10gb
 akka.framesize: 1048576000b
 

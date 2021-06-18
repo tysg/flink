@@ -37,7 +37,7 @@ import org.apache.flink.runtime.executiongraph.TaskInformation;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionID;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionType;
 import org.apache.flink.runtime.jobgraph.IntermediateDataSetID;
-import org.apache.flink.runtime.rescale.RescaleID;
+import org.apache.flink.runtime.rescale.ReconfigID;
 import org.apache.flink.runtime.shuffle.ShuffleDescriptor;
 import org.apache.flink.runtime.shuffle.UnknownShuffleDescriptor;
 import org.apache.flink.runtime.state.KeyGroupRange;
@@ -185,7 +185,7 @@ public class TaskDeploymentDescriptorFactory {
 		IntermediateResultPartition consumedPartition = edge.getSource();
 		Execution producer = consumedPartition.getProducer().getCurrentExecutionAttempt();
 		// TODO: rescale id should be coming from source, however, now it comes from target, need to be double checked.
-		RescaleID rescaleID = edge.getTarget().getRescaleId();
+		ReconfigID reconfigID = edge.getTarget().getRescaleId();
 
 		ExecutionState producerState = producer.getState();
 		Optional<ResultPartitionDeploymentDescriptor> consumedPartitionDescriptor =
@@ -196,7 +196,7 @@ public class TaskDeploymentDescriptorFactory {
 		ResultPartitionID consumedPartitionId = new ResultPartitionID(
 			consumedPartition.getPartitionId(),
 			producer.getAttemptId(),
-			rescaleID);
+                reconfigID);
 
 		return getConsumedPartitionShuffleDescriptor(
 			consumedPartitionId,

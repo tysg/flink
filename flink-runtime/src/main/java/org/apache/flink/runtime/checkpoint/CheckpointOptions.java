@@ -19,8 +19,10 @@
 package org.apache.flink.runtime.checkpoint;
 
 import org.apache.flink.runtime.jobgraph.tasks.AbstractInvokable;
+import org.apache.flink.runtime.rescale.ReconfigID;
 import org.apache.flink.runtime.state.CheckpointStorageLocationReference;
 
+import javax.annotation.Nullable;
 import java.io.Serializable;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -41,6 +43,9 @@ public class CheckpointOptions implements Serializable {
 
 	/** Target location for the checkpoint. */
 	private final CheckpointStorageLocationReference targetLocation;
+
+	@Nullable
+	private ReconfigID reconfigID;
 
 	public CheckpointOptions(
 			CheckpointType checkpointType,
@@ -102,5 +107,14 @@ public class CheckpointOptions implements Serializable {
 
 	public static CheckpointOptions forCheckpointWithDefaultLocation() {
 		return CHECKPOINT_AT_DEFAULT_LOCATION;
+	}
+
+	public void setReconfigID(ReconfigID reconfigID) {
+		this.reconfigID = reconfigID;
+	}
+
+	@Nullable
+	public ReconfigID getReconfigID() {
+		return reconfigID;
 	}
 }

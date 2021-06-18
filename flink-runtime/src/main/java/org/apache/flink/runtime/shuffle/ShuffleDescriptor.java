@@ -20,7 +20,7 @@ package org.apache.flink.runtime.shuffle;
 
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionID;
-import org.apache.flink.runtime.rescale.RescaleID;
+import org.apache.flink.runtime.rescale.ReconfigID;
 
 import java.io.Serializable;
 import java.util.Collection;
@@ -68,5 +68,5 @@ public interface ShuffleDescriptor extends Serializable {
 	 */
 	Optional<ResourceID> storesLocalResourcesOn();
 
-	void updateResultPartitionId(RescaleID rescaleId);
+	void updateResultPartitionId(ReconfigID reconfigId);
 }

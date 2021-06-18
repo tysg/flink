@@ -68,7 +68,7 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 
 	private volatile ActionType actionType;
 
-	private volatile RescaleID rescaleId;
+	private volatile ReconfigID reconfigId;
 
 	private volatile JobRescalePartitionAssignment jobRescalePartitionAssignment;
 
@@ -133,10 +133,10 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 
 		this.jobGraph = jobGraph;
 
-		rescaleId = RescaleID.generateNextID();
+		reconfigId = ReconfigID.generateNextID();
 		this.jobRescalePartitionAssignment = jobRescalePartitionAssignment;
 
-		LOG.info("++++++ repartition job with RescaleID: " + rescaleId +
+		LOG.info("++++++ repartition job with RescaleID: " + reconfigId +
 			", taskID" + vertexID +
 			", partitionAssignment: " + jobRescalePartitionAssignment);
 
@@ -166,9 +166,9 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 
 		this.jobGraph = jobGraph;
 
-		rescaleId = RescaleID.generateNextID();
+		reconfigId = ReconfigID.generateNextID();
 		this.jobRescalePartitionAssignment = jobRescalePartitionAssignment;
-		LOG.info("++++++ scale out job with RescaleID: " + rescaleId +
+		LOG.info("++++++ scale out job with RescaleID: " + reconfigId +
 			", taskID" + vertexID +
 			", new parallelism: " + parallelism +
 			", partitionAssignment: " + jobRescalePartitionAssignment);
@@ -199,9 +199,9 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 
 		this.jobGraph = jobGraph;
 
-		rescaleId = RescaleID.generateNextID();
+		reconfigId = ReconfigID.generateNextID();
 		this.jobRescalePartitionAssignment = jobRescalePartitionAssignment;
-		LOG.info("++++++ scale in job with RescaleID: " + rescaleId + ", new parallelism: " + parallelism);
+		LOG.info("++++++ scale in job with RescaleID: " + reconfigId + ", new parallelism: " + parallelism);
 
 //		List<JobVertexID> involvedUpstream = new ArrayList<>();
 //		List<JobVertexID> involvedDownstream = new ArrayList<>();
@@ -248,23 +248,23 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 
 			for (ExecutionVertex vertex : tasks.get(jobId).getTaskVertices()) {
 				Execution execution = vertex.getCurrentExecutionAttempt();
-				execution.updateProducedPartitions(rescaleId);
+				execution.updateProducedPartitions(reconfigId);
 			}
 
 			for (ExecutionVertex vertex : tasks.get(jobId).getTaskVertices()) {
 				Execution execution = vertex.getCurrentExecutionAttempt();
-				rescaleCandidatesFutures.add(execution.scheduleRescale(rescaleId, RescaleOptions.RESCALE_PARTITIONS_ONLY, null));
+				rescaleCandidatesFutures.add(execution.scheduleRescale(reconfigId, RescaleOptions.RESCALE_PARTITIONS_ONLY, null));
 			}
 		}
 
 		for (int subtaskIndex = 0; subtaskIndex < targetVertex.getTaskVertices().length; subtaskIndex++) {
 			ExecutionVertex vertex = targetVertex.getTaskVertices()[subtaskIndex];
 			Execution execution = vertex.getCurrentExecutionAttempt();
-			execution.updateProducedPartitions(rescaleId);
+			execution.updateProducedPartitions(reconfigId);
 
 			if (!jobRescalePartitionAssignment.isSubtaskModified(subtaskIndex)) {
 				rescaleCandidatesFutures.add(
-					execution.scheduleRescale(rescaleId, RescaleOptions.RESCALE_BOTH, null));
+					execution.scheduleRescale(reconfigId, RescaleOptions.RESCALE_BOTH, null));
 			}
 		}
 
@@ -274,7 +274,7 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 			for (ExecutionVertex vertex : tasks.get(jobId).getTaskVertices()) {
 				Execution execution = vertex.getCurrentExecutionAttempt();
 				notYetAcknowledgedTasks.add(execution.getAttemptId());
-				rescaleCandidatesFutures.add(execution.scheduleRescale(rescaleId, RescaleOptions.RESCALE_GATES_ONLY, null));
+				rescaleCandidatesFutures.add(execution.scheduleRescale(reconfigId, RescaleOptions.RESCALE_GATES_ONLY, null));
 			}
 		}
 
@@ -366,7 +366,7 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 
 		for (ExecutionVertex vertex : this.createCandidates) {
 			Execution executionAttempt = vertex.getCurrentExecutionAttempt();
-			allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(rescaleId));
+			allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(reconfigId));
 		}
 
 		// rescale existed vertices from upstream to downstream
@@ -389,21 +389,21 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 					for (Map.Entry<RescaleOptions, List<ExecutionVertex>> entry : rescaleCandidates.entrySet()) {
 						for (ExecutionVertex vertex : entry.getValue()) {
 							Execution execution = vertex.getCurrentExecutionAttempt();
-							execution.updateProducedPartitions(rescaleId);
+							execution.updateProducedPartitions(reconfigId);
 						}
 					}
 
 					for (int subtaskIndex = 0; subtaskIndex < targetVertex.getTaskVertices().length; subtaskIndex++) {
 						ExecutionVertex vertex = targetVertex.getTaskVertices()[subtaskIndex];
 						Execution execution = vertex.getCurrentExecutionAttempt();
-						execution.updateProducedPartitions(rescaleId);
+						execution.updateProducedPartitions(reconfigId);
 					}
 
 					// then start to do schedule rescale
 					for (Map.Entry<RescaleOptions, List<ExecutionVertex>> entry : rescaleCandidates.entrySet()) {
 						for (ExecutionVertex vertex : entry.getValue()) {
 							Execution execution = vertex.getCurrentExecutionAttempt();
-							rescaleCandidatesFutures.add(execution.scheduleRescale(rescaleId, entry.getKey(), null));
+							rescaleCandidatesFutures.add(execution.scheduleRescale(reconfigId, entry.getKey(), null));
 						}
 					}
 
@@ -412,7 +412,7 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 							ExecutionVertex vertex = targetVertex.getTaskVertices()[subtaskIndex];
 							Execution execution = vertex.getCurrentExecutionAttempt();
 
-							rescaleCandidatesFutures.add(execution.scheduleRescale(rescaleId, RescaleOptions.RESCALE_BOTH, null));
+							rescaleCandidatesFutures.add(execution.scheduleRescale(reconfigId, RescaleOptions.RESCALE_BOTH, null));
 						}
 					}
 
@@ -491,7 +491,7 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 
 			for (ExecutionVertex vertex : tasks.get(jobId).getTaskVertices()) {
 				Execution execution = vertex.getCurrentExecutionAttempt();
-				rescaleCandidatesFutures.add(execution.scheduleRescale(rescaleId, RescaleOptions.RESCALE_PARTITIONS_ONLY, null));
+				rescaleCandidatesFutures.add(execution.scheduleRescale(reconfigId, RescaleOptions.RESCALE_PARTITIONS_ONLY, null));
 			}
 		}
 
@@ -501,7 +501,7 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 			for (ExecutionVertex vertex : tasks.get(jobId).getTaskVertices()) {
 				Execution execution = vertex.getCurrentExecutionAttempt();
 				notYetAcknowledgedTasks.add(execution.getAttemptId());
-				rescaleCandidatesFutures.add(execution.scheduleRescale(rescaleId, RescaleOptions.RESCALE_GATES_ONLY, null));
+				rescaleCandidatesFutures.add(execution.scheduleRescale(reconfigId, RescaleOptions.RESCALE_GATES_ONLY, null));
 			}
 		}
 
@@ -566,13 +566,13 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 			CompletableFuture<Void> scheduledRescale;
 
 			if (jobRescalePartitionAssignment.isSubtaskModified(i)) {
-				scheduledRescale = executionAttempt.scheduleRescale(rescaleId,
+				scheduledRescale = executionAttempt.scheduleRescale(reconfigId,
 					RescaleOptions.RESCALE_REDISTRIBUTE,
 					jobRescalePartitionAssignment.getAlignedKeyGroupRange(i),
 					jobRescalePartitionAssignment.getIdInModel(i));
 
 			} else {
-				scheduledRescale = executionAttempt.scheduleRescale(rescaleId,
+				scheduledRescale = executionAttempt.scheduleRescale(reconfigId,
 					RescaleOptions.RESCALE_KEYGROUP_RANGE_ONLY,
 					jobRescalePartitionAssignment.getAlignedKeyGroupRange(i));
 			}
@@ -636,14 +636,14 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 				} else {
 					Execution executionAttempt = vertex.getCurrentExecutionAttempt();
 
-					scheduledRescale = executionAttempt.scheduleRescale(rescaleId,
+					scheduledRescale = executionAttempt.scheduleRescale(reconfigId,
 						RescaleOptions.RESCALE_REDISTRIBUTE,
 						keyGroupRange, idInModel);
 				}
 			} else {
 				Execution executionAttempt = vertex.getCurrentExecutionAttempt();
 
-				scheduledRescale = executionAttempt.scheduleRescale(rescaleId,
+				scheduledRescale = executionAttempt.scheduleRescale(reconfigId,
 					RescaleOptions.RESCALE_KEYGROUP_RANGE_ONLY,
 					keyGroupRange);
 			}
@@ -700,11 +700,11 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 
 			if (jobRescalePartitionAssignment.isSubtaskModified(i)) {
 				int idInModel = jobRescalePartitionAssignment.getIdInModel(i);
-				scheduledRescale = executionAttempt.scheduleRescale(rescaleId,
+				scheduledRescale = executionAttempt.scheduleRescale(reconfigId,
 					RescaleOptions.RESCALE_REDISTRIBUTE,
 					keyGroupRange, idInModel);
 			} else {
-				scheduledRescale = executionAttempt.scheduleRescale(rescaleId,
+				scheduledRescale = executionAttempt.scheduleRescale(reconfigId,
 					RescaleOptions.RESCALE_KEYGROUP_RANGE_ONLY,
 					keyGroupRange);
 			}
@@ -791,6 +791,11 @@ public class JobRescaleCoordinator implements JobRescaleAction, RescalepointAckn
 				}
 			}, mainThreadExecutor);
 		}
+	}
+
+	@Override
+	public void onFullyAcknowledged(PendingCheckpoint checkpoint) {
+		// do nothing
 	}
 
 	@Override

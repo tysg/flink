@@ -26,7 +26,7 @@ import org.apache.flink.runtime.clusterframework.types.AllocationID;
 import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
 import org.apache.flink.runtime.executiongraph.JobInformation;
 import org.apache.flink.runtime.executiongraph.TaskInformation;
-import org.apache.flink.runtime.rescale.RescaleID;
+import org.apache.flink.runtime.rescale.ReconfigID;
 import org.apache.flink.runtime.state.KeyGroupRange;
 import org.apache.flink.util.FileUtils;
 import org.apache.flink.util.Preconditions;
@@ -149,7 +149,7 @@ public final class TaskDeploymentDescriptor implements Serializable {
 	private final JobManagerTaskRestore taskRestore;
 
 	/** The ID referencing the rescale id of the task*/
-	private RescaleID rescaleId = RescaleID.DEFAULT;
+	private ReconfigID reconfigId = ReconfigID.DEFAULT;
 
 	/** The id in Streamswitch. */
 	private int idInModel = Integer.MAX_VALUE/2;
@@ -284,8 +284,8 @@ public final class TaskDeploymentDescriptor implements Serializable {
 		return allocationId;
 	}
 
-	public RescaleID getRescaleId() {
-		return rescaleId;
+	public ReconfigID getRescaleId() {
+		return reconfigId;
 	}
 
 	public KeyGroupRange getKeyGroupRange() {

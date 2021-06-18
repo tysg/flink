@@ -33,6 +33,7 @@ import org.apache.flink.runtime.io.network.buffer.Buffer;
 import org.apache.flink.runtime.io.network.buffer.BufferConsumer;
 import org.apache.flink.runtime.io.network.buffer.FreeingBufferRecycler;
 import org.apache.flink.runtime.io.network.buffer.NetworkBuffer;
+import org.apache.flink.runtime.rescale.ReconfigID;
 import org.apache.flink.runtime.state.CheckpointStorageLocationReference;
 import org.apache.flink.util.InstantiationUtil;
 
@@ -207,11 +208,12 @@ public class EventSerializer {
 	private static ByteBuffer serializeCheckpointBarrier(CheckpointBarrier barrier) throws IOException {
 		final CheckpointOptions checkpointOptions = barrier.getCheckpointOptions();
 		final CheckpointType checkpointType = checkpointOptions.getCheckpointType();
+		final ReconfigID reconfigID = checkpointOptions.getReconfigID();
 
 		final byte[] locationBytes = checkpointOptions.getTargetLocation().isDefaultReference() ?
 				null : checkpointOptions.getTargetLocation().getReferenceBytes();
 
-		final ByteBuffer buf = ByteBuffer.allocate(28 + (locationBytes == null ? 0 : locationBytes.length));
+		final ByteBuffer buf = ByteBuffer.allocate(28 + (locationBytes == null ? 0 : locationBytes.length) + 8);
 
 		// we do not use checkpointType.ordinal() here to make the serialization robust
 		// against changes in the enum (such as changes in the order of the values)
@@ -239,7 +241,11 @@ public class EventSerializer {
 			buf.putInt(locationBytes.length);
 			buf.put(locationBytes);
 		}
-
+		if(reconfigID == null) {
+			buf.putLong(-1);
+		}else{
+			buf.putLong(reconfigID.getID());
+		}
 		buf.flip();
 		return buf;
 	}
@@ -272,8 +278,12 @@ public class EventSerializer {
 			buffer.get(bytes);
 			locationRef = new CheckpointStorageLocationReference(bytes);
 		}
-
-		return new CheckpointBarrier(id, timestamp, new CheckpointOptions(checkpointType, locationRef));
+		CheckpointOptions options = new CheckpointOptions(checkpointType, locationRef);
+		final long reconfigID = buffer.getLong();
+		if(reconfigID !=  -1){
+			options.setReconfigID(ReconfigID.forByteBuffer(reconfigID));
+		}
+		return new CheckpointBarrier(id, timestamp, options);
 	}
 
 	// ------------------------------------------------------------------------

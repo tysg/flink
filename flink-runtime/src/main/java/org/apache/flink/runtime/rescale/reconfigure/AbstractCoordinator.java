@@ -15,7 +15,7 @@ import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobgraph.jsonplan.JsonPlanGenerator;
 import org.apache.flink.runtime.messages.Acknowledge;
-import org.apache.flink.runtime.rescale.RescaleID;
+import org.apache.flink.runtime.rescale.ReconfigID;
 import org.apache.flink.util.Preconditions;
 
 import java.util.*;
@@ -42,8 +42,8 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 	protected volatile Map<Integer, List<ExecutionVertex>> removedCandidates;
 	protected volatile Map<Integer, List<ExecutionVertex>> createdCandidates;
 
-	// rescaleID should be maintained to identify number of reconfiguration that has been applied
-	protected volatile RescaleID rescaleID;
+	// reconfigID should be maintained to identify number of reconfiguration that has been applied
+	protected volatile ReconfigID reconfigID;
 
 
 	protected AbstractCoordinator(JobGraph jobGraph, ExecutionGraph executionGraph) {
@@ -93,7 +93,7 @@ public abstract class AbstractCoordinator implements PrimitiveOperation<Map<Inte
 
 	@Override
 	public final CompletableFuture<Map<Integer, Map<Integer, Diff>>> prepareExecutionPlan(ExecutionPlan executionPlan) {
-		rescaleID = RescaleID.generateNextID();
+		reconfigID = ReconfigID.generateNextID();
 		Map<Integer, Map<Integer, Diff>> differenceMap = new HashMap<>();
 		for (Iterator<OperatorDescriptor> it = executionPlan.getAllOperator(); it.hasNext();) {
 			OperatorDescriptor descriptor = it.next();

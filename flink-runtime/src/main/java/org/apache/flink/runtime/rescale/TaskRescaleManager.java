@@ -19,7 +19,6 @@
 package org.apache.flink.runtime.rescale;
 
 import org.apache.flink.api.common.JobID;
-import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.deployment.InputGateDeploymentDescriptor;
 import org.apache.flink.runtime.deployment.ResultPartitionDeploymentDescriptor;
 import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
@@ -28,14 +27,12 @@ import org.apache.flink.runtime.io.network.NettyShuffleEnvironment;
 import org.apache.flink.runtime.io.network.TaskEventDispatcher;
 import org.apache.flink.runtime.io.network.api.writer.ResultPartitionWriter;
 import org.apache.flink.runtime.io.network.metrics.InputChannelMetrics;
-import org.apache.flink.runtime.io.network.partition.ResultPartition;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionConsumableNotifier;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionID;
 import org.apache.flink.runtime.io.network.partition.consumer.*;
 import org.apache.flink.runtime.metrics.groups.TaskMetricGroup;
 import org.apache.flink.runtime.shuffle.NettyShuffleDescriptor;
 import org.apache.flink.runtime.shuffle.ShuffleDescriptor;
-import org.apache.flink.runtime.shuffle.ShuffleEnvironment;
 import org.apache.flink.runtime.shuffle.ShuffleIOOwnerContext;
 import org.apache.flink.runtime.taskmanager.ConsumableNotifyingResultPartitionWriterDecorator;
 import org.apache.flink.runtime.taskmanager.TaskActions;
@@ -105,13 +102,13 @@ public class TaskRescaleManager {
 	}
 
 	public void prepareRescaleMeta(
-		RescaleID rescaleId,
+		ReconfigID reconfigId,
 		RescaleOptions rescaleOptions,
 		Collection<ResultPartitionDeploymentDescriptor> resultPartitionDeploymentDescriptors,
 		Collection<InputGateDeploymentDescriptor> inputGateDeploymentDescriptors) {
 
 		TaskRescaleMeta meta = new TaskRescaleMeta(
-			rescaleId,
+                reconfigId,
 			rescaleOptions,
 			resultPartitionDeploymentDescriptors,
 			inputGateDeploymentDescriptors);
@@ -273,7 +270,7 @@ public class TaskRescaleManager {
 	}
 
 	private static class TaskRescaleMeta {
-		private final RescaleID rescaleId;
+		private final ReconfigID reconfigId;
 		private final RescaleOptions rescaleOptions;
 
 		private final Collection<ResultPartitionDeploymentDescriptor> resultPartitionDeploymentDescriptors;
@@ -282,12 +279,12 @@ public class TaskRescaleManager {
 		private final ResultPartitionWriter[] newConsumableNotifyingPartitionWriters;
 
 		TaskRescaleMeta(
-			RescaleID rescaleId,
+			ReconfigID reconfigId,
 			RescaleOptions rescaleOptions,
 			Collection<ResultPartitionDeploymentDescriptor> resultPartitionDeploymentDescriptors,
 			Collection<InputGateDeploymentDescriptor> inputGateDeploymentDescriptors) {
 
-			this.rescaleId = checkNotNull(rescaleId);
+			this.reconfigId = checkNotNull(reconfigId);
 			this.rescaleOptions = checkNotNull(rescaleOptions);
 
 			this.resultPartitionDeploymentDescriptors = checkNotNull(resultPartitionDeploymentDescriptors);
@@ -295,8 +292,8 @@ public class TaskRescaleManager {
 			this.newConsumableNotifyingPartitionWriters = new ResultPartitionWriter[resultPartitionDeploymentDescriptors.size()];
 		}
 
-		public RescaleID getRescaleId() {
-			return rescaleId;
+		public ReconfigID getRescaleId() {
+			return reconfigId;
 		}
 
 		public RescaleOptions getRescaleOptions() {

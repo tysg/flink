@@ -32,6 +32,7 @@ import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobmanager.slots.TaskManagerGateway;
 import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.messages.TaskBackPressureResponse;
+import org.apache.flink.runtime.rescale.ReconfigID;
 import org.apache.flink.runtime.rescale.RescaleOptions;
 
 import java.util.Collection;
@@ -111,8 +112,10 @@ public class SimpleAckingTaskManagerGateway implements TaskManagerGateway {
 	}
 
 	@Override
-	public CompletableFuture<Acknowledge> scheduleSync(ExecutionAttemptID executionAttemptID, int syncFlag, Time timeout) {
-		return null;
+	public CompletableFuture<Acknowledge> scheduleSync(ExecutionAttemptID executionAttemptID,
+													   int syncFlag, ReconfigID reconfigID,
+													   Time timeout) {
+		return CompletableFuture.completedFuture(Acknowledge.get());
 	}
 
 	@Override

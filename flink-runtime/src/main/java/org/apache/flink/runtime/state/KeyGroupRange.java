@@ -18,7 +18,6 @@
 
 package org.apache.flink.runtime.state;
 
-import org.apache.flink.runtime.rescale.RescaleID;
 import org.apache.flink.util.Preconditions;
 
 import java.io.Serializable;

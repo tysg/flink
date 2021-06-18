@@ -14,7 +14,7 @@ import org.apache.flink.runtime.executiongraph.*;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
-import org.apache.flink.runtime.rescale.RescaleID;
+import org.apache.flink.runtime.rescale.ReconfigID;
 import org.apache.flink.runtime.rescale.RescaleOptions;
 import org.apache.flink.runtime.rescale.RescalepointAcknowledgeListener;
 import org.apache.flink.util.Preconditions;
@@ -226,7 +226,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 
 		for (ExecutionVertex vertex : createdCandidates.get(operatorID)) {
 			Execution executionAttempt = vertex.getCurrentExecutionAttempt();
-			allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(rescaleID));
+			allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(reconfigID));
 		}
 
 		return FutureUtils.combineAll(allocateSlotFutures)
@@ -301,12 +301,12 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 			for (int i = 0; i < vertices.size(); i++) {
 				Execution executionAttempt = vertices.get(i).getCurrentExecutionAttempt();
 				LOG.info("++++++ allocating slots: " + slotIds.get(i));
-				allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(rescaleID, slotIds.get(i)));
+				allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(reconfigID, slotIds.get(i)));
 			}
 		} else {
 			for (ExecutionVertex vertex : createdCandidates.get(operatorID)) {
 				Execution executionAttempt = vertex.getCurrentExecutionAttempt();
-				allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(rescaleID));
+				allocateSlotFutures.add(executionAttempt.allocateAndAssignSlotForExecution(reconfigID));
 			}
 		}
 
@@ -419,7 +419,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 				// todo some partitions may not need modified, for example, broad cast partitioner
 				rescaleCandidatesFutures
 					.add(
-						updatePartitions(upstreamOperator.getOperatorID(), rescaleID)
+						updatePartitions(upstreamOperator.getOperatorID(), reconfigID)
 							.thenCompose(o -> updateDownstreamGates(upstreamOperator.getOperatorID()))
 //							.thenCompose(o -> {
 //								// check should we resume those tasks
@@ -447,7 +447,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 				Execution execution = vertex.getCurrentExecutionAttempt();
 				if (execution != null && execution.getState() == ExecutionState.RUNNING) {
 					rescaleCandidatesFutures.add(execution.scheduleRescale(
-						rescaleID,
+						reconfigID,
 						RescaleOptions.RESCALE_KEYGROUP_RANGE_ONLY,
 						remappingAssignment.getAlignedKeyGroupRange(subtaskIndex)));
 					// if is not a modified task and do not need to update partitions, then resume.
@@ -471,7 +471,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 				|| diffMap.containsKey(AbstractCoordinator.UDF)) {
 				if (remappingAssignment.isScaling()) {
 					try { // update partition and downstream gates if there are tasks to be scaled out/in
-						updatePartitions(targetOperatorID, rescaleID)
+						updatePartitions(targetOperatorID, reconfigID)
 							// downstream gates need to find out the upstream partitions, do not update downstream gates before upstream has updated
 //						.thenCompose(o -> updateDownstreamGates(targetOperatorID))
 							.thenAccept(o -> syncOp.resumeTasks(notModifiedList));
@@ -528,7 +528,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 			for (OperatorDescriptor upstreamOperator : heldExecutionPlan.getOperatorByID(targetOperatorID).getParents()) {
 				// todo some partitions may not need modified, for example, broad cast partitioner
 				rescaleCandidatesFutures
-					.add(updatePartitions(upstreamOperator.getOperatorID(), rescaleID).thenCompose(o -> updateDownstreamGates(upstreamOperator.getOperatorID()))
+					.add(updatePartitions(upstreamOperator.getOperatorID(), reconfigID).thenCompose(o -> updateDownstreamGates(upstreamOperator.getOperatorID()))
 					);
 			}
 			// update key group range in target stream
@@ -545,7 +545,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 				Execution execution = vertex.getCurrentExecutionAttempt();
 				if (execution != null && execution.getState() == ExecutionState.RUNNING) {
 					rescaleCandidatesFutures.add(execution.scheduleRescale(
-						rescaleID,
+						reconfigID,
 						RescaleOptions.RESCALE_KEYGROUP_RANGE_ONLY,
 						remappingAssignment.getAlignedKeyGroupRange(subtaskIndex)));
 				} else {
@@ -572,7 +572,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 		}
 	}
 
-	private CompletableFuture<Void> updatePartitions(int operatorID, RescaleID rescaleID) throws ExecutionGraphException {
+	private CompletableFuture<Void> updatePartitions(int operatorID, ReconfigID reconfigID) throws ExecutionGraphException {
 		// update result partition
 		JobVertexID jobVertexID = rawVertexIDToJobVertexID(operatorID);
 		ExecutionJobVertex jobVertex = executionGraph.getJobVertex(jobVertexID);
@@ -583,9 +583,9 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 			jobVertex.cleanBeforeRescale();
 			for (ExecutionVertex vertex : jobVertex.getTaskVertices()) {
 				Execution execution = vertex.getCurrentExecutionAttempt();
-				if (!vertex.getRescaleId().equals(rescaleID) && execution != null && execution.getState() == ExecutionState.RUNNING) {
-					execution.updateProducedPartitions(rescaleID);
-					updatePartitionsFuture.add(execution.scheduleRescale(rescaleID, RescaleOptions.RESCALE_PARTITIONS_ONLY, null));
+				if (!vertex.getRescaleId().equals(reconfigID) && execution != null && execution.getState() == ExecutionState.RUNNING) {
+					execution.updateProducedPartitions(reconfigID);
+					updatePartitionsFuture.add(execution.scheduleRescale(reconfigID, RescaleOptions.RESCALE_PARTITIONS_ONLY, null));
 				}
 			}
 		}
@@ -612,7 +612,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 		for (ExecutionVertex vertex : jobVertex.getTaskVertices()) {
 			Execution execution = vertex.getCurrentExecutionAttempt();
 			if (execution != null && execution.getState() == ExecutionState.RUNNING) {
-				futureList.add(execution.scheduleRescale(rescaleID, RescaleOptions.RESCALE_GATES_ONLY, null));
+				futureList.add(execution.scheduleRescale(reconfigID, RescaleOptions.RESCALE_GATES_ONLY, null));
 			}
 		}
 	}
@@ -659,7 +659,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 						try {
 							System.out.println(operatorID + " update state at: " + subtaskIndex + " id in model: " + remappingAssignment.getIdInModel(subtaskIndex));
 							CompletableFuture<Void> stateUpdateFuture = execution.scheduleRescale(
-								rescaleID,
+								reconfigID,
 								RescaleOptions.RESCALE_STATE_ONLY,
 								remappingAssignment.getAlignedKeyGroupRange(subtaskIndex),
 								remappingAssignment.getIdInModel(subtaskIndex)
@@ -723,7 +723,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 						.collect(Collectors.toList());
 				if (remappingAssignment.isScaling()) {
 					try {
-						updateTargetPartitionFuture = updatePartitions(operatorID, rescaleID);
+						updateTargetPartitionFuture = updatePartitions(operatorID, reconfigID);
 						updateTargetPartitionFuture.thenAccept(o -> syncOp.resumeTasks(notModifiedList));
 					} catch (ExecutionGraphException e) {
 						e.printStackTrace();
@@ -762,7 +762,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 						try {
 							System.out.println(operatorID + " update state at: " + subtaskIndex + " id in model: " + remappingAssignment.getIdInModel(subtaskIndex));
 							CompletableFuture<Void> stateUpdateFuture = execution.scheduleRescale(
-								rescaleID,
+								reconfigID,
 								RescaleOptions.RESCALE_STATE_ONLY,
 								remappingAssignment.getAlignedKeyGroupRange(subtaskIndex),
 								remappingAssignment.getIdInModel(subtaskIndex)
@@ -945,6 +945,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 
 		private final CompletableFuture<Map<OperatorID, OperatorState>> finishedFuture;
 
+		private final CompletableFuture<Void> fullyAckedFuture = new CompletableFuture<>();
 		private long checkpointId;
 
 		SynchronizeOperation(List<Tuple2<Integer, Integer>> taskList) {
@@ -989,7 +990,8 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 						.filter(execution -> execution != null &&
 							(execution.getState() == ExecutionState.RUNNING || execution.getState() == ExecutionState.DEPLOYING))
 						.forEach(execution -> {
-								affectedExecutionPrepareSyncFutures.add(execution.scheduleForInterTaskSync(TaskOperatorManager.NEED_SYNC_REQUEST));
+								affectedExecutionPrepareSyncFutures.add(
+									execution.scheduleForInterTaskSync(TaskOperatorManager.NEED_SYNC_REQUEST, reconfigID));
 								notYetAcknowledgedTasks.add(execution.getAttemptId());
 							}
 						);
@@ -1001,7 +1003,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 			for (Map.Entry<Integer, List<ExecutionVertex>> entry : removedCandidates.entrySet()) {
 				for (ExecutionVertex vertex :  entry.getValue()) {
 					Execution execution = vertex.getCurrentExecutionAttempt();
-					affectedExecutionPrepareSyncFutures.add(execution.scheduleForInterTaskSync(TaskOperatorManager.NEED_SYNC_REQUEST));
+					affectedExecutionPrepareSyncFutures.add(execution.scheduleForInterTaskSync(TaskOperatorManager.NEED_SYNC_REQUEST, reconfigID));
 					notYetAcknowledgedTasks.add(execution.getAttemptId());
 				}
 			}
@@ -1016,7 +1018,9 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 						checkpointCoordinator.setRescalepointAcknowledgeListener(this);
 						// temporary use rescale point
 						System.out.println("send barrier...");
-						checkpointCoordinator.triggerRescalePoint(System.currentTimeMillis());
+						checkpointCoordinator.triggerRescalePoint(
+							System.currentTimeMillis(),
+							ReconfigurationCoordinator.super.reconfigID);
 					} catch (Exception e) {
 						throw new CompletionException(e);
 					}
@@ -1033,8 +1037,8 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 			for (ExecutionVertex executionVertex : affectedVertices) {
 				Execution execution = executionVertex.getCurrentExecutionAttempt();
 				if (execution != null && execution.getState() == ExecutionState.RUNNING) {
-					execution.updateProducedPartitions(rescaleID);
-					futureList.add(execution.scheduleRescale(rescaleID, RescaleOptions.PREPARE_ONLY, null));
+					execution.updateProducedPartitions(reconfigID);
+					futureList.add(execution.scheduleRescale(reconfigID, RescaleOptions.PREPARE_ONLY, null));
 					notYetAcknowledgedTasks.add(execution.getAttemptId());
 				}
 			}
@@ -1042,7 +1046,9 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 		}
 
 		private CompletableFuture<Void> resumeAll() {
-			return resumeTasks(pausedTasks);
+			CompletableFuture<Void> resumeFuture = resumeTasks(pausedTasks);
+			return resumeFuture;
+//			return resumeFuture.thenCombine(fullyAckedFuture, (o1, o2) -> null);
 		}
 
 		private CompletableFuture<Void> resumeTasks(List<Tuple2<Integer, Integer>> taskList) {
@@ -1073,7 +1079,7 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 					isSourceResumed = true;
 				} else {
 					Execution execution = operatedVertex.getCurrentExecutionAttempt();
-					affectedExecutionPrepareSyncFutures.add(execution.scheduleForInterTaskSync(TaskOperatorManager.NEED_RESUME_REQUEST));
+					affectedExecutionPrepareSyncFutures.add(execution.scheduleForInterTaskSync(TaskOperatorManager.NEED_RESUME_REQUEST, reconfigID));
 				}
 			}
 			// make affected task resume
@@ -1109,6 +1115,13 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 						throw new CompletionException(e);
 					}
 				});
+			}
+		}
+
+		@Override
+		public void onFullyAcknowledged(PendingCheckpoint checkpoint) {
+			if(checkpoint.getCheckpointId() == checkpointId) {
+				fullyAckedFuture.complete(null);
 			}
 		}
 

@@ -20,10 +20,13 @@ package org.apache.flink.runtime.checkpoint;
 
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.JobStatus;
+import org.apache.flink.runtime.rescale.ReconfigID;
 
+import javax.annotation.Nullable;
 import java.io.Serializable;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
+import static org.apache.flink.util.Preconditions.checkState;
 
 /**
  * The configuration of a checkpoint. This describes whether
@@ -49,6 +52,9 @@ public class CheckpointProperties implements Serializable {
 	private final boolean discardCancelled;
 	private final boolean discardFailed;
 	private final boolean discardSuspended;
+
+	@Nullable
+	private ReconfigID reconfigID;
 
 	@VisibleForTesting
 	CheckpointProperties(
@@ -318,6 +324,25 @@ public class CheckpointProperties implements Serializable {
 		return RESCALINGPOINT;
 	}
 
+	public static CheckpointProperties forRescalePoint(ReconfigID reconfigID) {
+		return new CheckpointProperties(
+			true,
+			CheckpointType.RESCALEPOINT,
+			true,
+			true,  // Delete on success
+			true,  // Delete on cancellation
+			true,  // Delete on failure
+			true)
+			.setRescaleID(reconfigID); // Delete on suspension;
+	}
+
+	private CheckpointProperties setRescaleID(ReconfigID reconfigID) {
+		checkState(CheckpointType.RESCALEPOINT.equals(this.checkpointType),
+			"rescale id only reserved for CheckpointType.RESCALEPOINT");
+		this.reconfigID = reconfigID;
+		return this;
+	}
+
 	/**
 	 * Creates the checkpoint properties for a checkpoint.
 	 *
@@ -339,5 +364,9 @@ public class CheckpointProperties implements Serializable {
 			default:
 				throw new IllegalArgumentException("unknown policy: " + policy);
 		}
+	}
+
+	public ReconfigID getReconfigID() {
+		return checkNotNull(reconfigID, "only CheckpointType.RESCALEPOINT have rescale id");
 	}
 }

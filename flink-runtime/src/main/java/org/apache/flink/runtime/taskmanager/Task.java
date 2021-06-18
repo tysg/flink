@@ -61,7 +61,7 @@ import org.apache.flink.runtime.memory.MemoryManager;
 import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.metrics.groups.TaskMetricGroup;
 import org.apache.flink.runtime.query.TaskKvStateRegistry;
-import org.apache.flink.runtime.rescale.RescaleID;
+import org.apache.flink.runtime.rescale.ReconfigID;
 import org.apache.flink.runtime.rescale.RescaleOptions;
 import org.apache.flink.runtime.rescale.TaskRescaleManager;
 import org.apache.flink.runtime.rescale.reconfigure.TaskOperatorManager;
@@ -70,7 +70,6 @@ import org.apache.flink.runtime.shuffle.ShuffleIOOwnerContext;
 import org.apache.flink.runtime.state.CheckpointListener;
 import org.apache.flink.runtime.state.KeyGroupRange;
 import org.apache.flink.runtime.state.TaskStateManager;
-import org.apache.flink.runtime.state.TaskStateManagerImpl;
 import org.apache.flink.runtime.taskexecutor.BackPressureSampleableTask;
 import org.apache.flink.runtime.taskexecutor.GlobalAggregateManager;
 import org.apache.flink.runtime.taskexecutor.KvStateService;
@@ -1260,13 +1259,13 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 	}
 
 	public void prepareRescalingComponent(
-		RescaleID rescaleId,
+		ReconfigID reconfigId,
 		RescaleOptions rescaleOptions,
 		Collection<ResultPartitionDeploymentDescriptor> resultPartitionDeploymentDescriptors,
 		Collection<InputGateDeploymentDescriptor> inputGateDeploymentDescriptors) {
 
 		taskRescaleManager.prepareRescaleMeta(
-			rescaleId,
+			reconfigId,
 			rescaleOptions,
 			resultPartitionDeploymentDescriptors,
 			inputGateDeploymentDescriptors);
@@ -1301,9 +1300,9 @@ public class Task implements Runnable, TaskSlotPayload, TaskActions, PartitionPr
 		taskRescaleManager.createNewResultPartitions();
 	}
 
-	public void prepareSync(int syncFlag) {
+	public void prepareSync(int syncFlag, ReconfigID reconfigID) {
 		try {
-			taskOperatorManager.setSyncRequestFlag(syncFlag);
+			taskOperatorManager.setSyncRequestFlag(syncFlag, reconfigID);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

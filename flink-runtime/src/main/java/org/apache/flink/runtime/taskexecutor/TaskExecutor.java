@@ -79,6 +79,7 @@ import org.apache.flink.runtime.query.KvStateClientProxy;
 import org.apache.flink.runtime.query.KvStateRegistry;
 import org.apache.flink.runtime.query.KvStateServer;
 import org.apache.flink.runtime.registration.RegistrationConnectionListener;
+import org.apache.flink.runtime.rescale.ReconfigID;
 import org.apache.flink.runtime.rescale.RescaleOptions;
 import org.apache.flink.runtime.resourcemanager.ResourceManagerGateway;
 import org.apache.flink.runtime.resourcemanager.ResourceManagerId;
@@ -701,12 +702,13 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 	public CompletableFuture<Acknowledge> scheduleSync(
 		ExecutionAttemptID executionAttemptID,
 		int syncFlag,
+		ReconfigID reconfigID,
 		@RpcTimeout Time timeout){
 		final Task task = taskSlotTable.getTask(executionAttemptID);
 		if (task != null) {
 			try {
 				// Run asynchronously because it might be blocking
-				task.prepareSync(syncFlag);
+				task.prepareSync(syncFlag, reconfigID);
 
 				return CompletableFuture.completedFuture(Acknowledge.get());
 			} catch (Exception e) {

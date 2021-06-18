@@ -9,6 +9,8 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 import org.apache.flink.streaming.controlplane.streammanager.ByteClassLoader;
 import org.apache.flink.streaming.controlplane.streammanager.abstraction.TriskWithLock;
 import org.apache.flink.streaming.controlplane.streammanager.abstraction.ReconfigurationExecutor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -22,6 +24,8 @@ import java.util.*;
  *
  */
 public abstract class AbstractController implements ControlPolicy {
+
+	protected final Logger log = LoggerFactory.getLogger(getClass());
 
 	private final ReconfigurationExecutor reconfigurationExecutor;
 	private final Object lock = new Object();
@@ -41,7 +45,6 @@ public abstract class AbstractController implements ControlPolicy {
 		if(throwable != null){
 			throw new RuntimeException("error while execute reconfiguration", throwable);
 		}
-		System.out.println("my self defined instruction finished??");
 		synchronized (lock) {
 			lock.notify();
 		}
@@ -219,7 +222,7 @@ public abstract class AbstractController implements ControlPolicy {
 						Map<String, List<AbstractSlot>> resourceMap) {
 		for (String otherNodeID : resourceMap.keySet()) {
 			if (loadMap.getOrDefault(otherNodeID, 0) < numTasksInOneNode) {
-				System.out.println("++++++ exceeded number of tasks on node: " + nodeID
+				log.info("++++++ exceeded number of tasks on node: " + nodeID
 					+ " allocate exceeded one to another node: " + otherNodeID);
 				pendingStots.put(otherNodeID, pendingStots.getOrDefault(otherNodeID, 0) + 1);
 				loadMap.put(otherNodeID, loadMap.getOrDefault(otherNodeID, 0) + 1);

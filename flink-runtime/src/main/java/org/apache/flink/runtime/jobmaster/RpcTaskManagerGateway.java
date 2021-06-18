@@ -31,6 +31,7 @@ import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobmanager.slots.TaskManagerGateway;
 import org.apache.flink.runtime.messages.Acknowledge;
 import org.apache.flink.runtime.messages.TaskBackPressureResponse;
+import org.apache.flink.runtime.rescale.ReconfigID;
 import org.apache.flink.runtime.rescale.RescaleOptions;
 import org.apache.flink.runtime.rpc.RpcTimeout;
 import org.apache.flink.runtime.taskexecutor.TaskExecutorGateway;
@@ -79,8 +80,9 @@ public class RpcTaskManagerGateway implements TaskManagerGateway {
 	}
 
 	@Override
-	public CompletableFuture<Acknowledge> scheduleSync(ExecutionAttemptID executionAttemptID, int syncFlag, @RpcTimeout Time timeout){
-		return taskExecutorGateway.scheduleSync(executionAttemptID, syncFlag, timeout);
+	public CompletableFuture<Acknowledge> scheduleSync(ExecutionAttemptID executionAttemptID, int syncFlag, ReconfigID reconfigID,
+													   @RpcTimeout Time timeout) {
+		return taskExecutorGateway.scheduleSync(executionAttemptID, syncFlag, reconfigID, timeout);
 	}
 
 	@Override

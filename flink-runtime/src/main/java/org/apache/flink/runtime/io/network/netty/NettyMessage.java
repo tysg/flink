@@ -26,7 +26,7 @@ import org.apache.flink.runtime.io.network.partition.ResultPartitionID;
 import org.apache.flink.runtime.io.network.partition.consumer.InputChannel;
 import org.apache.flink.runtime.io.network.partition.consumer.InputChannelID;
 import org.apache.flink.runtime.jobgraph.IntermediateResultPartitionID;
-import org.apache.flink.runtime.rescale.RescaleID;
+import org.apache.flink.runtime.rescale.ReconfigID;
 import org.apache.flink.util.ExceptionUtils;
 
 import org.apache.flink.shaded.netty4.io.netty.buffer.ByteBuf;
@@ -506,7 +506,7 @@ public abstract class NettyMessage {
 				new ResultPartitionID(
 					IntermediateResultPartitionID.fromByteBuf(buffer),
 					ExecutionAttemptID.fromByteBuf(buffer),
-					RescaleID.fromByteBuf(buffer));
+					ReconfigID.fromByteBuf(buffer));
 			int queueIndex = buffer.readInt();
 			InputChannelID receiverId = InputChannelID.fromByteBuf(buffer);
 			int credit = buffer.readInt();
@@ -581,7 +581,7 @@ public abstract class NettyMessage {
 				new ResultPartitionID(
 					IntermediateResultPartitionID.fromByteBuf(buffer),
 					ExecutionAttemptID.fromByteBuf(buffer),
-					RescaleID.fromByteBuf(buffer));
+					ReconfigID.fromByteBuf(buffer));
 
 			InputChannelID receiverId = InputChannelID.fromByteBuf(buffer);
 
@@ -697,7 +697,7 @@ public abstract class NettyMessage {
 				new ResultPartitionID(
 					IntermediateResultPartitionID.fromByteBuf(buffer),
 					ExecutionAttemptID.fromByteBuf(buffer),
-					RescaleID.fromByteBuf(buffer));
+					ReconfigID.fromByteBuf(buffer));
 			int credit = buffer.readInt();
 			InputChannelID receiverId = InputChannelID.fromByteBuf(buffer);
 
