@@ -70,13 +70,12 @@ public class InternalKeyContextImpl<K> implements InternalKeyContext<K> {
 	}
 
 	@Override
-	public void setCurrentKeyGroupIndex(int currentKeyGroupIndex) {
+	public void setCurrentKeyGroupIndex(int currentHashedKeyGroupIndex) {
 		// this is a hashed index, need to map to a aligned index
 		try {
-			int alignedCurrentKeyGroupIndex = keyGroupRange.mapFromHashedToAligned(currentKeyGroupIndex);
-			this.currentKeyGroupIndex = alignedCurrentKeyGroupIndex;
+			this.currentKeyGroupIndex = keyGroupRange.mapFromHashedToAligned(currentHashedKeyGroupIndex);
 		}catch (NullPointerException e){
-			throw new RuntimeException("the input key may not belongs to this context:" + currentKeyGroupIndex, e);
+			throw new RuntimeException("the input key may not belongs to this context:" + currentHashedKeyGroupIndex, e);
 		}
 	}
 

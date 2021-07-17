@@ -294,10 +294,18 @@ public abstract class AbstractStreamOperator<OUT>
 	}
 
 	@Override
+	public void updateStateTable(KeyGroupRange keyGroupRange, int maxNumberOfParallelSubtasks) {
+		if (keyedStateBackend instanceof HeapKeyedStateBackend) {
+			((HeapKeyedStateBackend) keyedStateBackend).updateStateTable(keyGroupRange, maxNumberOfParallelSubtasks);
+		}
+	}
+
+	@Override
 	public void updateKeyGroupOffset() {
 		if (keyedStateBackend instanceof HeapKeyedStateBackend) {
 			((HeapKeyedStateBackend) keyedStateBackend).updateKeyGroupOffset();
 		}
+		// TODO: need to read the snapshot and restore the state table.
 	}
 
 	private static void closeFromRegistry(Closeable closeable, CloseableRegistry registry) {

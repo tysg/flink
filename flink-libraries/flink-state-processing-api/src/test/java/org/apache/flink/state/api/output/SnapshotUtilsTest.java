@@ -25,6 +25,7 @@ import org.apache.flink.runtime.checkpoint.CheckpointOptions;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.state.CheckpointStorageWorkerView;
 import org.apache.flink.runtime.state.CheckpointStreamFactory;
+import org.apache.flink.runtime.state.KeyGroupRange;
 import org.apache.flink.runtime.state.ttl.mock.MockStateBackend;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OperatorSnapshotFutures;
@@ -145,6 +146,11 @@ public class SnapshotUtilsTest {
 
 		@Override
 		public void updateKeyGroupOffset() {
+
+		}
+
+		@Override
+		public void updateStateTable(KeyGroupRange keyGroupRange, int maxNumberOfParallelSubtasks) {
 
 		}
 

@@ -1267,10 +1267,11 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 
 		try {
 			actionExecutor.runThrowing(() -> {
-				this.assignedKeyGroupRange.update(keyGroupRange);
 				this.idInModel = idInModel;
 
-				initializeStateAndOpen();
+				updateState(keyGroupRange, getEnvironment().getTaskInfo().getMaxNumberOfParallelSubtasks());
+
+				this.assignedKeyGroupRange.update(keyGroupRange);
 
 				getEnvironment().getMetricsManager().updateTaskId(
 					getEnvironment().getTaskInfo().getTaskNameWithSubtasks(), idInModel);
@@ -1282,6 +1283,17 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 			throw new RuntimeException(e);
 		}
 //		throw new IllegalArgumentException("reinitializeState is not suppported now.");
+	}
+
+	private void updateState(KeyGroupRange keyGroupRange, int maxNumberOfParallelSubtasks) throws Exception {
+
+		StreamOperator<?>[] allOperators = operatorChain.getAllOperators();
+
+		for (StreamOperator<?> operator : allOperators) {
+			if (null != operator) {
+				operator.updateStateTable(keyGroupRange, maxNumberOfParallelSubtasks);
+			}
+		}
 	}
 
 	@Override

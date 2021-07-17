@@ -34,22 +34,8 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.core.fs.CloseableRegistry;
 import org.apache.flink.runtime.checkpoint.CheckpointOptions;
 import org.apache.flink.runtime.query.TaskKvStateRegistry;
-import org.apache.flink.runtime.state.AbstractKeyedStateBackend;
-import org.apache.flink.runtime.state.CheckpointStreamFactory;
-import org.apache.flink.runtime.state.KeyExtractorFunction;
-import org.apache.flink.runtime.state.KeyGroupedInternalPriorityQueue;
-import org.apache.flink.runtime.state.Keyed;
-import org.apache.flink.runtime.state.KeyedStateFunction;
-import org.apache.flink.runtime.state.KeyedStateHandle;
-import org.apache.flink.runtime.state.LocalRecoveryConfig;
-import org.apache.flink.runtime.state.PriorityComparable;
-import org.apache.flink.runtime.state.RegisteredKeyValueStateBackendMetaInfo;
-import org.apache.flink.runtime.state.RegisteredPriorityQueueStateBackendMetaInfo;
-import org.apache.flink.runtime.state.SnapshotResult;
-import org.apache.flink.runtime.state.StateSnapshotRestore;
+import org.apache.flink.runtime.state.*;
 import org.apache.flink.runtime.state.StateSnapshotTransformer.StateSnapshotTransformFactory;
-import org.apache.flink.runtime.state.StateSnapshotTransformers;
-import org.apache.flink.runtime.state.StreamCompressionDecorator;
 import org.apache.flink.runtime.state.ttl.TtlTimeProvider;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.StateMigrationException;
@@ -337,9 +323,24 @@ public class HeapKeyedStateBackend<K> extends AbstractKeyedStateBackend<K> {
 	}
 
 	public void updateKeyGroupOffset() {
-		for (StateTable registeredKVState : registeredKVStates.values()) {
+		for (StateTable<K, ?, ?> registeredKVState : registeredKVStates.values()) {
 			registeredKVState.updateKeyGroupOffset();
 		}
+	}
+
+	public void updateStateTable(KeyGroupRange keyGroupRange, int numberOfKeyGroups) {
+		this.keyGroupRange = keyGroupRange;
+		this.numberOfKeyGroups = numberOfKeyGroups;
+		InternalKeyContextImpl<K> keyContext = new InternalKeyContextImpl<>(
+			keyGroupRange,
+			numberOfKeyGroups
+		);
+		for (StateTable<K, ?, ?> registeredKVState : registeredKVStates.values()) {
+			registeredKVState.updateStateTable(keyContext);
+		}
+
+		// substitute the keyContext
+		this.keyContext = keyContext;
 	}
 
 	@Override

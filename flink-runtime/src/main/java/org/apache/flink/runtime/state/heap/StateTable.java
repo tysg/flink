@@ -28,6 +28,8 @@ import org.apache.flink.runtime.state.StateSnapshotRestore;
 import org.apache.flink.runtime.state.StateTransformationFunction;
 import org.apache.flink.runtime.state.internal.InternalKvState.StateIncrementalVisitor;
 import org.apache.flink.util.Preconditions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 
@@ -49,11 +51,12 @@ import java.util.stream.StreamSupport;
  */
 public abstract class StateTable<K, N, S>
 	implements StateSnapshotRestore, Iterable<StateEntry<K, N, S>> {
+	protected static final Logger LOG = LoggerFactory.getLogger(StateTable.class);
 
 	/**
 	 * The key context view on the backend. This provides information, such as the currently active key.
 	 */
-	protected final InternalKeyContext<K> keyContext;
+	protected InternalKeyContext<K> keyContext;
 
 	/**
 	 * Combined meta information such as name and serializers for this state.
@@ -74,7 +77,7 @@ public abstract class StateTable<K, N, S>
 	 * Map for holding the actual state objects. The outer array represents the key-groups.
 	 * All array positions will be initialized with an empty state map.
 	 */
-	protected final StateMap<K, N, S>[] keyGroupedStateMaps;
+	protected StateMap<K, N, S>[] keyGroupedStateMaps;
 
 	/**
 	 * @param keyContext    the key context provides the key scope for all put/get/delete operations.
@@ -276,6 +279,38 @@ public abstract class StateTable<K, N, S>
 		return stateMap.removeAndGetOld(key, namespace);
 	}
 
+
+	public void updateStateTable(InternalKeyContext<K> newKeyContext) {
+		// step 1: update the keyGroupedStateMaps map, it should be mapped to the exact place.
+		// old stateMap index: 0-nKeygroups
+		// aligned keygroup index: 0+keyGroupOffset, nKeygroups+keyGroupOffset
+		// hashed keygroup index: hashed idx = mapFromAlignedToHashed(aligned idx)
+		// keys to hashed keygroup idx mapped is never changed.
+		@SuppressWarnings("unchecked")
+		StateMap<K, N, S>[] state = (StateMap<K, N, S>[]) new StateMap[newKeyContext.getKeyGroupRange().getNumberOfKeyGroups()];
+		for (int i = 0; i < state.length; i++) {
+			state[i] = createStateMap();
+		}
+		for (int curOffset = 0; curOffset < this.keyGroupedStateMaps.length; curOffset++) {
+			// if old hashed keygroup is still in new allocated hashed keygoup set
+			// put the state map of the hashed keygroup to the correct offset of new state map.
+			int alignedKeygroupIdx = offsetToIndex(curOffset);
+			int hashedKeygroupIdx = this.keyContext.getKeyGroupRange().mapFromAlignedToHashed(alignedKeygroupIdx);
+			if (newKeyContext.getKeyGroupRange().getFromHashedToAligned().containsKey(hashedKeygroupIdx)) {
+				int newAlignedKeygroupIdx = newKeyContext.getKeyGroupRange().mapFromHashedToAligned(hashedKeygroupIdx);
+				int newOffset = newAlignedKeygroupIdx - newKeyContext.getKeyGroupRange().getStartKeyGroup();
+				state[newOffset] = this.keyGroupedStateMaps[curOffset];
+				LOG.info("++++++ offset has do not need to be restored: " + curOffset + " -> " + newOffset);
+			}
+		}
+		this.keyGroupedStateMaps = state;
+		// step 2: update keygroup offset
+		this.keyGroupOffset = newKeyContext.getKeyGroupRange().getStartKeyGroup();
+		// step 3: if is migrate in, restore the state of new assigned keygroup, this can be done by the keygroup restore mechanism HeapRestoreOperation.readKeyGroupStateData()
+		// step 4: TODO: update keygrouprange in original keycontext
+//		this.keyContext = newKeyContext;
+	}
+
 	// ------------------------------------------------------------------------
 	//  access to maps
 	// ------------------------------------------------------------------------
@@ -313,9 +348,18 @@ public abstract class StateTable<K, N, S>
 	 * Translates a key-group id to the internal array offset.
 	 */
 	private int indexToOffset(int index) {
-		// remap the hashed index to aligned index.
+		// remap the aligned index to offset of state map.
 		return index - keyGroupOffset;
 	}
+
+	/**
+	 * Translates a internal array offset to the key-group id.
+	 */
+	private int offsetToIndex(int offset) {
+		// remap the offset of state map to the aligned index.
+		return offset + keyGroupOffset;
+	}
+
 
 	// Meta data setter / getter and toString -----------------------------------------------------
 

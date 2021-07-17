@@ -69,10 +69,10 @@ public abstract class AbstractKeyedStateBackend<K> implements
 	private InternalKvState lastState;
 
 	/** The number of key-groups aka max parallelism. */
-	protected final int numberOfKeyGroups;
+	protected int numberOfKeyGroups;
 
 	/** Range of key-groups for which this backend is responsible. */
-	protected final KeyGroupRange keyGroupRange;
+	protected KeyGroupRange keyGroupRange;
 
 	/** KvStateRegistry helper for this task. */
 	protected final TaskKvStateRegistry kvStateRegistry;
@@ -90,7 +90,7 @@ public abstract class AbstractKeyedStateBackend<K> implements
 	protected final StreamCompressionDecorator keyGroupCompressionDecorator;
 
 	/** The key context for this backend. */
-	protected final InternalKeyContext<K> keyContext;
+	protected InternalKeyContext<K> keyContext;
 
 	public AbstractKeyedStateBackend(
 		TaskKvStateRegistry kvStateRegistry,

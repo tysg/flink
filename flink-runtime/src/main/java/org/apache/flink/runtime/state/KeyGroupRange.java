@@ -148,7 +148,7 @@ public class KeyGroupRange implements KeyGroupsList, Serializable {
 		return fromAlignedToHashed;
 	}
 
-	private Map<Integer, Integer> getFromHashedToAligned() {
+	public Map<Integer, Integer> getFromHashedToAligned() {
 		return fromHashedToAligned;
 	}
 

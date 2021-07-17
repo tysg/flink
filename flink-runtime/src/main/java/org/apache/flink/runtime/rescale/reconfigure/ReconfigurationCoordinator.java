@@ -446,13 +446,15 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 				ExecutionVertex vertex = targetJobVertex.getTaskVertices()[subtaskIndex];
 				Execution execution = vertex.getCurrentExecutionAttempt();
 				if (execution != null && execution.getState() == ExecutionState.RUNNING) {
-					rescaleCandidatesFutures.add(execution.scheduleRescale(
-						reconfigID,
-						RescaleOptions.RESCALE_KEYGROUP_RANGE_ONLY,
-						remappingAssignment.getAlignedKeyGroupRange(subtaskIndex)));
-					// if is not a modified task and do not need to update partitions, then resume.
 					if (!remappingAssignment.isTaskModified(subtaskIndex)) {
+						// if is not a modified task and only need to update keygrouprange, then resume.
+						rescaleCandidatesFutures.add(execution.scheduleRescale(
+							reconfigID,
+							RescaleOptions.RESCALE_KEYGROUP_RANGE_ONLY,
+							remappingAssignment.getAlignedKeyGroupRange(subtaskIndex)));
+//						if (!remappingAssignment.isTaskModified(subtaskIndex)) {
 						notModifiedList.add(Tuple2.of(targetOperatorID, subtaskIndex));
+//						}
 					}
 				} else {
 					vertex.assignKeyGroupRange(remappingAssignment.getAlignedKeyGroupRange(subtaskIndex));
@@ -544,10 +546,13 @@ public class ReconfigurationCoordinator extends AbstractCoordinator {
 				ExecutionVertex vertex = targetJobVertex.getTaskVertices()[subtaskIndex];
 				Execution execution = vertex.getCurrentExecutionAttempt();
 				if (execution != null && execution.getState() == ExecutionState.RUNNING) {
-					rescaleCandidatesFutures.add(execution.scheduleRescale(
-						reconfigID,
-						RescaleOptions.RESCALE_KEYGROUP_RANGE_ONLY,
-						remappingAssignment.getAlignedKeyGroupRange(subtaskIndex)));
+					// only need to update those unaffected tasks.
+					if (!remappingAssignment.isTaskModified(subtaskIndex)) {
+						rescaleCandidatesFutures.add(execution.scheduleRescale(
+							reconfigID,
+							RescaleOptions.RESCALE_KEYGROUP_RANGE_ONLY,
+							remappingAssignment.getAlignedKeyGroupRange(subtaskIndex)));
+					}
 				} else {
 					vertex.assignKeyGroupRange(remappingAssignment.getAlignedKeyGroupRange(subtaskIndex));
 				}
