@@ -987,10 +987,14 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 
 				// Step (3): Take the state snapshot. This should be largely asynchronous, to not
 				//           impact progress of the streaming topology
-				checkpointState(checkpointMetaData, checkpointOptions, checkpointMetrics);
-
-				// Step (4): Check whether the checkpoint is rescalepoint type, and do rescaling if it is.
-				checkRescalePoint(checkpointMetaData, checkpointOptions, checkpointMetrics);
+				if (!checkpointOptions.getCheckpointType().isRescalepoint()) {
+					checkpointState(checkpointMetaData, checkpointOptions, checkpointMetrics);
+				} else {
+					// TODO: only snapshot on affected state tables and ack to coordinator accordingly
+					snapshotAffectedState(checkpointMetaData, checkpointOptions, checkpointMetrics);
+					// Step (4): Check whether the checkpoint is rescalepoint type, and do rescaling if it is.
+					checkRescalePoint(checkpointMetaData, checkpointOptions, checkpointMetrics);
+				}
 			});
 
 			return true;
@@ -1094,6 +1098,25 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 			checkpointMetrics);
 
 		checkpointingOperation.executeCheckpointing();
+	}
+
+	private void snapshotAffectedState(
+		CheckpointMetaData checkpointMetaData,
+		CheckpointOptions checkpointOptions,
+		CheckpointMetrics checkpointMetrics) throws Exception {
+
+		CheckpointStreamFactory storage = checkpointStorage.resolveCheckpointStorageLocation(
+			checkpointMetaData.getCheckpointId(),
+			checkpointOptions.getTargetLocation());
+
+		SnapshotAffectedStateOperation snapshotAffectedStateOperation = new SnapshotAffectedStateOperation(
+			this,
+			checkpointMetaData,
+			checkpointOptions,
+			storage,
+			checkpointMetrics);
+
+		snapshotAffectedStateOperation.executeAffectedStateSnapshot();
 	}
 
 	/**
@@ -1585,6 +1608,130 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 	}
 
 	// ------------------------------------------------------------------------
+
+	private static final class SnapshotAffectedStateOperation {
+
+		private final StreamTask<?, ?> owner;
+
+		private final CheckpointMetaData checkpointMetaData;
+		private final CheckpointOptions checkpointOptions;
+		private final CheckpointMetrics checkpointMetrics;
+		private final CheckpointStreamFactory storageLocation;
+
+		private final StreamOperator<?>[] allOperators;
+
+		private long startSyncPartNano;
+		private long startAsyncPartNano;
+
+		// ------------------------
+
+		private final Map<OperatorID, OperatorSnapshotFutures> operatorSnapshotsInProgress;
+
+		public SnapshotAffectedStateOperation(
+			StreamTask<?, ?> owner,
+			CheckpointMetaData checkpointMetaData,
+			CheckpointOptions checkpointOptions,
+			CheckpointStreamFactory checkpointStorageLocation,
+			CheckpointMetrics checkpointMetrics) {
+
+			this.owner = Preconditions.checkNotNull(owner);
+			this.checkpointMetaData = Preconditions.checkNotNull(checkpointMetaData);
+			this.checkpointOptions = Preconditions.checkNotNull(checkpointOptions);
+			this.checkpointMetrics = Preconditions.checkNotNull(checkpointMetrics);
+			this.storageLocation = Preconditions.checkNotNull(checkpointStorageLocation);
+			this.allOperators = owner.operatorChain.getAllOperators();
+			this.operatorSnapshotsInProgress = new HashMap<>(allOperators.length);
+		}
+
+		public void executeAffectedStateSnapshot() throws Exception {
+			startSyncPartNano = System.nanoTime();
+
+			try {
+				// TODO: only the affected operators do snapshot, by far, we temporarily use the same logic as before
+				for (StreamOperator<?> op : allOperators) {
+					snapshotAffectedState(op);
+				}
+
+				if (LOG.isDebugEnabled()) {
+					LOG.debug("Finished synchronous checkpoints for checkpoint {} on task {}",
+						checkpointMetaData.getCheckpointId(), owner.getName());
+				}
+
+				startAsyncPartNano = System.nanoTime();
+
+				checkpointMetrics.setSyncDurationMillis((startAsyncPartNano - startSyncPartNano) / 1_000_000);
+
+				// we are transferring ownership over snapshotInProgressList for cleanup to the thread, active on submit
+				AsyncCheckpointRunnable asyncCheckpointRunnable = new AsyncCheckpointRunnable(
+					owner,
+					operatorSnapshotsInProgress,
+					checkpointMetaData,
+					checkpointMetrics,
+					startAsyncPartNano);
+
+				owner.cancelables.registerCloseable(asyncCheckpointRunnable);
+				owner.asyncOperationsThreadPool.execute(asyncCheckpointRunnable);
+
+				if (LOG.isDebugEnabled()) {
+					LOG.debug("{} - finished synchronous part of checkpoint {}. " +
+							"Alignment duration: {} ms, snapshot duration {} ms",
+						owner.getName(), checkpointMetaData.getCheckpointId(),
+						checkpointMetrics.getAlignmentDurationNanos() / 1_000_000,
+						checkpointMetrics.getSyncDurationMillis());
+				}
+			} catch (Exception ex) {
+				// Cleanup to release resources
+				for (OperatorSnapshotFutures operatorSnapshotResult : operatorSnapshotsInProgress.values()) {
+					if (null != operatorSnapshotResult) {
+						try {
+							operatorSnapshotResult.cancel();
+						} catch (Exception e) {
+							LOG.warn("Could not properly cancel an operator snapshot result.", e);
+						}
+					}
+				}
+
+				if (LOG.isDebugEnabled()) {
+					LOG.debug("{} - did NOT finish synchronous part of checkpoint {}. " +
+							"Alignment duration: {} ms, snapshot duration {} ms",
+						owner.getName(), checkpointMetaData.getCheckpointId(),
+						checkpointMetrics.getAlignmentDurationNanos() / 1_000_000,
+						checkpointMetrics.getSyncDurationMillis());
+				}
+
+				if (checkpointOptions.getCheckpointType().isSynchronous()) {
+					// in the case of a synchronous checkpoint, we always rethrow the exception,
+					// so that the task fails.
+					// this is because the intention is always to stop the job after this checkpointing
+					// operation, and without the failure, the task would go back to normal execution.
+					throw ex;
+				} else {
+					owner.getEnvironment().declineCheckpoint(checkpointMetaData.getCheckpointId(), ex);
+				}
+			}
+		}
+
+		@SuppressWarnings("deprecation")
+		private void snapshotAffectedState(StreamOperator<?> op) throws Exception {
+			if (null != op) {
+
+				// only snapshot on the affected keygroup set, we can simply hard code it to snapshot on the first keygroup to test the effectiveness
+				OperatorSnapshotFutures snapshotInProgress = op.snapshotAffectedState(
+					checkpointMetaData.getCheckpointId(),
+					checkpointMetaData.getTimestamp(),
+					checkpointOptions,
+					storageLocation,
+					null);
+				operatorSnapshotsInProgress.put(op.getOperatorID(), snapshotInProgress);
+			}
+		}
+
+		private enum AsyncCheckpointState {
+			RUNNING,
+			DISCARDED,
+			COMPLETED
+		}
+	}
 
 	private static final class CheckpointingOperation {
 

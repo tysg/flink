@@ -39,10 +39,8 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import javax.annotation.Nullable;
+import java.util.*;
 
 /**
  * Tests that snapshot utils can properly snapshot an operator.
@@ -99,6 +97,11 @@ public class SnapshotUtilsTest {
 		public OperatorSnapshotFutures snapshotState(long checkpointId, long timestamp, CheckpointOptions checkpointOptions, CheckpointStreamFactory storageLocation) throws Exception {
 			ACTUAL_ORDER_TRACKING.add("snapshotState");
 			return new OperatorSnapshotFutures();
+		}
+
+		@Override
+		public OperatorSnapshotFutures snapshotAffectedState(long checkpointId, long timestamp, CheckpointOptions checkpointOptions, CheckpointStreamFactory storageLocation, @Nullable Collection<Integer> affectedKeygroups) throws Exception {
+			return null;
 		}
 
 		@Override

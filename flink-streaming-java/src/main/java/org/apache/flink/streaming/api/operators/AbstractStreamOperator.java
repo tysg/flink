@@ -76,6 +76,7 @@ import org.slf4j.LoggerFactory;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.Serializable;
+import java.util.Collection;
 import java.util.Locale;
 
 /**
@@ -432,6 +433,62 @@ public abstract class AbstractStreamOperator<OUT>
 			if (null != keyedStateBackend) {
 				snapshotInProgress.setKeyedStateManagedFuture(
 					keyedStateBackend.snapshot(checkpointId, timestamp, factory, checkpointOptions));
+			}
+		} catch (Exception snapshotException) {
+			try {
+				snapshotInProgress.cancel();
+			} catch (Exception e) {
+				snapshotException.addSuppressed(e);
+			}
+
+			String snapshotFailMessage = "Could not complete snapshot " + checkpointId + " for operator " +
+				getOperatorName() + ".";
+
+			if (!getContainingTask().isCanceled()) {
+				LOG.info(snapshotFailMessage, snapshotException);
+			}
+			try {
+				snapshotContext.closeExceptionally();
+			} catch (IOException e) {
+				snapshotException.addSuppressed(e);
+			}
+			throw new CheckpointException(snapshotFailMessage, CheckpointFailureReason.CHECKPOINT_DECLINED, snapshotException);
+		}
+
+		return snapshotInProgress;
+	}
+
+	@Override
+	public final OperatorSnapshotFutures snapshotAffectedState(long checkpointId, long timestamp, CheckpointOptions checkpointOptions,
+															   CheckpointStreamFactory factory, Collection<Integer> affectedKeygroups) throws Exception {
+
+		KeyGroupRange keyGroupRange = null != keyedStateBackend ?
+			keyedStateBackend.getKeyGroupRange() : KeyGroupRange.EMPTY_KEY_GROUP_RANGE;
+
+		OperatorSnapshotFutures snapshotInProgress = new OperatorSnapshotFutures();
+
+		StateSnapshotContextSynchronousImpl snapshotContext = new StateSnapshotContextSynchronousImpl(
+			checkpointId,
+			timestamp,
+			factory,
+			keyGroupRange,
+			getContainingTask().getCancelables());
+
+		try {
+			snapshotState(snapshotContext);
+
+			snapshotInProgress.setKeyedStateRawFuture(snapshotContext.getKeyedStateStreamFuture());
+			snapshotInProgress.setOperatorStateRawFuture(snapshotContext.getOperatorStateStreamFuture());
+
+			if (null != operatorStateBackend) {
+				operatorStateBackend.snapshot(checkpointId, timestamp, factory, checkpointOptions);
+			}
+
+			if (null != keyedStateBackend) {
+				if (keyedStateBackend instanceof HeapKeyedStateBackend) {
+					snapshotInProgress.setKeyedStateManagedFuture(
+						((HeapKeyedStateBackend) keyedStateBackend).snapshotAffectedKeyGroups(checkpointId, timestamp, factory, checkpointOptions, affectedKeygroups));
+				}
 			}
 		} catch (Exception snapshotException) {
 			try {

@@ -44,8 +44,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 import java.io.IOException;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.RunnableFuture;
@@ -287,6 +289,22 @@ public class HeapKeyedStateBackend<K> extends AbstractKeyedStateBackend<K> {
 
 		final RunnableFuture<SnapshotResult<KeyedStateHandle>> snapshotRunner =
 			snapshotStrategy.snapshot(checkpointId, timestamp, streamFactory, checkpointOptions);
+
+		snapshotStrategy.logSyncCompleted(streamFactory, startTime);
+		return snapshotRunner;
+	}
+
+	public RunnableFuture<SnapshotResult<KeyedStateHandle>> snapshotAffectedKeyGroups(
+		final long checkpointId,
+		final long timestamp,
+		@Nonnull final CheckpointStreamFactory streamFactory,
+		@Nonnull CheckpointOptions checkpointOptions,
+		@Nullable Collection<Integer> affectedKeygroups) throws IOException {
+
+		long startTime = System.currentTimeMillis();
+
+		final RunnableFuture<SnapshotResult<KeyedStateHandle>> snapshotRunner =
+			snapshotStrategy.snapshotAffectedKeygroups(checkpointId, timestamp, streamFactory, checkpointOptions, affectedKeygroups);
 
 		snapshotStrategy.logSyncCompleted(streamFactory, startTime);
 		return snapshotRunner;

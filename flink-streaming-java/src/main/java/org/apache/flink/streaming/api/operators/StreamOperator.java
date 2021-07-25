@@ -28,7 +28,9 @@ import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
 import org.apache.flink.util.Disposable;
 
+import javax.annotation.Nullable;
 import java.io.Serializable;
+import java.util.Collection;
 
 /**
  * Basic interface for stream operators. Implementers would implement one of
@@ -125,6 +127,22 @@ public interface StreamOperator<OUT> extends CheckpointListener, KeyContext, Dis
 		long timestamp,
 		CheckpointOptions checkpointOptions,
 		CheckpointStreamFactory storageLocation) throws Exception;
+
+	/**
+	 * snapshot 
+	 * @param checkpointId
+	 * @param timestamp
+	 * @param checkpointOptions
+	 * @param storageLocation
+	 * @return
+	 * @throws Exception
+	 */
+	OperatorSnapshotFutures snapshotAffectedState(
+		long checkpointId,
+		long timestamp,
+		CheckpointOptions checkpointOptions,
+		CheckpointStreamFactory storageLocation,
+		@Nullable Collection<Integer> affectedKeygroups) throws Exception;
 
 	/**
 	 * Provides a context to initialize all state in the operator.

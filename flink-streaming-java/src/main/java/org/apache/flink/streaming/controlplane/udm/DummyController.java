@@ -527,7 +527,7 @@ public class DummyController extends AbstractController {
 			try {
 				showOperatorInfo();
 				// todo, if the time of sleep is too short, may cause receiving not belong key
-				Thread.sleep(50000);
+				Thread.sleep(10000);
 
 //				for (int i=0; i<100; i++) {
 
