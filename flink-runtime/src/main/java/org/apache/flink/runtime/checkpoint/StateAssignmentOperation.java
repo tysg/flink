@@ -344,7 +344,7 @@ public class StateAssignmentOperation {
 				OperatorInstanceID instanceID = OperatorInstanceID.of(subTaskIndex, newOperatorIDs.get(operatorIndex));
 
 				List<KeyedStateHandle> subManagedKeyedStates = new ArrayList<>();
-				List<KeyedStateHandle> subRawKeyedStates = new ArrayList<>();;
+				List<KeyedStateHandle> subRawKeyedStates = new ArrayList<>();
 
 				for (int i = 0; i < partitionAssignment.get(subTaskIndex).size(); i++) {
 					// the keyGroup we get from partitionAssignment is the hashed one (most origin without remapping)
@@ -402,6 +402,19 @@ public class StateAssignmentOperation {
 
 								for (int alignedOldKeyGroup = start; alignedOldKeyGroup <= end; alignedOldKeyGroup++) {
 									long offset = keyGroupsStateHandle.getOffsetForKeyGroup(alignedOldKeyGroup);
+									int olderAlignedOldKeyGroup = alignedOldKeyGroup+1;
+									// those who does not snapshot should be skipped
+									if (olderAlignedOldKeyGroup <= end) {
+										long olderOffset = keyGroupsStateHandle.getOffsetForKeyGroup(olderAlignedOldKeyGroup);
+										if (olderOffset == offset) {
+											continue;
+										}
+									} else {
+										long stateSize = keyGroupsStateHandle.getStateSize();
+										if (offset == stateSize) {
+											continue;
+										}
+									}
 
 									fsDataInputStream.seek(offset);
 									int hashedKeyGroup = inView.readInt();

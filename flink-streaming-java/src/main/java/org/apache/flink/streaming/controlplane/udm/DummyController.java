@@ -309,6 +309,42 @@ public class DummyController extends AbstractController {
 		}
 	}
 
+	private void keyLevelMigrationTest(int operatorId) throws InterruptedException {
+		int newParallelism = 2;
+		// get the execution plan, will throw an exception if the execution plan is in used
+		TriskWithLock executionPlan = getReconfigurationExecutor().getExecutionPlanCopy();
+
+//		Map<Integer, List<Integer>> curKeyDistribution = executionPlan.getKeyDistribution(operatorId);
+		int oldParallelism = executionPlan.getParallelism(operatorId);
+//		assert oldParallelism == curKeyDistribution.size() : "old parallelism does not match the key set";
+
+		Map<Integer, List<Integer>> newKeyDistribution = preparePartitionAssignment(newParallelism);
+
+		// only migrate one key from task 0 to 1.
+		int maxParallelism = 128;
+		for (int i = 0; i < maxParallelism; i++) {
+			if (i <= 62) {
+				newKeyDistribution.get(0).add(i);
+			} else {
+				newKeyDistribution.get(1).add(i);
+			}
+		}
+
+
+//		executionPlan
+//			.redistribute(operatorId, newKeyDistribution)
+//			.redeploy(operatorId, null, newParallelism>oldParallelism);
+//
+//		getReconfigurationExecutor().execute(this, executionPlan);
+//
+//		onChangeStarted();
+		if (newParallelism != oldParallelism) {
+			scaling(operatorId, newKeyDistribution, null);
+		} else {
+			loadBalancing(operatorId, newKeyDistribution);
+		}
+	}
+
 	private void measureFunctionUpdate(int testOpID) throws InterruptedException {
 		TriskWithLock executionPlan = getReconfigurationExecutor().getExecutionPlanCopy();
 		try {
@@ -538,7 +574,7 @@ public class DummyController extends AbstractController {
 //					i++;
 //				}
 //				measureFunctionUpdate(statefulOpID);
-				rescaleV2(statefulOpID, 10);
+				keyLevelMigrationTest(statefulOpID);
 //				sleep(100);
 //				rescaleV2(statefulOpID, 5);
 //				sleep(100);

@@ -480,6 +480,7 @@ public abstract class AbstractStreamOperator<OUT>
 			snapshotInProgress.setKeyedStateRawFuture(snapshotContext.getKeyedStateStreamFuture());
 			snapshotInProgress.setOperatorStateRawFuture(snapshotContext.getOperatorStateStreamFuture());
 
+			// do not need to snapshot affected state for operator state, because it is non-relavant to keygroups e.g. broadcast stream state.
 			if (null != operatorStateBackend) {
 				operatorStateBackend.snapshot(checkpointId, timestamp, factory, checkpointOptions);
 			}

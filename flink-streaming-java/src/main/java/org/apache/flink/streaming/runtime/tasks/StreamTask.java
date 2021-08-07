@@ -990,6 +990,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 				if (!checkpointOptions.getCheckpointType().isRescalepoint()) {
 					checkpointState(checkpointMetaData, checkpointOptions, checkpointMetrics);
 				} else {
+					// TODO: only the affected task i.e. the task to migrate should take snapshot, other tasks should keep unaffected.
 					// TODO: only snapshot on affected state tables and ack to coordinator accordingly
 					snapshotAffectedState(checkpointMetaData, checkpointOptions, checkpointMetrics);
 					// Step (4): Check whether the checkpoint is rescalepoint type, and do rescaling if it is.
@@ -1424,6 +1425,8 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 		public void run() {
 			FileSystemSafetyNet.initializeSafetyNetForThread();
 			try {
+
+				System.out.println("++++++ task build ack to report: " + this);
 
 				TaskStateSnapshot jobManagerTaskOperatorSubtaskStates =
 					new TaskStateSnapshot(operatorSnapshotsInProgress.size());
