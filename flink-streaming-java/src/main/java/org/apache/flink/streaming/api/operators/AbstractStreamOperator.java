@@ -32,30 +32,14 @@ import org.apache.flink.core.fs.CloseableRegistry;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 import org.apache.flink.metrics.Counter;
 import org.apache.flink.metrics.MetricGroup;
-import org.apache.flink.runtime.checkpoint.CheckpointException;
-import org.apache.flink.runtime.checkpoint.CheckpointFailureReason;
-import org.apache.flink.runtime.checkpoint.CheckpointOptions;
+import org.apache.flink.runtime.checkpoint.*;
 import org.apache.flink.runtime.execution.Environment;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.metrics.groups.OperatorMetricGroup;
 import org.apache.flink.runtime.metrics.groups.TaskManagerJobMetricGroup;
 import org.apache.flink.runtime.metrics.groups.UnregisteredMetricGroups;
-import org.apache.flink.runtime.state.AbstractKeyedStateBackend;
-import org.apache.flink.runtime.state.CheckpointStreamFactory;
-import org.apache.flink.runtime.state.DefaultKeyedStateStore;
-import org.apache.flink.runtime.state.KeyGroupRange;
-import org.apache.flink.runtime.state.KeyGroupStatePartitionStreamProvider;
-import org.apache.flink.runtime.state.KeyGroupsList;
-import org.apache.flink.runtime.state.KeyedStateBackend;
-import org.apache.flink.runtime.state.KeyedStateCheckpointOutputStream;
-import org.apache.flink.runtime.state.OperatorStateBackend;
-import org.apache.flink.runtime.state.StateInitializationContext;
-import org.apache.flink.runtime.state.StateInitializationContextImpl;
-import org.apache.flink.runtime.state.StatePartitionStreamProvider;
-import org.apache.flink.runtime.state.StateSnapshotContext;
-import org.apache.flink.runtime.state.StateSnapshotContextSynchronousImpl;
-import org.apache.flink.runtime.state.VoidNamespace;
-import org.apache.flink.runtime.state.VoidNamespaceSerializer;
+import org.apache.flink.runtime.rescale.state.HeapUpdateOperation;
+import org.apache.flink.runtime.state.*;
 import org.apache.flink.runtime.state.heap.HeapKeyedStateBackend;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.watermark.Watermark;
@@ -77,6 +61,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.Collection;
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -295,10 +280,36 @@ public abstract class AbstractStreamOperator<OUT>
 	}
 
 	@Override
-	public void updateStateTable(KeyGroupRange keyGroupRange, int maxNumberOfParallelSubtasks) {
-		if (keyedStateBackend instanceof HeapKeyedStateBackend) {
-			((HeapKeyedStateBackend) keyedStateBackend).updateStateTable(keyGroupRange, maxNumberOfParallelSubtasks);
+	public void updateStateTable(KeyGroupRange keyGroupRange, int maxNumberOfParallelSubtasks) throws Exception {
+		// TODO: follow the similar pattern as the restoration to initialize state backend
+		// step 1: get the task state manager which contains the state handles to restore
+		final TypeSerializer<?> keySerializer = config.getStateKeySerializer(getUserCodeClassloader());
+
+		final StreamTask<?, ?> containingTask =
+			Preconditions.checkNotNull(getContainingTask());
+		final TaskStateManager taskStateManager = Preconditions.checkNotNull(containingTask.getEnvironment().getTaskStateManager());
+		final CloseableRegistry streamTaskCloseableRegistry =
+			Preconditions.checkNotNull(containingTask.getCancelables());
+		final PrioritizedOperatorSubtaskState prioritizedOperatorSubtaskStates =
+			taskStateManager.prioritizedOperatorState(getOperatorID());
+		List<StateObjectCollection<KeyedStateHandle>> stateHandlesList = prioritizedOperatorSubtaskStates.getPrioritizedManagedKeyedState();
+		int idx = 0;
+		while (idx < stateHandlesList.size()) {
+			Collection<KeyedStateHandle> stateHandles = stateHandlesList.get(idx);
+			++idx;
+			// recover keygroup from the state handle
+			if (keyedStateBackend instanceof HeapKeyedStateBackend) {
+				final HeapUpdateOperation<?> heapUpdateOperation = new HeapUpdateOperation(stateHandles,
+					(HeapKeyedStateBackend<?>) keyedStateBackend,
+					keySerializer,
+					keyGroupRange,
+					maxNumberOfParallelSubtasks,
+					streamTaskCloseableRegistry);
+				heapUpdateOperation.updateHeapState();
+			}
 		}
+		// step 2: create a state table update operation to update the state table by read the input view
+
 	}
 
 	@Override

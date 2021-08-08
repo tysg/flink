@@ -36,6 +36,9 @@ public class JobManagerTaskRestore implements Serializable {
 	/** The state for this task to restore. */
 	private final TaskStateSnapshot taskStateSnapshot;
 
+	/** The flag to indicate the type of this restore, false -> for recovery, true -> for state migration */
+	private boolean isMigratingState = false;
+
 	public JobManagerTaskRestore(@Nonnegative long restoreCheckpointId, @Nonnull TaskStateSnapshot taskStateSnapshot) {
 		this.restoreCheckpointId = restoreCheckpointId;
 		this.taskStateSnapshot = taskStateSnapshot;
@@ -50,11 +53,17 @@ public class JobManagerTaskRestore implements Serializable {
 		return taskStateSnapshot;
 	}
 
+	// TODO: check whether the message is serialized
+	public void setMigratingState(boolean migratingState) {
+		isMigratingState = migratingState;
+	}
+
 	@Override
 	public String toString() {
 		return "JobManagerTaskRestore{" +
 			"restoreCheckpointId=" + restoreCheckpointId +
 			", taskStateSnapshot=" + taskStateSnapshot +
+			", isMigratingState=" + isMigratingState +
 			'}';
 	}
 }

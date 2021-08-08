@@ -183,6 +183,7 @@ public class StateAssignmentOperation {
 		Map<OperatorInstanceID, List<KeyedStateHandle>> newRawKeyedState =
 			new HashMap<>(expectedNumberOfSubTasks);
 
+		boolean isMigratingstate = false;
 		if (jobRescalePartitionAssignment == null) {
 			reDistributeKeyedStates(
 				operatorStates,
@@ -192,6 +193,7 @@ public class StateAssignmentOperation {
 				newManagedKeyedState,
 				newRawKeyedState);
 		} else {
+			isMigratingstate = true; // TODO: hardcode this part just for state migration test
 			reDistributeKeyedStatesWithPartitionAssignment(
 				operatorStates,
 				newParallelism,
@@ -216,16 +218,17 @@ public class StateAssignmentOperation {
 			newRawOperatorStates,
 			newManagedKeyedState,
 			newRawKeyedState,
-			newParallelism);
+			newParallelism,
+			isMigratingstate);
 	}
 
 	private void assignTaskStateToExecutionJobVertices(
-			ExecutionJobVertex executionJobVertex,
-			Map<OperatorInstanceID, List<OperatorStateHandle>> subManagedOperatorState,
-			Map<OperatorInstanceID, List<OperatorStateHandle>> subRawOperatorState,
-			Map<OperatorInstanceID, List<KeyedStateHandle>> subManagedKeyedState,
-			Map<OperatorInstanceID, List<KeyedStateHandle>> subRawKeyedState,
-			int newParallelism) {
+		ExecutionJobVertex executionJobVertex,
+		Map<OperatorInstanceID, List<OperatorStateHandle>> subManagedOperatorState,
+		Map<OperatorInstanceID, List<OperatorStateHandle>> subRawOperatorState,
+		Map<OperatorInstanceID, List<KeyedStateHandle>> subManagedKeyedState,
+		Map<OperatorInstanceID, List<KeyedStateHandle>> subRawKeyedState,
+		int newParallelism, boolean isMigratingstate) {
 
 		List<OperatorID> operatorIDs = executionJobVertex.getOperatorIDs();
 
@@ -255,6 +258,7 @@ public class StateAssignmentOperation {
 
 			if (!statelessTask) {
 				JobManagerTaskRestore taskRestore = new JobManagerTaskRestore(restoreCheckpointId, taskState);
+				taskRestore.setMigratingState(isMigratingstate);
 				currentExecutionAttempt.setInitialState(taskRestore);
 			}
 		}

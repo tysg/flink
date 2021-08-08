@@ -1294,6 +1294,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 				this.idInModel = idInModel;
 
 				updateState(keyGroupRange, getEnvironment().getTaskInfo().getMaxNumberOfParallelSubtasks());
+//				initializeStateAndOpen();
 
 				this.assignedKeyGroupRange.update(keyGroupRange);
 

@@ -357,6 +357,8 @@ public class HeapKeyedStateBackend<K> extends AbstractKeyedStateBackend<K> {
 			registeredKVState.updateStateTable(keyContext);
 		}
 
+		// TODO: add a heapStateUpdateOperation, where we need to read the state from the data view and update them to the state table
+
 		// substitute the keyContext
 		this.keyContext = keyContext;
 	}
@@ -409,4 +411,12 @@ public class HeapKeyedStateBackend<K> extends AbstractKeyedStateBackend<K> {
 			TypeSerializer<K> keySerializer) throws Exception;
 	}
 
+
+	public ClassLoader getUserCodeClassLoader() {
+		return userCodeClassLoader;
+	}
+
+	public Map<String, StateTable<K, ?, ?>> getRegisteredKVStates() {
+		return registeredKVStates;
+	}
 }

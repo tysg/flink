@@ -300,7 +300,7 @@ public abstract class StateTable<K, N, S>
 				int newAlignedKeygroupIdx = newKeyContext.getKeyGroupRange().mapFromHashedToAligned(hashedKeygroupIdx);
 				int newOffset = newAlignedKeygroupIdx - newKeyContext.getKeyGroupRange().getStartKeyGroup();
 				state[newOffset] = this.keyGroupedStateMaps[curOffset];
-				LOG.info("++++++ offset has do not need to be restored: " + curOffset + " -> " + newOffset);
+				LOG.info("++++++ offset already exists do not need to be restored: " + curOffset + " -> " + newOffset);
 			}
 		}
 		this.keyGroupedStateMaps = state;
