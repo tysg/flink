@@ -274,6 +274,28 @@ under the License.
 
 					<!-- WordCount -->
 					<execution>
+						<id>MiniBatchWordCount</id>
+						<phase>package</phase>
+						<goals>
+							<goal>jar</goal>
+						</goals>
+						<configuration>
+							<classifier>MiniBatchWordCount</classifier>
+
+							<archive>
+								<manifestEntries>
+									<program-class>org.apache.flink.streaming.examples.minibatching.WordCount</program-class>
+								</manifestEntries>
+							</archive>
+
+							<includes>
+								<include>org/apache/flink/streaming/examples/minibatching/WordCount.class</include>
+								<include>org/apache/flink/streaming/examples/minibatching/WordCount$*.class</include>
+							</includes>
+						</configuration>
+					</execution>
+					<!-- WordCount -->
+					<execution>
 						<id>WordCount</id>
 						<phase>package</phase>
 						<goals>
@@ -481,6 +503,7 @@ under the License.
 								<copy file="${project.basedir}/target/flink-examples-streaming_${scala.binary.version}-${project.version}-WindowJoin.jar" tofile="${project.basedir}/target/WindowJoin.jar" />
 								<copy file="${project.basedir}/target/flink-examples-streaming_${scala.binary.version}-${project.version}-WordCount.jar" tofile="${project.basedir}/target/WordCount.jar" />
 								<copy file="${project.basedir}/target/flink-examples-streaming_${scala.binary.version}-${project.version}-SocketWindowWordCount.jar" tofile="${project.basedir}/target/SocketWindowWordCount.jar" />
+								<copy file="${project.basedir}/target/flink-examples-streaming_${scala.binary.version}-${project.version}-MiniBatchWordCount.jar" tofile="${project.basedir}/target/MiniBatchWordCount.jar" />
 							</target>
 						</configuration>
 					</execution>
