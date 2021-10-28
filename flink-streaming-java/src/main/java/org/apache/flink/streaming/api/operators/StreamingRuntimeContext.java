@@ -214,5 +214,10 @@ public class StreamingRuntimeContext extends AbstractRuntimeUDFContext {
 	public long getBufferTimeout() {
 		return streamConfig.getBufferTimeout();
 	}
+	
+	// ----- for minibatching prototype
+	public void setCurrentKey(Object k) {
+		operator.setCurrentKey(k);
+	}
 
 }
