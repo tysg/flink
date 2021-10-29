@@ -23,7 +23,7 @@ public class WordCount {
         DataStream<String> text = env.socketTextStream("localhost", 8765);
 
         DataStream<Tuple2<String, Integer>> counts = text.keyBy(value -> value)
-                .process(new WordCountExample())
+                .process(new MiniBatchWordCount())
                 .returns(Types.TUPLE(Types.STRING, Types.INT));
 
         counts.print();
