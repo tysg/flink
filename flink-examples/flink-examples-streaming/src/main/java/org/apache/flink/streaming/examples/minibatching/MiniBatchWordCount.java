@@ -5,6 +5,8 @@ import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.metrics.Counter;
+import org.apache.flink.metrics.Meter;
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
 import org.apache.flink.streaming.api.operators.StreamingRuntimeContext;
 import org.apache.flink.util.Collector;
@@ -16,12 +18,16 @@ import java.util.Map;
 
 public class MiniBatchWordCount extends KeyedProcessFunction<String, String, Tuple2<String, Integer>> {
 
+	// config
 	private final long MINI_BATCH_ALLOW_LATENCY = 5 * 1000;
 
 
 	private transient ValueState<Integer> countState;
 	private HashMap<String, ArrayList<String>> buffer;
 	private boolean isScheduledBundle;
+
+	// metrics
+	private transient Counter counter;
 
 	@Override
 	public void open(Configuration parameters) {
@@ -30,6 +36,8 @@ public class MiniBatchWordCount extends KeyedProcessFunction<String, String, Tup
 		countState = getRuntimeContext().getState(countDescriptor);
 		buffer = new HashMap<>();
 		isScheduledBundle = false;
+
+		this.counter = getRuntimeContext().getMetricGroup().counter("myCounter");
 	}
 
 	@Override
@@ -70,6 +78,7 @@ public class MiniBatchWordCount extends KeyedProcessFunction<String, String, Tup
 				} else {
 					count = 1;
 				}
+				this.counter.inc();
 			}
 			countState.update(count);
 			collector.collect(new Tuple2<>(key, count));

@@ -7,7 +7,7 @@ import org.apache.flink.contrib.streaming.state.RocksDBStateBackend;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
-public class WordCount {
+public class WordCountJob {
     public static void main(String[] args) throws Exception {
 
         // Checking input parameters
