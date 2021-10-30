@@ -19,12 +19,11 @@
 
 ## Metrics Reporter
 
-
-metrics.reporter.grph.factory.class: org.apache.flink.metrics.graphite.GraphiteReporterFactory
+metrics.reporter.grph.class: org.apache.flink.metrics.graphite.GraphiteReporter
 metrics.reporter.grph.host: localhost
 metrics.reporter.grph.port: 2003
 metrics.reporter.grph.protocol: TCP
-metrics.reporter.grph.interval: 10 SECONDS
+  #metrics.reporter.grph.interval: 10 SECONDS
 
 
 
